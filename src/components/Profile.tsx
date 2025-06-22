@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Camera, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Camera, User, History } from 'lucide-react';
+import MatchingHistory from './MatchingHistory';
 
 const Profile = () => {
   const { user, logout } = useAuth();
@@ -38,7 +40,6 @@ const Profile = () => {
   };
 
   const handleSave = () => {
-    // Save profile data to localStorage or backend
     localStorage.setItem('knot_profile', JSON.stringify(profileData));
     setIsOpen(false);
   };
@@ -56,93 +57,110 @@ const Profile = () => {
           <span className="text-gray-700">{profileData.name || 'Profile'}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Your Profile</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
-          {/* Profile Photo */}
-          <div className="text-center">
-            <Avatar className="w-20 h-20 mx-auto mb-4">
-              <AvatarImage src={profileData.profilePhoto} />
-              <AvatarFallback>
-                <User className="w-8 h-8" />
-              </AvatarFallback>
-            </Avatar>
-            <Label htmlFor="profile-photo" className="cursor-pointer">
-              <div className="flex items-center justify-center space-x-2 text-knot-blue">
-                <Camera className="w-4 h-4" />
-                <span>Change Photo</span>
-              </div>
-            </Label>
-            <Input
-              id="profile-photo"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handlePhotoUpload(e, 'profile')}
-            />
-          </div>
+        <Tabs defaultValue="profile" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="profile" className="flex items-center space-x-2">
+              <User className="w-4 h-4" />
+              <span>Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center space-x-2">
+              <History className="w-4 h-4" />
+              <span>History</span>
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Name */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">
-              Name
-            </Label>
-            <Input
-              value={profileData.name}
-              onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-              className="rounded-xl border-gray-200"
-              placeholder="Enter your name"
-            />
-          </div>
+          <TabsContent value="profile" className="space-y-6 mt-4">
+            {/* Profile Photo */}
+            <div className="text-center">
+              <Avatar className="w-20 h-20 mx-auto mb-4">
+                <AvatarImage src={profileData.profilePhoto} />
+                <AvatarFallback>
+                  <User className="w-8 h-8" />
+                </AvatarFallback>
+              </Avatar>
+              <Label htmlFor="profile-photo" className="cursor-pointer">
+                <div className="flex items-center justify-center space-x-2 text-knot-blue">
+                  <Camera className="w-4 h-4" />
+                  <span>Change Photo</span>
+                </div>
+              </Label>
+              <Input
+                id="profile-photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handlePhotoUpload(e, 'profile')}
+              />
+            </div>
 
-          {/* Identity Verification */}
-          <div>
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">
-              Identity Verification
-            </Label>
-            <p className="text-xs text-gray-500 mb-3">
-              Upload photos to verify your identity for safer rides
-            </p>
-            <Label htmlFor="verification-photo" className="cursor-pointer">
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-knot-blue transition-colors">
-                <Camera className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-                <span className="text-sm text-gray-600">Add Verification Photo</span>
-              </div>
-            </Label>
-            <Input
-              id="verification-photo"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handlePhotoUpload(e, 'verification')}
-            />
-            
-            {profileData.verificationPhotos.length > 0 && (
-              <div className="mt-3 flex space-x-2">
-                {profileData.verificationPhotos.map((photo, index) => (
-                  <img
-                    key={index}
-                    src={photo}
-                    alt={`Verification ${index + 1}`}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            {/* Name */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                Name
+              </Label>
+              <Input
+                value={profileData.name}
+                onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                className="rounded-xl border-gray-200"
+                placeholder="Enter your name"
+              />
+            </div>
 
-          <div className="flex space-x-3">
-            <Button onClick={handleSave} className="flex-1 bg-knot-blue hover:bg-blue-600 rounded-xl">
-              Save Profile
-            </Button>
-            <Button onClick={logout} variant="outline" className="flex-1 rounded-xl">
-              Sign Out
-            </Button>
-          </div>
-        </div>
+            {/* Identity Verification */}
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                Identity Verification
+              </Label>
+              <p className="text-xs text-gray-500 mb-3">
+                Upload photos to verify your identity for safer rides
+              </p>
+              <Label htmlFor="verification-photo" className="cursor-pointer">
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-knot-blue transition-colors">
+                  <Camera className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                  <span className="text-sm text-gray-600">Add Verification Photo</span>
+                </div>
+              </Label>
+              <Input
+                id="verification-photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handlePhotoUpload(e, 'verification')}
+              />
+              
+              {profileData.verificationPhotos.length > 0 && (
+                <div className="mt-3 flex space-x-2">
+                  {profileData.verificationPhotos.map((photo, index) => (
+                    <img
+                      key={index}
+                      src={photo}
+                      alt={`Verification ${index + 1}`}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3">
+              <Button onClick={handleSave} className="flex-1 bg-knot-blue hover:bg-blue-600 rounded-xl">
+                Save Profile
+              </Button>
+              <Button onClick={logout} variant="outline" className="flex-1 rounded-xl">
+                Sign Out
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4">
+            <MatchingHistory />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

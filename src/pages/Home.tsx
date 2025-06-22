@@ -27,6 +27,7 @@ const airports = [
 const Home = () => {
   const { user, updateLocation } = useAuth();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('current');
   const [airportFormData, setAirportFormData] = useState({
     airport: '',
     arrivalDate: '',
@@ -40,7 +41,6 @@ const Home = () => {
       return;
     }
 
-    // Request location on component mount
     if (navigator.geolocation && !user.location) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -63,6 +63,21 @@ const Home = () => {
       return;
     }
     
+    // Save to matching history
+    const historyEntry = {
+      id: Date.now().toString(),
+      type: 'airport',
+      airport: airportFormData.airport,
+      arrivalDate: airportFormData.arrivalDate,
+      arrivalTime: airportFormData.arrivalTime,
+      destination: airportFormData.destination,
+      timestamp: new Date().toISOString()
+    };
+    
+    const existingHistory = JSON.parse(localStorage.getItem('knot_matching_history') || '[]');
+    existingHistory.unshift(historyEntry);
+    localStorage.setItem('knot_matching_history', JSON.stringify(existingHistory.slice(0, 20)));
+    
     localStorage.setItem('knot_search', JSON.stringify({ ...airportFormData, type: 'airport' }));
     navigate('/matching');
   };
@@ -76,8 +91,16 @@ const Home = () => {
     return null;
   }
 
+  const getBackgroundClasses = () => {
+    if (activeTab === 'current') {
+      return 'bg-gradient-to-br from-blue-100 via-blue-50 to-indigo-100';
+    } else {
+      return 'bg-gradient-to-br from-purple-100 via-blue-50 to-cyan-100';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
+    <div className={`min-h-screen transition-all duration-700 ease-in-out ${getBackgroundClasses()}`}>
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-blue-100 px-4 py-4">
         <div className="flex justify-between items-center">
@@ -96,23 +119,35 @@ const Home = () => {
             <p className="text-gray-600">Match with travelers heading your way</p>
           </div>
 
-          <Tabs defaultValue="current" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/70 backdrop-blur-sm">
-              <TabsTrigger value="current" className="data-[state=active]:bg-knot-blue data-[state=active]:text-white">
+              <TabsTrigger 
+                value="current" 
+                className="data-[state=active]:bg-knot-blue data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105"
+              >
                 Current Location
               </TabsTrigger>
-              <TabsTrigger value="airport" className="data-[state=active]:bg-knot-blue data-[state=active]:text-white">
+              <TabsTrigger 
+                value="airport" 
+                className="data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105"
+              >
                 Airport Arrival
               </TabsTrigger>
             </TabsList>
 
             {/* Current Location Tab */}
-            <TabsContent value="current" className="space-y-6">
+            <TabsContent 
+              value="current" 
+              className="space-y-6 animate-fade-in"
+            >
               <CurrentLocation onFindRides={handleFindCurrentLocationRides} />
             </TabsContent>
 
             {/* Airport Arrival Tab */}
-            <TabsContent value="airport" className="space-y-6">
+            <TabsContent 
+              value="airport" 
+              className="space-y-6 animate-fade-in"
+            >
               <Card className="p-6 shadow-lg border-0 bg-white/90 backdrop-blur-sm">
                 <div className="space-y-6">
                   {/* Airport Selection */}
@@ -177,7 +212,7 @@ const Home = () => {
                   {/* Find Matches Button */}
                   <Button
                     onClick={handleFindAirportMatches}
-                    className="w-full bg-knot-blue hover:bg-blue-600 text-white font-semibold py-3 h-12 rounded-xl transition-all duration-200 shadow-md"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 h-12 rounded-xl transition-all duration-200 shadow-md"
                   >
                     Find Airport Matches
                   </Button>

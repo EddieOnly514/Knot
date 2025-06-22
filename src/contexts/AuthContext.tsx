@@ -5,6 +5,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  profilePhoto?: string;
   location?: {
     lat: number;
     lng: number;
@@ -42,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `user_${Date.now()}`,
       name: credentials?.name || 'John Doe',
       email: credentials?.email || 'john@example.com',
+      profilePhoto: credentials?.profilePhoto || '',
     };
     
     setUser(mockUser);

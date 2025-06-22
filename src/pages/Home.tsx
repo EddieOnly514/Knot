@@ -32,8 +32,18 @@ const Home = () => {
     airport: '',
     arrivalDate: '',
     arrivalTime: '',
-    destination: ''
+    destination: '',
+    radius: '1000'
   });
+
+  const radiusOptions = [
+    { value: '500', label: '500 feet' },
+    { value: '1000', label: '1000 feet' },
+    { value: '2500', label: '0.5 miles' },
+    { value: '5000', label: '1 mile' },
+    { value: '10000', label: '2 miles' },
+    { value: 'building', label: 'Same building' }
+  ];
 
   useEffect(() => {
     if (!user) {
@@ -114,7 +124,7 @@ const Home = () => {
       {/* Main Content */}
       <div className="px-4 py-6">
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 animate-fade-in">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Find Ride Buddies</h2>
             <p className="text-gray-600">Match with travelers heading your way</p>
           </div>
@@ -123,13 +133,13 @@ const Home = () => {
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/70 backdrop-blur-sm">
               <TabsTrigger 
                 value="current" 
-                className="data-[state=active]:bg-knot-blue data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105"
+                className="data-[state=active]:bg-knot-blue data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105 hover:scale-102"
               >
                 Current Location
               </TabsTrigger>
               <TabsTrigger 
                 value="airport" 
-                className="data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105"
+                className="data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105 hover:scale-102"
               >
                 Airport Arrival
               </TabsTrigger>
@@ -156,7 +166,7 @@ const Home = () => {
                       Airport of Arrival
                     </Label>
                     <Select onValueChange={(value) => handleAirportInputChange('airport', value)}>
-                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-white/70">
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 hover:scale-105">
                         <SelectValue placeholder="Select airport" />
                       </SelectTrigger>
                       <SelectContent>
@@ -178,7 +188,7 @@ const Home = () => {
                       type="date"
                       value={airportFormData.arrivalDate}
                       onChange={(e) => handleAirportInputChange('arrivalDate', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70"
+                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
                     />
                   </div>
 
@@ -191,7 +201,7 @@ const Home = () => {
                       type="time"
                       value={airportFormData.arrivalTime}
                       onChange={(e) => handleAirportInputChange('arrivalTime', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70"
+                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
                     />
                   </div>
 
@@ -202,17 +212,36 @@ const Home = () => {
                     </Label>
                     <Input
                       type="text"
-                      placeholder="e.g., UCI, Downtown LA, Santa Monica"
+                      placeholder="Enter destination address"
                       value={airportFormData.destination}
                       onChange={(e) => handleAirportInputChange('destination', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70"
+                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
                     />
+                  </div>
+
+                  {/* Radius Selection */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      Match Range
+                    </Label>
+                    <Select value={airportFormData.radius} onValueChange={(value) => handleAirportInputChange('radius', value)}>
+                      <SelectTrigger className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 hover:scale-105">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {radiusOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Find Matches Button */}
                   <Button
                     onClick={handleFindAirportMatches}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 h-12 rounded-xl transition-all duration-200 shadow-md"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 h-12 rounded-xl transition-all duration-200 shadow-md transform hover:scale-105 active:scale-95"
                   >
                     Find Airport Matches
                   </Button>
@@ -221,7 +250,7 @@ const Home = () => {
             </TabsContent>
           </Tabs>
 
-          <div className="text-center mt-6">
+          <div className="text-center mt-6 animate-fade-in">
             <p className="text-sm text-gray-500">
               We don't book rides. We just match travelers.
             </p>

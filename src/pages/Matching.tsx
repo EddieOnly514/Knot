@@ -82,7 +82,7 @@ const Matching = () => {
           <Button
             variant="ghost"
             onClick={() => navigate('/home')}
-            className="mr-3 p-2"
+            className="mr-3 p-2 transition-all duration-200 hover:scale-110 active:scale-95"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -102,8 +102,8 @@ const Matching = () => {
         <div className="max-w-md mx-auto">
           {matches.length > 0 ? (
             <div className="space-y-4">
-              {matches.map((match) => (
-                <Card key={match.id} className="p-4 shadow-sm border border-gray-100 animate-fade-in">
+              {matches.map((match, index) => (
+                <Card key={match.id} className="p-4 shadow-sm border border-gray-100 animate-fade-in transform hover:scale-102 transition-all duration-200" style={{animationDelay: `${index * 100}ms`}}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 bg-knot-blue rounded-full flex items-center justify-center">
@@ -117,7 +117,7 @@ const Matching = () => {
                     </div>
                     <Button
                       onClick={() => handleMatchAndChat(match.id, match.name)}
-                      className="bg-knot-green hover:bg-green-600 text-white font-semibold px-4 py-2 rounded-xl transition-all duration-200"
+                      className="bg-knot-green hover:bg-green-600 text-white font-semibold px-4 py-2 rounded-xl transition-all duration-200 transform hover:scale-110 active:scale-95"
                     >
                       Match & Chat
                     </Button>
@@ -126,8 +126,8 @@ const Matching = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <div className="text-center py-12 animate-fade-in">
+              <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse-slow">
                 <span className="text-gray-400 text-2xl">🔍</span>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No matches yet</h3>
@@ -137,7 +137,7 @@ const Matching = () => {
               <Button
                 onClick={() => navigate('/home')}
                 variant="outline"
-                className="border-knot-blue text-knot-blue hover:bg-knot-blue hover:text-white"
+                className="border-knot-blue text-knot-blue hover:bg-knot-blue hover:text-white transition-all duration-200 transform hover:scale-105"
               >
                 Update Search
               </Button>
@@ -145,7 +145,7 @@ const Matching = () => {
           )}
 
           {matches.length > 0 && (
-            <div className="mt-8 p-4 bg-gray-50 rounded-xl">
+            <div className="mt-8 p-4 bg-gray-50 rounded-xl animate-fade-in">
               <p className="text-sm text-gray-600 text-center">
                 Coordinate rides on Uber/Lyft after matching. No payments through this app.
               </p>

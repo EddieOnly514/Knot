@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -6,10 +5,19 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Navigation, Users } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MapPin, Navigation, Users, Search } from 'lucide-react';
 
 interface CurrentLocationProps {
   onFindRides: (data: { currentLocation: string; destination: string; radius: string; coordinates?: { lat: number; lng: number } }) => void;
+}
+
+interface LocationSuggestion {
+  display_name: string;
+  address: string;
+  lat: number;
+  lng: number;
 }
 
 const CurrentLocation: React.FC<CurrentLocationProps> = ({ onFindRides }) => {
@@ -22,6 +30,9 @@ const CurrentLocation: React.FC<CurrentLocationProps> = ({ onFindRides }) => {
   });
   const [locationLoading, setLocationLoading] = useState(false);
   const [nearbyPlaces, setNearbyPlaces] = useState<string[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [destinationQuery, setDestinationQuery] = useState('');
+  const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
 
   const radiusOptions = [
     { value: '500', label: '500 feet' },
@@ -40,25 +51,37 @@ const CurrentLocation: React.FC<CurrentLocationProps> = ({ onFindRides }) => {
           const { latitude, longitude } = position.coords;
           updateLocation(latitude, longitude);
           
-          // Reverse geocode to get address
           try {
+            // Use Nominatim (OpenStreetMap) for reverse geocoding - it's free
             const response = await fetch(
-              `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=YOUR_API_KEY`
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
             );
             const data = await response.json();
             
-            if (data.results && data.results.length > 0) {
-              const result = data.results[0];
-              const address = result.formatted;
+            if (data && data.display_name) {
+              // Extract meaningful location info
+              const address = data.display_name;
+              const components = data.address || {};
+              
+              // Try to get a more specific location name
+              let locationName = address;
+              if (components.building) {
+                locationName = components.building;
+              } else if (components.house_number && components.road) {
+                locationName = `${components.house_number} ${components.road}`;
+              } else if (components.amenity) {
+                locationName = components.amenity;
+              } else if (components.shop) {
+                locationName = components.shop;
+              }
               
               setLocationData(prev => ({
                 ...prev,
-                currentLocation: address,
+                currentLocation: locationName,
                 coordinates: { lat: latitude, lng: longitude }
               }));
               
-              // Generate nearby places based on location components
-              const components = result.components;
+              // Generate nearby places based on actual location data
               const generatedNearby = generateNearbyPlaces(components, latitude, longitude);
               setNearbyPlaces(generatedNearby);
             } else {
@@ -95,11 +118,53 @@ const CurrentLocation: React.FC<CurrentLocationProps> = ({ onFindRides }) => {
     }
   };
 
+  const searchDestinations = async (query: string) => {
+    if (query.length < 2) {
+      setDestinationSuggestions([]);
+      return;
+    }
+
+    try {
+      // Use Nominatim for place search
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&countrycodes=us`
+      );
+      const data = await response.json();
+      
+      const suggestions: LocationSuggestion[] = data.map((item: any) => ({
+        display_name: item.display_name.split(',')[0], // Get the main name
+        address: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon)
+      }));
+
+      setDestinationSuggestions(suggestions);
+    } catch (error) {
+      console.error('Search error:', error);
+      setDestinationSuggestions([]);
+    }
+  };
+
+  const handleDestinationInputChange = (value: string) => {
+    setDestinationQuery(value);
+    setLocationData(prev => ({ ...prev, destination: value }));
+    searchDestinations(value);
+  };
+
+  const selectDestination = (suggestion: LocationSuggestion) => {
+    setLocationData(prev => ({ ...prev, destination: suggestion.address }));
+    setDestinationQuery(suggestion.address);
+    setShowDestinationSuggestions(false);
+    setDestinationSuggestions([]);
+  };
+
   const generateNearbyPlaces = (components: any, lat: number, lng: number) => {
     const places = [];
     
     // Add specific building/venue if available
     if (components.building) places.push(components.building);
+    if (components.amenity) places.push(components.amenity);
+    if (components.shop) places.push(components.shop);
     if (components.house_number && components.road) {
       places.push(`${components.house_number} ${components.road}`);
     }
@@ -248,19 +313,54 @@ const CurrentLocation: React.FC<CurrentLocationProps> = ({ onFindRides }) => {
           )}
         </div>
 
-        {/* Destination */}
+        {/* Destination with Smart Search */}
         <div>
           <Label className="text-sm font-medium text-gray-700 mb-2 block">
             Where are you going?
           </Label>
           
-          <Input
-            type="text"
-            placeholder="Enter destination address"
-            value={locationData.destination}
-            onChange={(e) => setLocationData(prev => ({ ...prev, destination: e.target.value }))}
-            className="h-12 rounded-xl border-gray-200 transition-all duration-200 focus:scale-105"
-          />
+          <Popover open={showDestinationSuggestions} onOpenChange={setShowDestinationSuggestions}>
+            <PopoverTrigger asChild>
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Enter destination (e.g., UCI, Santa Monica Pier)"
+                  value={destinationQuery}
+                  onChange={(e) => {
+                    handleDestinationInputChange(e.target.value);
+                    setShowDestinationSuggestions(true);
+                  }}
+                  onFocus={() => destinationSuggestions.length > 0 && setShowDestinationSuggestions(true)}
+                  className="h-12 rounded-xl border-gray-200 transition-all duration-200 focus:scale-105 pr-10"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandList>
+                  {destinationSuggestions.length === 0 ? (
+                    <CommandEmpty>No destinations found.</CommandEmpty>
+                  ) : (
+                    <CommandGroup>
+                      {destinationSuggestions.map((suggestion, index) => (
+                        <CommandItem
+                          key={index}
+                          onSelect={() => selectDestination(suggestion)}
+                          className="cursor-pointer hover:bg-gray-50 transition-all duration-200"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{suggestion.display_name}</span>
+                            <span className="text-sm text-gray-500">{suggestion.address}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Radius Selection */}

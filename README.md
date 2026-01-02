@@ -6,22 +6,22 @@ Knot is a ride-sharing matchmaking app that helps travelers going to the same de
 
 ## Core Features
 
-### 🚗 Trip Matching
+### Trip Matching
 - **Real-time matching** — Find other travelers heading to the same destination
 - **Smart filters** — Match by verified users, pickup distance, and time window
 - **NOW or LATER** — Match immediately or schedule trips in advance
 
-### 🛡️ Trust & Safety
+### Trust & Safety
 - **Phone verification** — All users verify their phone numbers
 - **User ratings** — Rate your ride-share experience
 - **Safety Center** — Emergency call, live location sharing, blocked users
 
-### 💬 In-App Chat
+### In-App Chat
 - **Quick coordination** — Confirm meetup details with your match
 - **Ride suggestions** — Knot Bot recommends optimal ride types
 - **Real-time updates** — Stay connected during the matching process
 
-### 📍 Smart Meetup
+### Smart Meetup
 - **Nearby pickup points** — System suggests safe, convenient meetup spots
 - **Time windows** — Flexible 15/30/60 min coordination windows
 - **Live status** — Track when your match is ready

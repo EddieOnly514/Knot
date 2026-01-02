@@ -5,10 +5,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
-import Login from "./pages/Login";
+import Auth from "./pages/Auth";
+import ProfileSetup from "./pages/ProfileSetup";
 import Home from "./pages/Home";
-import Matching from "./pages/Matching";
+import TripCreation from "./pages/TripCreation";
+import MatchFeed from "./pages/MatchFeed";
 import Chat from "./pages/Chat";
+import PostTrip from "./pages/PostTrip";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,13 +22,16 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-background">
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Login />} />
+              <Route path="/" element={<Auth />} />
+              <Route path="/profile-setup" element={<ProfileSetup />} />
               <Route path="/home" element={<Home />} />
-              <Route path="/matching" element={<Matching />} />
-              <Route path="/chat/:chatId" element={<Chat />} />
+              <Route path="/trip-creation" element={<TripCreation />} />
+              <Route path="/matches" element={<MatchFeed />} />
+              <Route path="/chat/:matchId" element={<Chat />} />
+              <Route path="/post-trip/:matchId" element={<PostTrip />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

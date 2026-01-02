@@ -1,195 +1,273 @@
-
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ArrowLeft, Send } from 'lucide-react';
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ActionButton } from "@/components/ui/action-button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Lock, Send, MapPin, Phone, MessageCircle, Car } from "lucide-react";
 
 interface Message {
   id: string;
   text: string;
-  sender: string;
-  timestamp: number;
+  isMine: boolean;
+  timestamp: Date;
+  isTemplate?: boolean;
 }
 
-const quickMessages = [
-  "Want to split an UberXL?",
-  "I'm at Terminal B — meet at rideshare zone?",
-  "When does your flight land?"
+type UnlockState = "pending" | "waiting" | "unlocked";
+
+const quickTemplates = [
+  "Where are you exactly?",
+  "I'm at the pickup zone",
+  "UberX or XL?",
+  "Leaving now!",
 ];
 
 const Chat = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const { chatId } = useParams();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [otherParticipant, setOtherParticipant] = useState<string>('');
+  const { matchId } = useParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      text: "Hey! I saw we're both heading to Downtown SF around the same time. Want to share a ride?",
+      isMine: false,
+      timestamp: new Date(Date.now() - 120000),
+    },
+    {
+      id: "2",
+      text: "Hi! Yes, I'm leaving in about 15 minutes. Would love to split! What terminal are you at?",
+      isMine: true,
+      timestamp: new Date(Date.now() - 60000),
+    },
+    {
+      id: "3",
+      text: "I'm at Terminal 4, near the baggage claim. Easy to spot - wearing a blue jacket 👋",
+      isMine: false,
+      timestamp: new Date(),
+    },
+  ]);
+  const [newMessage, setNewMessage] = useState("");
+  const [unlockState, setUnlockState] = useState<UnlockState>("pending");
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const matchName = "Sarah";
+  const matchPhoto = "/profiles/sarah.png";
+  const matchVerified = true;
+
   useEffect(() => {
-    if (!user || !chatId) {
-      navigate('/');
-      return;
-    }
-
-    // Load chat data from localStorage
-    const chatData = localStorage.getItem(`knot_chat_${chatId}`);
-    if (chatData) {
-      const parsed = JSON.parse(chatData);
-      setMessages(parsed.messages || []);
-      const otherPerson = parsed.participants.find((p: string) => p !== user.name);
-      setOtherParticipant(otherPerson || 'Unknown');
-    }
-
-    // Add initial system message
-    if (messages.length === 0) {
-      const systemMessage: Message = {
-        id: `msg_${Date.now()}`,
-        text: "You're now connected! Coordinate your rideshare below.",
-        sender: 'system',
-        timestamp: Date.now()
-      };
-      setMessages([systemMessage]);
-    }
-  }, [user, chatId, navigate]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = (text: string) => {
-    if (!text.trim() || !user) return;
+  const handleSendMessage = (text?: string) => {
+    const messageText = text || newMessage;
+    if (!messageText.trim()) return;
 
-    const message: Message = {
-      id: `msg_${Date.now()}`,
-      text: text.trim(),
-      sender: user.name,
-      timestamp: Date.now()
-    };
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        text: messageText,
+        isMine: true,
+        timestamp: new Date(),
+      },
+    ]);
+    setNewMessage("");
+    setShowTemplates(false);
+  };
 
-    const updatedMessages = [...messages, message];
-    setMessages(updatedMessages);
+  const handleConfirmMeetup = () => {
+    setUnlockState("waiting");
+    // Simulate other user confirming after 3 seconds
+    setTimeout(() => {
+      setUnlockState("unlocked");
+    }, 3000);
+  };
 
-    // Save to localStorage
-    if (chatId) {
-      const chatData = localStorage.getItem(`knot_chat_${chatId}`);
-      if (chatData) {
-        const parsed = JSON.parse(chatData);
-        parsed.messages = updatedMessages;
-        localStorage.setItem(`knot_chat_${chatId}`, JSON.stringify(parsed));
-      }
+  const handleOpenRideApp = (app: "uber" | "lyft") => {
+    // Deep link to ride apps
+    const destination = encodeURIComponent("123 Main St, San Francisco, CA");
+    if (app === "uber") {
+      window.open(`uber://?action=setPickup&pickup=my_location&dropoff=${destination}`, "_blank");
+    } else {
+      window.open(`lyft://ridetype?id=lyft&destination=${destination}`, "_blank");
     }
-
-    setNewMessage('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage(newMessage);
+  const handleCompleteTrip = () => {
+    navigate(`/post-trip/${matchId}`);
   };
 
-  if (!user) {
-    return null;
-  }
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-white">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-100 px-4 py-4">
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/matching')}
-            className="mr-3 p-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">{otherParticipant}</h1>
-            <p className="text-sm text-gray-600">Travel buddy</p>
+      <div className="bg-surface shadow-card px-4 py-3 flex items-center gap-3 pt-safe">
+        <button
+          onClick={() => navigate(-1)}
+          className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center"
+        >
+          <ArrowLeft className="w-5 h-5 text-text-main" />
+        </button>
+        <img
+          src={matchPhoto}
+          alt={matchName}
+          className="w-10 h-10 rounded-full object-cover"
+        />
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="font-headline font-semibold text-text-main">
+              {matchName}
+            </h1>
+            {matchVerified && <StatusBadge variant="verified" />}
           </div>
+          <p className="text-xs text-text-muted">Active now</p>
         </div>
+        <button className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+          <Phone className="w-5 h-5 text-text-muted" />
+        </button>
       </div>
 
-      {/* Safety Notice */}
-      <div className="bg-blue-50 border-b border-blue-100 px-4 py-3">
-        <p className="text-sm text-blue-800 text-center font-medium">
-          🔒 Only pay via Uber/Lyft. Never pay cash.
-        </p>
-      </div>
+      {/* Safety Banner */}
+      {unlockState !== "unlocked" && (
+        <div className="bg-slate-900 text-white px-4 py-3 flex items-center gap-2">
+          <Lock className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm">
+            Confirm meetup to reveal exact destinations
+          </span>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((message) => (
-          <div key={message.id}>
-            {message.sender === 'system' ? (
-              <div className="text-center">
-                <div className="inline-block bg-gray-100 px-4 py-2 rounded-full text-sm text-gray-600">
-                  {message.text}
-                </div>
-              </div>
-            ) : (
-              <div className={`flex ${message.sender === user.name ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                    message.sender === user.name
-                      ? 'bg-knot-blue text-white'
-                      : 'bg-gray-100 text-gray-900'
+          <div
+            key={message.id}
+            className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}
+          >
+            <div className="max-w-[80%]">
+              <div
+                className={`px-4 py-3 ${message.isMine
+                    ? "gradient-primary text-white rounded-2xl rounded-br-md"
+                    : "bg-white shadow-card text-text-main rounded-2xl rounded-bl-md"
                   }`}
-                >
-                  <p className="text-sm">{message.text}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.sender === user.name ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {new Date(message.timestamp).toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </p>
-                </div>
+              >
+                <p className="text-sm leading-relaxed">{message.text}</p>
               </div>
-            )}
+              <p className={`text-xs text-text-muted mt-1 ${message.isMine ? "text-right" : ""}`}>
+                {formatTime(message.timestamp)}
+              </p>
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Messages */}
-      <div className="px-4 py-2 border-t border-gray-100">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {quickMessages.map((msg, index) => (
-            <Button
-              key={index}
-              variant="outline"
-              size="sm"
-              onClick={() => sendMessage(msg)}
-              className="whitespace-nowrap text-xs border-gray-200 text-gray-600 hover:bg-gray-50 flex-shrink-0"
+      {/* Quick Templates */}
+      {showTemplates && (
+        <div className="px-4 py-2 bg-surface border-t border-slate-100 flex gap-2 overflow-x-auto">
+          {quickTemplates.map((template) => (
+            <button
+              key={template}
+              onClick={() => handleSendMessage(template)}
+              className="px-3 py-2 rounded-full bg-slate-100 text-text-muted text-sm whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
             >
-              {msg}
-            </Button>
+              {template}
+            </button>
           ))}
+        </div>
+      )}
+
+      {/* Message Input */}
+      <div className="px-4 py-3 bg-surface border-t border-slate-100">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowTemplates(!showTemplates)}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${showTemplates ? "bg-primary/10 text-primary" : "bg-slate-100 text-text-muted"
+              }`}
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+          <Input
+            placeholder="Type a message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+            className="flex-1 h-12"
+          />
+          <button
+            onClick={() => handleSendMessage()}
+            disabled={!newMessage.trim()}
+            className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-float disabled:opacity-50"
+          >
+            <Send className="w-5 h-5 text-white" />
+          </button>
         </div>
       </div>
 
-      {/* Message Input */}
-      <div className="border-t border-gray-100 p-4">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 rounded-xl border-gray-200"
-          />
-          <Button
-            type="submit"
-            disabled={!newMessage.trim()}
-            className="bg-knot-blue hover:bg-blue-600 text-white p-3 rounded-xl"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+      {/* Lock/Unlock Panel */}
+      <div className="bg-surface border-t border-slate-100 px-4 py-4 pb-safe">
+        {unlockState === "pending" && (
+          <ActionButton onClick={handleConfirmMeetup}>
+            <MapPin className="w-5 h-5 mr-2" />
+            Confirm Meetup Point
+          </ActionButton>
+        )}
+
+        {unlockState === "waiting" && (
+          <div className="text-center py-4">
+            <div className="inline-flex items-center gap-2 text-text-muted animate-pulse-slow">
+              <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <span>Waiting for {matchName} to confirm...</span>
+            </div>
+          </div>
+        )}
+
+        {unlockState === "unlocked" && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Map Preview */}
+            <div className="h-24 bg-slate-200 rounded-2xl relative overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-text-main">Meetup Point</p>
+                  <p className="text-xs text-text-muted">Terminal 4 Pickup Zone</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ride App Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleOpenRideApp("uber")}
+                className="flex-1 h-14 bg-black text-white rounded-xl font-headline font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                <Car className="w-5 h-5" />
+                Open Uber
+              </button>
+              <button
+                onClick={() => handleOpenRideApp("lyft")}
+                className="flex-1 h-14 bg-[#FF00BF] text-white rounded-xl font-headline font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                <Car className="w-5 h-5" />
+                Open Lyft
+              </button>
+            </div>
+
+            {/* Complete Trip */}
+            <button
+              onClick={handleCompleteTrip}
+              className="w-full py-3 text-primary text-sm font-medium"
+            >
+              Trip completed? Rate your ride partner →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

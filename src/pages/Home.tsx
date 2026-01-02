@@ -1,260 +1,151 @@
-
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Profile from '@/components/Profile';
-import CurrentLocation from '@/components/CurrentLocation';
-
-const airports = [
-  'LAX - Los Angeles International',
-  'JFK - John F. Kennedy International',
-  'ORD - Chicago OHare International',
-  'ATL - Hartsfield-Jackson Atlanta International',
-  'DFW - Dallas/Fort Worth International',
-  'DEN - Denver International',
-  'SFO - San Francisco International',
-  'SEA - Seattle-Tacoma International',
-  'LAS - McCarran International',
-  'PHX - Phoenix Sky Harbor International'
-];
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ElevatedCard } from "@/components/ui/elevated-card";
+import { CarFront, PlaneLanding, User, Ticket, MapPin, Clock, ChevronRight } from "lucide-react";
 
 const Home = () => {
-  const { user, updateLocation } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('current');
-  const [airportFormData, setAirportFormData] = useState({
-    airport: '',
-    arrivalDate: '',
-    arrivalTime: '',
-    destination: '',
-    radius: '1000'
-  });
+  const userName = "Alex"; // TODO: Get from auth context
+  const [hasActiveTrip] = useState(true); // Mock active trip
 
-  const radiusOptions = [
-    { value: '500', label: '500 feet' },
-    { value: '1000', label: '1000 feet' },
-    { value: '2500', label: '0.5 miles' },
-    { value: '5000', label: '1 mile' },
-    { value: '10000', label: '2 miles' },
-    { value: 'building', label: 'Same building' }
-  ];
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/');
-      return;
-    }
-
-    if (navigator.geolocation && !user.location) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          updateLocation(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.log('Location access denied:', error);
-        }
-      );
-    }
-  }, [user, navigate, updateLocation]);
-
-  const handleAirportInputChange = (field: string, value: string) => {
-    setAirportFormData(prev => ({ ...prev, [field]: value }));
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
   };
 
-  const handleFindAirportMatches = () => {
-    if (!airportFormData.airport || !airportFormData.arrivalDate || !airportFormData.arrivalTime || !airportFormData.destination) {
-      alert('Please fill in all fields');
-      return;
-    }
-    
-    // Save to matching history
-    const historyEntry = {
-      id: Date.now().toString(),
-      type: 'airport',
-      airport: airportFormData.airport,
-      arrivalDate: airportFormData.arrivalDate,
-      arrivalTime: airportFormData.arrivalTime,
-      destination: airportFormData.destination,
-      timestamp: new Date().toISOString()
-    };
-    
-    const existingHistory = JSON.parse(localStorage.getItem('knot_matching_history') || '[]');
-    existingHistory.unshift(historyEntry);
-    localStorage.setItem('knot_matching_history', JSON.stringify(existingHistory.slice(0, 20)));
-    
-    localStorage.setItem('knot_search', JSON.stringify({ ...airportFormData, type: 'airport' }));
-    navigate('/matching');
+  const handleNowClick = () => {
+    navigate("/trip-creation?mode=now");
   };
 
-  const handleFindCurrentLocationRides = (data: any) => {
-    localStorage.setItem('knot_search', JSON.stringify({ ...data, type: 'current' }));
-    navigate('/matching');
-  };
-
-  if (!user) {
-    return null;
-  }
-
-  const getBackgroundClasses = () => {
-    if (activeTab === 'current') {
-      return 'bg-gradient-to-br from-blue-100 via-blue-50 to-indigo-100';
-    } else {
-      return 'bg-gradient-to-br from-purple-100 via-blue-50 to-cyan-100';
-    }
+  const handleArrivalClick = () => {
+    navigate("/trip-creation?mode=arrival");
   };
 
   return (
-    <div className={`min-h-screen transition-all duration-700 ease-in-out ${getBackgroundClasses()}`}>
+    <div className="min-h-screen bg-background flex flex-col px-4 pt-safe pb-safe">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-blue-100 px-4 py-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold text-knot-blue">Knot</h1>
-          </div>
-          <Profile />
+      <div className="flex items-center justify-between py-6">
+        <div>
+          <p className="text-text-muted text-sm">{getGreeting()},</p>
+          <h1 className="font-headline text-2xl font-bold text-text-main">
+            {userName}
+          </h1>
         </div>
+        <button
+          onClick={() => navigate("/profile")}
+          className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <User className="w-6 h-6 text-primary" />
+        </button>
       </div>
 
-      {/* Main Content */}
-      <div className="px-4 py-6">
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-8 animate-fade-in">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Find Ride Buddies</h2>
-            <p className="text-gray-600">Match with travelers heading your way</p>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/70 backdrop-blur-sm">
-              <TabsTrigger 
-                value="current" 
-                className="data-[state=active]:bg-knot-blue data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105 hover:scale-102"
-              >
-                Current Location
-              </TabsTrigger>
-              <TabsTrigger 
-                value="airport" 
-                className="data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all duration-300 transform data-[state=active]:scale-105 hover:scale-102"
-              >
-                Airport Arrival
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Current Location Tab */}
-            <TabsContent 
-              value="current" 
-              className="space-y-6 animate-fade-in"
-            >
-              <CurrentLocation onFindRides={handleFindCurrentLocationRides} />
-            </TabsContent>
-
-            {/* Airport Arrival Tab */}
-            <TabsContent 
-              value="airport" 
-              className="space-y-6 animate-fade-in"
-            >
-              <Card className="p-6 shadow-lg border-0 bg-white/90 backdrop-blur-sm">
-                <div className="space-y-6">
-                  {/* Airport Selection */}
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Airport of Arrival
-                    </Label>
-                    <Select onValueChange={(value) => handleAirportInputChange('airport', value)}>
-                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 hover:scale-105">
-                        <SelectValue placeholder="Select airport" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {airports.map((airport) => (
-                          <SelectItem key={airport} value={airport}>
-                            {airport}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Arrival Date */}
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Arrival Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={airportFormData.arrivalDate}
-                      onChange={(e) => handleAirportInputChange('arrivalDate', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
-                    />
-                  </div>
-
-                  {/* Arrival Time */}
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Arrival Time
-                    </Label>
-                    <Input
-                      type="time"
-                      value={airportFormData.arrivalTime}
-                      onChange={(e) => handleAirportInputChange('arrivalTime', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
-                    />
-                  </div>
-
-                  {/* Destination */}
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Destination
-                    </Label>
-                    <Input
-                      type="text"
-                      placeholder="Enter destination address"
-                      value={airportFormData.destination}
-                      onChange={(e) => handleAirportInputChange('destination', e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 focus:scale-105"
-                    />
-                  </div>
-
-                  {/* Radius Selection */}
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Match Range
-                    </Label>
-                    <Select value={airportFormData.radius} onValueChange={(value) => handleAirportInputChange('radius', value)}>
-                      <SelectTrigger className="h-12 rounded-xl border-gray-200 bg-white/70 transition-all duration-200 hover:scale-105">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {radiusOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Find Matches Button */}
-                  <Button
-                    onClick={handleFindAirportMatches}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 h-12 rounded-xl transition-all duration-200 shadow-md transform hover:scale-105 active:scale-95"
-                  >
-                    Find Airport Matches
-                  </Button>
+      {/* Active Trip Banner */}
+      {hasActiveTrip && (
+        <ElevatedCard
+          pressable
+          onClick={() => navigate("/matches")}
+          className="p-4 mb-4 border-l-4 border-l-primary"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Ticket className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-text-main text-sm">Active Trip</p>
+                <div className="flex items-center gap-2 text-xs text-text-muted">
+                  <MapPin className="w-3 h-3" />
+                  <span>Downtown SF Area</span>
+                  <span>•</span>
+                  <Clock className="w-3 h-3" />
+                  <span>Leaving in 15 min</span>
                 </div>
-              </Card>
-            </TabsContent>
-          </Tabs>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-text-muted" />
+          </div>
+        </ElevatedCard>
+      )}
 
-          <div className="text-center mt-6 animate-fade-in">
-            <p className="text-sm text-gray-500">
-              We don't book rides. We just match travelers.
+      {/* Section Title */}
+      <h2 className="font-headline text-lg font-semibold text-text-main mb-4">
+        Where are you headed?
+      </h2>
+
+      {/* Mode Selection Cards */}
+      <div className="flex-1 flex flex-col gap-4 pb-24">
+        {/* NOW Card */}
+        <ElevatedCard
+          pressable
+          onClick={handleNowClick}
+          className="flex-1 p-6 flex flex-col justify-between min-h-[180px]"
+        >
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <CarFront className="w-7 h-7 text-primary" />
+          </div>
+          <div className="mt-4">
+            <h3 className="font-headline text-2xl font-bold text-primary">
+              NOW
+            </h3>
+            <p className="text-lg text-text-main font-medium mt-1">
+              Leave soon
+            </p>
+            <p className="text-text-muted text-sm mt-1">
+              Find a match near your current location
             </p>
           </div>
+        </ElevatedCard>
+
+        {/* ARRIVAL Card */}
+        <ElevatedCard
+          pressable
+          onClick={handleArrivalClick}
+          className="flex-1 p-6 flex flex-col justify-between min-h-[180px]"
+        >
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <PlaneLanding className="w-7 h-7 text-primary" />
+          </div>
+          <div className="mt-4">
+            <h3 className="font-headline text-2xl font-bold text-primary">
+              ARRIVAL
+            </h3>
+            <p className="text-lg text-text-main font-medium mt-1">
+              Landing later
+            </p>
+            <p className="text-text-muted text-sm mt-1">
+              Schedule a ride match for your airport arrival
+            </p>
+          </div>
+        </ElevatedCard>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-slate-100 px-6 py-3 pb-safe">
+        <div className="flex justify-around items-center max-w-md mx-auto">
+          <button className="flex flex-col items-center gap-1 text-primary">
+            <div className="w-6 h-6 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+              </svg>
+            </div>
+            <span className="text-xs font-medium">Home</span>
+          </button>
+          <button
+            onClick={() => navigate("/matches")}
+            className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
+          >
+            <Ticket className="w-6 h-6" />
+            <span className="text-xs font-medium">Trips</span>
+          </button>
+          <button
+            onClick={() => navigate("/profile")}
+            className="flex flex-col items-center gap-1 text-text-muted hover:text-primary transition-colors"
+          >
+            <User className="w-6 h-6" />
+            <span className="text-xs font-medium">Profile</span>
+          </button>
         </div>
       </div>
     </div>

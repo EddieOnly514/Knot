@@ -1,73 +1,102 @@
-# Welcome to your Lovable project
+# Knot
 
-## Project info
+**Split rides. Stay safe. Save money.**
 
-**URL**: https://lovable.dev/projects/cf99100c-c870-46b0-8120-1f5692606053
+Knot is a ride-sharing matchmaking app that helps travelers going to the same destination find each other and split their ride costs. Think of it as "Tinder for ridesharing" — swipe right on compatible travelers, confirm the meetup, and save up to 50% on your ride.
 
-## How can I edit this code?
+## Core Features
 
-There are several ways of editing your application.
+### 🚗 Trip Matching
+- **Real-time matching** — Find other travelers heading to the same destination
+- **Smart filters** — Match by verified users, pickup distance, and time window
+- **NOW or LATER** — Match immediately or schedule trips in advance
 
-**Use Lovable**
+### 🛡️ Trust & Safety
+- **Phone verification** — All users verify their phone numbers
+- **User ratings** — Rate your ride-share experience
+- **Safety Center** — Emergency call, live location sharing, blocked users
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/cf99100c-c870-46b0-8120-1f5692606053) and start prompting.
+### 💬 In-App Chat
+- **Quick coordination** — Confirm meetup details with your match
+- **Ride suggestions** — Knot Bot recommends optimal ride types
+- **Real-time updates** — Stay connected during the matching process
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📍 Smart Meetup
+- **Nearby pickup points** — System suggests safe, convenient meetup spots
+- **Time windows** — Flexible 15/30/60 min coordination windows
+- **Live status** — Track when your match is ready
 
-**Use your preferred IDE**
+## Tech Stack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Mobile App (React Native + Expo)
+- React Native with Expo
+- TypeScript
+- React Navigation
+- Supabase (Auth, Database, Realtime)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Web App (React + Vite)
+- React 18 with Vite
+- TypeScript
+- Tailwind CSS + shadcn/ui
+- Supabase JS Client
 
-Follow these steps:
+## Getting Started
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Expo CLI (for mobile)
+- Supabase account
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Mobile App
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+# Navigate to mobile directory
+cd mobile
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Install dependencies
+npm install
+
+# Start Expo dev server
+npx expo start
+```
+
+### Web App
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+knot-ride-buddy/
+├── mobile/                 # React Native Expo app
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── screens/        # App screens
+│   │   ├── navigation/     # React Navigation setup
+│   │   ├── design/         # Design tokens & styles
+│   │   └── services/       # Supabase & API services
+│   └── assets/             # Images & icons
+├── src/                    # Web app (React + Vite)
+│   ├── components/
+│   ├── pages/
+│   └── lib/
+└── supabase/               # Edge functions
+```
 
-**Use GitHub Codespaces**
+## Design Language
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Primary Color**: Electric Blue (#0052FF)
+- **Background**: Soft Gray (#F8F9FA)
+- **Cards**: Faded Blue (#EFF6FF)
+- **Style**: Minimalist Utility
 
-## What technologies are used for this project?
+## License
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/cf99100c-c870-46b0-8120-1f5692606053) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Private - All rights reserved.

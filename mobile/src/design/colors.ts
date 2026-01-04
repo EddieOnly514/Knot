@@ -25,8 +25,10 @@ export const colors = {
   // UI States
   border: '#E2E8F0',         // Slate 200
   danger: '#EF4444',
+  error: '#EF4444',          // Alias for danger
   success: '#22C55E',        // Green 500
   warning: '#F59E0B',
+  accent: '#8B5CF6',         // Purple 500 for accents
 
   // UI - backward compatibility
   ui: {

@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   SafeAreaView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,8 +15,9 @@ import type { RouteProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { AuthStackParamList, RootStackParamList } from '../../types/navigation';
+import { supabase } from '../../lib/supabase';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 type OTPRouteProp = RouteProp<AuthStackParamList, 'OTPVerification'>;
 
 export function OTPVerificationScreen() {
@@ -22,7 +25,8 @@ export function OTPVerificationScreen() {
   const route = useRoute<OTPRouteProp>();
   const phone = route.params?.phone || '';
 
-  const [code, setCode] = useState(['', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '', '', '']); // 6 digits
+  const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const maskedPhone = phone.length > 4
@@ -35,7 +39,7 @@ export function OTPVerificationScreen() {
       newCode[index] = value;
       setCode(newCode);
 
-      if (value && index < 3) {
+      if (value && index < 5) {
         inputRefs.current[index + 1]?.focus();
       }
     }
@@ -47,11 +51,40 @@ export function OTPVerificationScreen() {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const fullCode = code.join('');
-    if (fullCode.length === 4) {
-      // Navigate to ProfileSetup for first-time users
-      (navigation as any).navigate('ProfileSetup');
+    if (fullCode.length !== 6) return;
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone,
+        token: fullCode,
+        type: 'sms',
+      });
+
+      if (error) {
+        Alert.alert('Verification Failed', error.message);
+      } else if (data.session) {
+        // Check if this is a new user (no profile yet)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', data.user?.id)
+          .single();
+
+        if (!profile) {
+          // New user, go to profile setup
+          navigation.navigate('ProfileSetup');
+        } else {
+          // Existing user, go to welcome loading
+          navigation.navigate('WelcomeLoading');
+        }
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Verification failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,8 +92,17 @@ export function OTPVerificationScreen() {
     navigation.goBack();
   };
 
-  const handleResend = () => {
-    // Resend OTP logic
+  const handleResend = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone });
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert('Code Sent', 'A new code has been sent to your phone');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to resend code');
+    }
   };
 
   const isComplete = code.every(digit => digit !== '');
@@ -84,12 +126,12 @@ export function OTPVerificationScreen() {
         {/* Title */}
         <Text style={styles.title}>Enter your code</Text>
         <Text style={styles.subtitle}>
-          We sent a 4-digit code to {maskedPhone}
+          We sent a 6-digit code to {maskedPhone}
         </Text>
 
-        {/* Code Input */}
+        {/* Code Input - 6 digits */}
         <View style={styles.codeContainer}>
-          {[0, 1, 2, 3].map((index) => (
+          {[0, 1, 2, 3, 4, 5].map((index) => (
             <TextInput
               key={index}
               ref={(ref) => { inputRefs.current[index] = ref; }}
@@ -200,16 +242,17 @@ const styles = StyleSheet.create({
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
     marginBottom: spacing.lg,
   },
   codeInput: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.xl,
+    width: 48,
+    height: 56,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.surface,
     textAlign: 'center',
-    ...typography.styles.h1,
+    fontSize: 24,
+    fontWeight: '600',
     color: colors.text.main,
     ...shadows.card,
   },

@@ -8,22 +8,54 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ChevronLeft, ArrowRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { AuthStackParamList } from '../../types/navigation';
+import { KnotLogo } from '../../components/common/KnotLogo';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export function PhoneVerificationScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { devBypassAuth } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
-    if (phoneNumber.length >= 10) {
-      navigation.navigate('OTPVerification', { phone: phoneNumber });
+  const getE164Phone = () => {
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    return `+1${cleaned}`;
+  };
+
+  const handleContinue = async () => {
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    if (cleaned.length < 10) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: getE164Phone(),
+      });
+
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        navigation.navigate('OTPVerification', { phone: getE164Phone() });
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to send code. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -31,7 +63,22 @@ export function PhoneVerificationScreen() {
     navigation.goBack();
   };
 
-  const isValid = phoneNumber.length >= 10;
+  const handleAppleLogin = () => {
+    // TODO: Implement Apple Sign In
+    console.log('Apple login');
+  };
+
+  const handleGoogleLogin = () => {
+    // TODO: Implement Google Sign In
+    console.log('Google login');
+  };
+
+  const handleEmailLogin = () => {
+    // TODO: Implement email login
+    console.log('Email login');
+  };
+
+  const isValid = phoneNumber.replace(/\D/g, '').length >= 10;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -41,15 +88,12 @@ export function PhoneVerificationScreen() {
       >
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backIcon}>←</Text>
+          <ChevronLeft size={24} color={colors.text.main} />
         </TouchableOpacity>
 
         {/* Logo */}
         <View style={styles.logoSection}>
-          <View style={styles.ringsContainer}>
-            <View style={[styles.ring, styles.ring1]} />
-            <View style={[styles.ring, styles.ring2]} />
-          </View>
+          <KnotLogo size="medium" color={colors.primary} />
         </View>
 
         {/* Title */}
@@ -63,27 +107,19 @@ export function PhoneVerificationScreen() {
           <TouchableOpacity style={styles.countryPicker}>
             <Text style={styles.countryFlag}>🇺🇸</Text>
             <Text style={styles.countryCode}>+1</Text>
-            <Text style={styles.countryArrow}>▼</Text>
           </TouchableOpacity>
 
           <TextInput
             style={styles.phoneInput}
-            placeholder="(555) 000-0000"
+            placeholder="555 000 0000"
             placeholderTextColor={colors.text.muted}
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
             autoFocus
+            textAlign="left"
           />
         </View>
-
-        {/* Spacer */}
-        <View style={styles.spacer} />
-
-        {/* Footer */}
-        <Text style={styles.footerText}>
-          By continuing, you agree to receive SMS messages from Knot
-        </Text>
 
         {/* Continue Button */}
         <View style={styles.buttonContainer}>
@@ -99,10 +135,50 @@ export function PhoneVerificationScreen() {
               style={styles.continueButton}
             >
               <Text style={styles.continueText}>Continue</Text>
-              <Text style={styles.continueArrow}>→</Text>
+              <ArrowRight size={20} color="#FFFFFF" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* Spacer */}
+        <View style={styles.spacer} />
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or continue with</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Social Login Options */}
+        <View style={styles.socialContainer}>
+          <TouchableOpacity style={styles.socialButton} onPress={handleAppleLogin}>
+            <Text style={styles.socialText}>Apple</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+            <Text style={styles.socialText}>Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.socialButton} onPress={handleEmailLogin}>
+            <Text style={styles.socialText}>Email</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <Text style={styles.footerText}>
+          By continuing, you agree to our Terms of Service and Privacy Policy
+        </Text>
+
+        {/* DEV BYPASS - Remove for production */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={devBypassAuth}
+          >
+            <Text style={styles.devButtonText}>🔧 DEV: Skip Auth</Text>
+          </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -121,65 +197,39 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.cardBlue,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: spacing.md,
-    ...shadows.card,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: colors.text.main,
   },
   logoSection: {
     alignItems: 'center',
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
   },
-  ringsContainer: {
-    width: 48,
-    height: 48,
-    position: 'relative',
-  },
-  ring: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: colors.primary,
-  },
-  ring1: {
-    top: 0,
-    left: 0,
-  },
-  ring2: {
-    bottom: 0,
-    right: 0,
-  },
   title: {
-    ...typography.styles.h1,
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.text.main,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   subtitle: {
-    ...typography.styles.body,
+    fontSize: 15,
     color: colors.text.muted,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
   inputCard: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius['3xl'],
+    backgroundColor: colors.cardBlue,
+    borderRadius: borderRadius['2xl'],
     padding: spacing.sm,
-    ...shadows.card,
   },
   countryPicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.slate[100],
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.xl,
@@ -190,34 +240,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   countryCode: {
-    ...typography.styles.bodyMedium,
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text.main,
-  },
-  countryArrow: {
-    fontSize: 10,
-    color: colors.text.muted,
   },
   phoneInput: {
     flex: 1,
-    backgroundColor: colors.slate[100],
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.xl,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    ...typography.styles.body,
-    color: colors.text.main,
     fontSize: 18,
-  },
-  spacer: {
-    flex: 1,
-  },
-  footerText: {
-    ...typography.styles.caption,
-    color: colors.text.muted,
-    textAlign: 'center',
-    marginBottom: spacing.md,
+    color: colors.text.main,
   },
   buttonContainer: {
-    paddingBottom: spacing.xl,
+    marginTop: spacing.lg,
   },
   continueButton: {
     flexDirection: 'row',
@@ -226,14 +263,71 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: borderRadius.lg,
     gap: spacing.sm,
-    ...shadows.button,
   },
   continueText: {
-    ...typography.styles.button,
-    color: colors.text.white,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
-  continueArrow: {
-    fontSize: 20,
-    color: colors.text.white,
+  spacer: {
+    flex: 1,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.slate[200],
+  },
+  dividerText: {
+    fontSize: 13,
+    color: colors.text.muted,
+    marginHorizontal: 12,
+  },
+  socialContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: spacing.lg,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardBlue,
+    paddingVertical: 14,
+    borderRadius: borderRadius.lg,
+    gap: 6,
+  },
+  socialIcon: {
+    fontSize: 18,
+  },
+  socialText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.main,
+  },
+  footerText: {
+    fontSize: 12,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  devButton: {
+    backgroundColor: colors.slate[900],
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  devButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

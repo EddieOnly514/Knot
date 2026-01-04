@@ -1,19 +1,38 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Knot",
+    "slug": "knot-ride-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "knot",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.knot.ridebuddy",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDlmpx0yCgTT9iMmDaJ0RhkbKkfJn50x_k"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Knot needs your location to find nearby riders and suggest meetup points.",
+        "NSLocationAlwaysUsageDescription": "Knot uses your location to help coordinate rides with matched travelers.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "knot"
+            ]
+          }
+        ]
+      },
+      "associatedDomains": [
+        "applinks:xtlkvchawhwskcnbhaxe.supabase.co"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +40,46 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.knot.ridebuddy",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_ANDROID_MAPS_API_KEY"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "knot",
+              "host": "auth",
+              "pathPrefix": "/callback"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Knot needs your location to find nearby riders."
+        }
+      ],
+      "expo-web-browser",
+      "expo-secure-store"
+    ]
   }
 }

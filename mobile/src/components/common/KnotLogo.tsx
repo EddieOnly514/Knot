@@ -1,66 +1,76 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../../design';
 
 interface KnotLogoProps {
-    size?: 'small' | 'medium' | 'large';
+    size?: 'small' | 'medium' | 'large' | number;
     color?: string;
 }
 
-const SIZES = {
-    small: { container: 32, ring: 20, border: 2 },
-    medium: { container: 48, ring: 32, border: 3 },
-    large: { container: 64, ring: 40, border: 3 },
-};
-
+/**
+ * Knot Logo - Two diagonal circles that barely touch
+ * 
+ * The logo consists of two equal circles positioned diagonally:
+ * - Top-left circle
+ * - Bottom-right circle  
+ * - Circles just barely touch in the center (minimal overlap)
+ * - Neither circle pokes out from the bounding box
+ * 
+ * SVG is used for consistent rendering across all screens.
+ */
 export function KnotLogo({ size = 'medium', color = colors.primary }: KnotLogoProps) {
-    const dimensions = SIZES[size];
+    // Calculate dimensions based on size
+    const sizeValue = typeof size === 'number'
+        ? size
+        : size === 'small' ? 32 : size === 'medium' ? 48 : 64;
+
+    // Logo geometry:
+    // - viewBox is 100x100 for easy calculations
+    // - Each circle radius is ~28 (so diameter is 56)
+    // - Circles positioned at diagonal corners, just touching
+    const viewBox = 100;
+    const strokeWidth = 6;
+    const circleRadius = 28;
+
+    // Position circles so they just barely touch at center
+    // Top-left circle center: offset from top-left by radius + half stroke
+    // Bottom-right circle center: offset from bottom-right by radius + half stroke
+    const circle1Cx = circleRadius + strokeWidth / 2;
+    const circle1Cy = circleRadius + strokeWidth / 2;
+    const circle2Cx = viewBox - circleRadius - strokeWidth / 2;
+    const circle2Cy = viewBox - circleRadius - strokeWidth / 2;
 
     return (
-        <View style={[styles.container, { width: dimensions.container, height: dimensions.container }]}>
-            <View
-                style={[
-                    styles.ring,
-                    styles.ring1,
-                    {
-                        width: dimensions.ring,
-                        height: dimensions.ring,
-                        borderRadius: dimensions.ring / 2,
-                        borderWidth: dimensions.border,
-                        borderColor: color,
-                    },
-                ]}
+        <Svg
+            width={sizeValue}
+            height={sizeValue}
+            viewBox={`0 0 ${viewBox} ${viewBox}`}
+        >
+            {/* Top-left circle */}
+            <Circle
+                cx={circle1Cx}
+                cy={circle1Cy}
+                r={circleRadius}
+                stroke={color}
+                strokeWidth={strokeWidth}
+                fill="none"
             />
-            <View
-                style={[
-                    styles.ring,
-                    styles.ring2,
-                    {
-                        width: dimensions.ring,
-                        height: dimensions.ring,
-                        borderRadius: dimensions.ring / 2,
-                        borderWidth: dimensions.border,
-                        borderColor: color,
-                    },
-                ]}
+            {/* Bottom-right circle */}
+            <Circle
+                cx={circle2Cx}
+                cy={circle2Cy}
+                r={circleRadius}
+                stroke={color}
+                strokeWidth={strokeWidth}
+                fill="none"
             />
-        </View>
+        </Svg>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        position: 'relative',
-    },
-    ring: {
-        position: 'absolute',
-    },
-    ring1: {
-        top: 0,
-        left: 0,
-    },
-    ring2: {
-        bottom: 0,
-        right: 0,
-    },
-});
+// Export logo dimensions for reference
+export const KNOT_LOGO_SIZES = {
+    small: 32,
+    medium: 48,
+    large: 64,
+};

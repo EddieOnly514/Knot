@@ -7,23 +7,40 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Clock, Calendar, X, Check } from 'lucide-react-native';
+import { Clock, Calendar, X, Check, MapPin, Navigation, History } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { RootStackParamList } from '../../types/navigation';
+import { KnotMap } from '../../components/common/KnotMap';
+import { useAuth } from '../../contexts/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Mock recent searches
+const recentSearches = [
+  { id: '1', destination: 'Downtown SF', date: 'Yesterday' },
+  { id: '2', destination: 'SFO Airport', date: 'Dec 28' },
+  { id: '3', destination: 'Oakland', date: 'Dec 20' },
+];
+
 export function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const userName = 'Alex';
+  const { profile } = useAuth();
+  const userName = profile?.first_name || 'Traveler';
   const [scheduleLater, setScheduleLater] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+
+  // Mock current location
+  const currentLocation = 'San Francisco, CA';
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -33,16 +50,18 @@ export function HomeScreen() {
   };
 
   const handleSearchPress = () => {
-    navigation.navigate('TripSearch', { scheduleLater });
+    navigation.navigate('PlanRide');
+  };
+
+  const handleRecentPress = (destination: string) => {
+    navigation.navigate('PlanRide');
   };
 
   const handleLaterPress = () => {
     if (scheduleLater) {
-      // Clear schedule
       setScheduleLater(false);
       setSelectedDate(new Date());
     } else {
-      // Open schedule modal
       setShowScheduleModal(true);
       setPickerMode('date');
     }
@@ -83,73 +102,95 @@ export function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{getGreeting()},</Text>
-          <Text style={styles.userName}>{userName}</Text>
-        </View>
-        <TouchableOpacity style={styles.avatarButton}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>A</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      {/* Gradient Background */}
+      <LinearGradient
+        colors={['#DBEAFE', '#E0F2FE', colors.background]}
+        locations={[0, 0.35, 0.55]}
+        style={styles.gradientBg}
+      />
 
-      {/* Main Search Card */}
-      <TouchableOpacity
-        style={styles.searchCard}
-        onPress={handleSearchPress}
-        activeOpacity={0.95}
-      >
-        <View style={styles.searchRow}>
-          {/* Search Input */}
-          <View style={styles.searchInputContainer}>
-            <View style={styles.searchDot} />
-            <Text style={styles.searchPlaceholder}>Where to?</Text>
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.userName}>{userName}</Text>
           </View>
-
-          {/* Later Button */}
-          <TouchableOpacity
-            style={[styles.laterButton, scheduleLater && styles.laterButtonActive]}
-            onPress={handleLaterPress}
-          >
-            <View style={styles.laterContent}>
-              <Clock size={16} color={scheduleLater ? colors.primary : colors.text.muted} />
-              <Text style={[styles.laterText, scheduleLater && styles.laterTextActive]}>
-                {scheduleLater ? formatScheduleDisplay() : 'Later'}
-              </Text>
+          <TouchableOpacity style={styles.avatarButton}>
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitial}>A</Text>
             </View>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
 
-      {/* Recent/Saved Places */}
-      <View style={styles.placesSection}>
-        <View style={styles.placeRow}>
-          <View style={styles.placeIcon}>
-            <View style={styles.placeIconDot} />
-          </View>
-          <View style={styles.placeInfo}>
-            <Text style={styles.placeTitle}>Downtown SF</Text>
-            <Text style={styles.placeSubtitle}>Recent destination</Text>
+        {/* Main Search Card */}
+        <View style={styles.searchSection}>
+          <TouchableOpacity
+            style={styles.searchCard}
+            onPress={handleSearchPress}
+            activeOpacity={0.95}
+          >
+            <View style={styles.searchRow}>
+              <View style={styles.searchInputContainer}>
+                <View style={styles.searchDot} />
+                <Text style={styles.searchPlaceholder}>Where to?</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.laterButton, scheduleLater && styles.laterButtonActive]}
+                onPress={handleLaterPress}
+              >
+                <View style={styles.laterContent}>
+                  <Clock size={16} color={scheduleLater ? colors.primary : colors.text.muted} />
+                  <Text style={[styles.laterText, scheduleLater && styles.laterTextActive]}>
+                    {scheduleLater ? formatScheduleDisplay() : 'Later'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+
+          {/* Recent Searches */}
+          <View style={styles.recentSection}>
+            <View style={styles.recentHeader}>
+              <History size={14} color={colors.text.muted} />
+              <Text style={styles.recentTitle}>Recent</Text>
+            </View>
+            {recentSearches.map((search, index) => (
+              <TouchableOpacity
+                key={search.id}
+                style={[
+                  styles.recentItem,
+                  index < recentSearches.length - 1 && styles.recentItemBorder
+                ]}
+                onPress={() => handleRecentPress(search.destination)}
+              >
+                <MapPin size={16} color={colors.text.muted} />
+                <View style={styles.recentInfo}>
+                  <Text style={styles.recentDestination}>{search.destination}</Text>
+                  <Text style={styles.recentDate}>{search.date}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
-        <View style={styles.divider} />
-        <View style={styles.placeRow}>
-          <View style={styles.placeIcon}>
-            <View style={styles.placeIconDot} />
-          </View>
-          <View style={styles.placeInfo}>
-            <Text style={styles.placeTitle}>SFO Airport</Text>
-            <Text style={styles.placeSubtitle}>Recent destination</Text>
+
+        {/* You Are Here - Takes 1/3 of screen */}
+        <View style={styles.locationContainer}>
+          <View style={styles.locationCard}>
+            <View style={styles.locationHeader}>
+              <Navigation size={14} color={colors.primary} />
+              <Text style={styles.locationLabel}>You are here</Text>
+            </View>
+            <KnotMap style={styles.locationMapPlaceholder} showUserLocation interactive={false} />
+            <View style={styles.locationInfo}>
+              <MapPin size={14} color={colors.text.muted} />
+              <Text style={styles.locationText}>{currentLocation}</Text>
+            </View>
           </View>
         </View>
-      </View>
-
-      {/* Spacer */}
-      <View style={styles.spacer} />
+      </SafeAreaView>
 
       {/* Schedule Modal */}
       <Modal
@@ -160,7 +201,6 @@ export function HomeScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={handleCancelSchedule} style={styles.modalButton}>
                 <X size={24} color={colors.text.muted} />
@@ -171,7 +211,6 @@ export function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Mode Tabs */}
             <View style={styles.modeTabs}>
               <TouchableOpacity
                 style={[styles.modeTab, pickerMode === 'date' && styles.modeTabActive]}
@@ -193,13 +232,11 @@ export function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Selected Display */}
             <View style={styles.selectedDisplay}>
               <Text style={styles.selectedLabel}>Scheduled for</Text>
               <Text style={styles.selectedValue}>{formatScheduleDisplay()}</Text>
             </View>
 
-            {/* Date/Time Picker */}
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={selectedDate}
@@ -213,7 +250,7 @@ export function HomeScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -222,13 +259,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  gradientBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 400,
+  },
+  safeArea: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   greeting: {
     ...typography.styles.bodySmall,
@@ -255,9 +302,11 @@ const styles = StyleSheet.create({
     ...typography.styles.h3,
     color: colors.text.white,
   },
+  searchSection: {
+    paddingHorizontal: spacing.md,
+  },
   searchCard: {
-    marginHorizontal: spacing.md,
-    backgroundColor: colors.cardBlue,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius['3xl'],
     padding: spacing.sm,
     ...shadows.card,
@@ -309,55 +358,94 @@ const styles = StyleSheet.create({
   laterTextActive: {
     color: colors.primary,
   },
-  placesSection: {
-    marginTop: spacing.lg,
-    marginHorizontal: spacing.md,
-    backgroundColor: colors.cardBlue,
-    borderRadius: borderRadius['3xl'],
-    padding: spacing.md,
+  // Recent searches
+  recentSection: {
+    marginTop: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius['2xl'],
     ...shadows.card,
   },
-  placeRow: {
+  recentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  placeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.slate[100],
-    justifyContent: 'center',
+  recentTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.muted,
+  },
+  recentItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.md,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
   },
-  placeIconDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.text.muted,
+  recentItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate[100],
   },
-  placeInfo: {
+  recentInfo: {
     flex: 1,
   },
-  placeTitle: {
-    ...typography.styles.bodyMedium,
+  recentDestination: {
+    fontSize: 15,
+    fontWeight: '500',
     color: colors.text.main,
   },
-  placeSubtitle: {
-    ...typography.styles.caption,
+  recentDate: {
+    fontSize: 12,
     color: colors.text.muted,
     marginTop: 2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: 56,
-  },
-  spacer: {
+  // Location section - 1/3 of screen
+  locationContainer: {
     flex: 1,
+    marginTop: 24,
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
   },
-
+  locationCard: {
+    height: SCREEN_HEIGHT * 0.35,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius['2xl'],
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  locationLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  locationMapPlaceholder: {
+    flex: 1,
+    backgroundColor: colors.slate[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 12,
+  },
+  locationText: {
+    fontSize: 14,
+    color: colors.text.main,
+  },
   // Modal styles
   modalOverlay: {
     flex: 1,

@@ -14,8 +14,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { Camera, ArrowRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { RootStackParamList } from '../../types/navigation';
+import { KnotLogo } from '../../components/common/KnotLogo';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -24,6 +26,7 @@ export function ProfileSetupScreen() {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const handlePickPhoto = async () => {
@@ -65,10 +68,7 @@ export function ProfileSetupScreen() {
       >
         {/* Logo */}
         <View style={styles.logoSection}>
-          <View style={styles.ringsContainer}>
-            <View style={[styles.ring, styles.ring1]} />
-            <View style={[styles.ring, styles.ring2]} />
-          </View>
+          <KnotLogo size="medium" color={colors.primary} />
         </View>
 
         {/* Title */}
@@ -83,12 +83,12 @@ export function ProfileSetupScreen() {
             <Image source={{ uri: photoUri }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoIcon}>📷</Text>
+              <Camera size={32} color={colors.text.muted} />
               <Text style={styles.photoText}>Add Photo</Text>
             </View>
           )}
           <View style={styles.photoEditBadge}>
-            <Text style={styles.photoEditIcon}>✎</Text>
+            <Text style={styles.photoEditIcon}>+</Text>
           </View>
         </TouchableOpacity>
 
@@ -117,14 +117,22 @@ export function ProfileSetupScreen() {
               autoCapitalize="words"
             />
           </View>
-        </View>
 
-        {/* Info Note */}
-        <View style={styles.infoNote}>
-          <Text style={styles.infoIcon}>ℹ️</Text>
-          <Text style={styles.infoText}>
-            Your name will be shown to other riders when you match
-          </Text>
+          <View style={styles.inputCard}>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <Text style={styles.optionalLabel}>Optional</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              placeholderTextColor={colors.text.muted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
         </View>
       </ScrollView>
 
@@ -142,7 +150,7 @@ export function ProfileSetupScreen() {
             style={styles.continueButton}
           >
             <Text style={styles.continueText}>Continue</Text>
-            <Text style={styles.continueArrow}>→</Text>
+            <ArrowRight size={20} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -167,35 +175,15 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
   },
-  ringsContainer: {
-    width: 48,
-    height: 48,
-    position: 'relative',
-  },
-  ring: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: colors.primary,
-  },
-  ring1: {
-    top: 0,
-    left: 0,
-  },
-  ring2: {
-    bottom: 0,
-    right: 0,
-  },
   title: {
-    ...typography.styles.h1,
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.text.main,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   subtitle: {
-    ...typography.styles.body,
+    fontSize: 15,
     color: colors.text.muted,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -214,20 +202,17 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.slate[100],
+    backgroundColor: colors.cardBlue,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.slate[200],
     borderStyle: 'dashed',
   },
-  photoIcon: {
-    fontSize: 32,
-    marginBottom: spacing.xs,
-  },
   photoText: {
-    ...typography.styles.caption,
+    fontSize: 12,
     color: colors.text.muted,
+    marginTop: 4,
   },
   photoEditBadge: {
     position: 'absolute',
@@ -242,45 +227,39 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   photoEditIcon: {
-    fontSize: 14,
-    color: colors.text.white,
+    fontSize: 20,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   inputsContainer: {
     gap: spacing.md,
   },
   inputCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius['3xl'],
+    backgroundColor: colors.cardBlue,
+    borderRadius: borderRadius['2xl'],
     padding: spacing.md,
-    ...shadows.card,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   inputLabel: {
-    ...typography.styles.caption,
+    fontSize: 12,
+    fontWeight: '500',
     color: colors.text.muted,
     marginBottom: spacing.xs,
   },
-  input: {
-    ...typography.styles.body,
-    color: colors.text.main,
-    fontSize: 18,
-    paddingVertical: spacing.xs,
-  },
-  infoNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryAlpha[5],
-    padding: spacing.md,
-    borderRadius: borderRadius.xl,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  infoIcon: {
-    fontSize: 16,
-  },
-  infoText: {
-    ...typography.styles.caption,
+  optionalLabel: {
+    fontSize: 11,
     color: colors.text.muted,
-    flex: 1,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
+  input: {
+    fontSize: 18,
+    color: colors.text.main,
+    paddingVertical: spacing.xs,
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,
@@ -295,14 +274,10 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: borderRadius.lg,
     gap: spacing.sm,
-    ...shadows.button,
   },
   continueText: {
-    ...typography.styles.button,
-    color: colors.text.white,
-  },
-  continueArrow: {
-    fontSize: 20,
-    color: colors.text.white,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

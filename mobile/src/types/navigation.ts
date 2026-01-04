@@ -6,15 +6,14 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { TripMode } from './models';
 
-// Auth Stack
+// Auth Stack (full onboarding flow)
 export type AuthStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
-  Welcome: undefined;
   PhoneVerification: undefined;
   OTPVerification: { phone: string };
-  WelcomeLoading: undefined;
   ProfileSetup: undefined;
+  WelcomeLoading: undefined;
 };
 
 // Main Tab Navigator
@@ -26,11 +25,42 @@ export type MainTabParamList = {
 
 // Root Stack (combines Auth and Main)
 export type RootStackParamList = {
+  Loading: undefined;
   Auth: undefined;
   Main: undefined;
-  TripSearch: { scheduleLater?: boolean };
+  PlanRide: undefined;
+  DestinationSearchScreen: { scheduleLater?: boolean };
+  TripSearch: {
+    scheduleLater?: boolean;
+    destination?: {
+      id: string;
+      name: string;
+      address: string;
+      latitude: number;
+      longitude: number;
+      type: string;
+    };
+    origin?: {
+      id?: string;
+      name: string;
+      address: string;
+      latitude: number;
+      longitude: number;
+    };
+  };
   CreateTripNow: undefined;
   CreateTripArrival: undefined;
+  // Matching flow
+  FindingMatches: {
+    tripIntentId?: string;
+    destination?: string;
+    partySize?: number;
+    luggage?: string;
+    rideType?: 'standard' | 'xl';
+    departureTime?: string;
+  };
+  MatchesList: undefined;
+  MatchDetail: { matchId: string };
   MatchFeed: { tripIntentId?: string };
   Chat: { matchId?: string };
   RideLaunch: { matchId: string };
@@ -48,7 +78,8 @@ export type RootStackParamList = {
 };
 
 // Screen Props Types
-export type WelcomeScreenProps = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
+export type SplashScreenProps = NativeStackScreenProps<AuthStackParamList, 'Splash'>;
+export type OnboardingScreenProps = NativeStackScreenProps<AuthStackParamList, 'Onboarding'>;
 export type PhoneVerificationScreenProps = NativeStackScreenProps<AuthStackParamList, 'PhoneVerification'>;
 export type OTPVerificationScreenProps = NativeStackScreenProps<AuthStackParamList, 'OTPVerification'>;
 export type ProfileSetupScreenProps = NativeStackScreenProps<AuthStackParamList, 'ProfileSetup'>;

@@ -4,13 +4,14 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { AuthStackParamList } from '../../types/navigation';
+import { KnotLogo } from '../../components/common/KnotLogo';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
@@ -22,12 +23,15 @@ export function OnboardingScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <LinearGradient
+            colors={['#DBEAFE', '#E0F2FE', '#F8FAFC']}
+            locations={[0, 0.4, 0.7]}
+            style={styles.container}
+        >
             {/* Logo Section */}
             <View style={styles.logoSection}>
-                <View style={styles.ringsContainer}>
-                    <View style={[styles.ring, styles.ring1]} />
-                    <View style={[styles.ring, styles.ring2]} />
+                <View style={styles.logoCircle}>
+                    <KnotLogo size="large" color={colors.primary} />
                 </View>
                 <Text style={styles.logoText}>Knot</Text>
             </View>
@@ -42,65 +46,52 @@ export function OnboardingScreen() {
 
             {/* Continue Button */}
             <View style={styles.buttonContainer}>
-                <TouchableOpacity onPress={handleContinue} activeOpacity={0.9}>
-                    <LinearGradient
-                        colors={[colors.primary, colors.primaryLight]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.continueButton}
-                    >
-                        <Text style={styles.continueText}>Get Started</Text>
-                        <Text style={styles.continueArrow}>→</Text>
-                    </LinearGradient>
+                <TouchableOpacity
+                    style={styles.continueButton}
+                    onPress={handleContinue}
+                    activeOpacity={0.9}
+                >
+                    <Text style={styles.continueText}>Get Started</Text>
+                    <ArrowRight size={20} color={colors.primary} />
                 </TouchableOpacity>
             </View>
-        </SafeAreaView>
+        </LinearGradient>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
         paddingHorizontal: spacing.lg,
+        paddingTop: 80,
+        paddingBottom: 40,
     },
     logoSection: {
         alignItems: 'center',
-        paddingTop: spacing['3xl'],
+        paddingTop: spacing.xl,
         paddingBottom: spacing.xl,
     },
-    ringsContainer: {
-        width: 64,
-        height: 64,
-        position: 'relative',
+    logoCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: spacing.md,
-    },
-    ring: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 3,
-        borderColor: colors.primary,
-    },
-    ring1: {
-        top: 0,
-        left: 0,
-    },
-    ring2: {
-        bottom: 0,
-        right: 0,
+        ...shadows.card,
     },
     logoText: {
-        ...typography.styles.h2,
+        fontSize: 28,
+        fontWeight: '700',
         color: colors.text.main,
         letterSpacing: -0.5,
     },
     tagline: {
-        ...typography.styles.h1,
+        fontSize: 38,
+        fontWeight: '700',
         color: colors.text.main,
-        fontSize: 36,
-        lineHeight: 44,
+        lineHeight: 48,
         textAlign: 'center',
         marginTop: spacing['2xl'],
     },
@@ -108,23 +99,21 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     buttonContainer: {
-        paddingBottom: spacing.xl,
+        paddingBottom: spacing.md,
     },
     continueButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         height: 56,
+        backgroundColor: '#FFFFFF',
         borderRadius: borderRadius.lg,
         gap: spacing.sm,
-        ...shadows.button,
+        ...shadows.card,
     },
     continueText: {
-        ...typography.styles.button,
-        color: colors.text.white,
-    },
-    continueArrow: {
-        fontSize: 20,
-        color: colors.text.white,
+        fontSize: 17,
+        fontWeight: '600',
+        color: colors.primary,
     },
 });

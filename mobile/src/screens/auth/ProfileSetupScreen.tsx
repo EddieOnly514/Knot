@@ -18,11 +18,13 @@ import { Camera, ArrowRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { RootStackParamList } from '../../types/navigation';
 import { KnotLogo } from '../../components/common/KnotLogo';
+import { useAuth } from '../../contexts/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export function ProfileSetupScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const { devBypassAuth } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -61,6 +63,16 @@ export function ProfileSetupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* DEV BYPASS - Remove for production */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.devButton}
+          onPress={devBypassAuth}
+        >
+          <Text style={styles.devButtonText}>DEV Skip</Text>
+        </TouchableOpacity>
+      )}
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -279,5 +291,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  devButton: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.md,
+    backgroundColor: colors.slate[500],
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.sm,
+    zIndex: 100,
+  },
+  devButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -49,7 +49,6 @@ export type RootStackParamList = {
     };
   };
   CreateTripNow: undefined;
-  CreateTripArrival: undefined;
   // Matching flow
   FindingMatches: {
     tripIntentId?: string;
@@ -63,7 +62,6 @@ export type RootStackParamList = {
   MatchDetail: { matchId: string };
   MatchFeed: { tripIntentId?: string };
   Chat: { matchId?: string };
-  RideLaunch: { matchId: string };
   PostTrip: { matchId?: string };
   // Account subpages
   EditProfile: undefined;
@@ -89,8 +87,6 @@ export type MatchesScreenProps = BottomTabScreenProps<MainTabParamList, 'Matches
 export type ProfileScreenProps = BottomTabScreenProps<MainTabParamList, 'Profile'>;
 
 export type CreateTripNowScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateTripNow'>;
-export type CreateTripArrivalScreenProps = NativeStackScreenProps<RootStackParamList, 'CreateTripArrival'>;
 export type MatchFeedScreenProps = NativeStackScreenProps<RootStackParamList, 'MatchFeed'>;
 export type ChatScreenProps = NativeStackScreenProps<RootStackParamList, 'Chat'>;
-export type RideLaunchScreenProps = NativeStackScreenProps<RootStackParamList, 'RideLaunch'>;
 export type PostTripScreenProps = NativeStackScreenProps<RootStackParamList, 'PostTrip'>;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Clock, Calendar, X, Check, MapPin, Navigation, History } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { RootStackParamList } from '../../types/navigation';
 import { KnotMap } from '../../components/common/KnotMap';
@@ -38,9 +39,33 @@ export function HomeScreen() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+  const [currentLocation, setCurrentLocation] = useState('Getting location...');
 
-  // Mock current location
-  const currentLocation = 'San Francisco, CA';
+  // Get user's actual location on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setCurrentLocation('Location unavailable');
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const [address] = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+        if (address) {
+          const city = address.city || address.subregion || '';
+          const state = address.region || '';
+          setCurrentLocation(`${city}, ${state}`);
+        }
+      } catch (err) {
+        console.log('[Home] Location error:', err);
+        setCurrentLocation('Location unavailable');
+      }
+    })();
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();

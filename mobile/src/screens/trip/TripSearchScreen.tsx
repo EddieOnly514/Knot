@@ -14,7 +14,7 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
+import Mapbox from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -36,6 +36,7 @@ import type { RootStackParamList } from '../../types/navigation';
 import { BackButton } from '../../components/common/BackButton';
 import { tripService } from '../../services/tripService';
 import { useAuth } from '../../contexts/AuthContext';
+import { KnotMap } from '../../components/common/KnotMap';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -75,9 +76,10 @@ export function TripSearchScreen() {
     const [selectedTime, setSelectedTime] = useState(new Date());
     const [isCreating, setIsCreating] = useState(false);
     const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [mapDimensions, setMapDimensions] = useState<{ width: number; height: number } | null>(null);
 
     const sheetHeight = useRef(new Animated.Value(EXPANDED_HEIGHT)).current;
-    const mapRef = useRef<MapView>(null);
+    const cameraRef = useRef<Mapbox.Camera>(null);
 
     // Get user location on mount
     useEffect(() => {
@@ -85,7 +87,7 @@ export function TripSearchScreen() {
             try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    const loc = await Location.getCurrentPositionAsync({});
+                    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
                     setUserLocation({
                         latitude: loc.coords.latitude,
                         longitude: loc.coords.longitude,
@@ -99,24 +101,59 @@ export function TripSearchScreen() {
 
     // Fit map to show route when destination loads
     useEffect(() => {
-        if (passedDestination && mapRef.current) {
-            const origin = passedOrigin || userLocation;
-            if (origin) {
-                setTimeout(() => {
-                    mapRef.current?.fitToCoordinates(
-                        [
-                            { latitude: origin.latitude, longitude: origin.longitude },
-                            { latitude: passedDestination.latitude, longitude: passedDestination.longitude }
-                        ],
-                        {
-                            edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
-                            animated: true,
-                        }
-                    );
-                }, 300);
-            }
+        // Wait for map to be ready (dimensions set) and have both origin and destination
+        if (!passedDestination || !cameraRef.current || !mapDimensions) {
+            return;
         }
-    }, [passedDestination, passedOrigin, userLocation]);
+
+        const originLoc = passedOrigin
+            ? [passedOrigin.longitude, passedOrigin.latitude]
+            : userLocation ? [userLocation.longitude, userLocation.latitude] : null;
+
+        const destLoc = [passedDestination.longitude, passedDestination.latitude];
+
+        if (originLoc) {
+            // Calculate center point between origin and destination
+            const centerLng = (originLoc[0] + destLoc[0]) / 2;
+            const centerLat = (originLoc[1] + destLoc[1]) / 2;
+
+            // Calculate the distance to determine zoom level
+            const latDiff = Math.abs(originLoc[1] - destLoc[1]);
+            const lngDiff = Math.abs(originLoc[0] - destLoc[0]);
+            const maxDiff = Math.max(latDiff, lngDiff);
+
+            // Rough zoom calculation based on distance
+            // Larger diff = more zoomed out (zoom out one extra level for padding)
+            let zoomLevel = 11;
+            if (maxDiff > 6) zoomLevel = 4;
+            else if (maxDiff > 4) zoomLevel = 5;
+            else if (maxDiff > 2) zoomLevel = 6;
+            else if (maxDiff > 1) zoomLevel = 7;
+            else if (maxDiff > 0.5) zoomLevel = 8;
+            else if (maxDiff > 0.2) zoomLevel = 9;
+            else if (maxDiff > 0.1) zoomLevel = 10;
+
+            console.log('[TripSearch] Fitting bounds:', {
+                originLoc,
+                destLoc,
+                centerLng,
+                centerLat,
+                maxDiff,
+                zoomLevel
+            });
+
+            // Longer delay to ensure map is fully ready
+            setTimeout(() => {
+                console.log('[TripSearch] Setting camera now');
+                cameraRef.current?.setCamera({
+                    centerCoordinate: [centerLng, centerLat],
+                    zoomLevel: zoomLevel,
+                    animationDuration: 1500,
+                    padding: { paddingTop: 80, paddingRight: 60, paddingBottom: 350, paddingLeft: 60 },
+                });
+            }, 800);
+        }
+    }, [passedDestination, passedOrigin, userLocation, mapDimensions]);
 
     const toggleSheet = () => {
         const toValue = isExpanded ? COLLAPSED_HEIGHT : EXPANDED_HEIGHT;
@@ -133,19 +170,6 @@ export function TripSearchScreen() {
 
         setIsCreating(true);
         try {
-            // For dev mode, just navigate with mock data
-            if (__DEV__ && !profile) {
-                navigation.navigate('FindingMatches', {
-                    tripIntentId: 'dev-trip-' + Date.now(),
-                    destination,
-                    partySize: parseInt(partySize) || 1,
-                    luggage,
-                    rideType,
-                    departureTime: leaveNow ? new Date().toISOString() : selectedTime.toISOString(),
-                });
-                return;
-            }
-
             // Create trip intent in database
             const { data, error } = await tripService.createTripIntent({
                 destination,
@@ -153,6 +177,9 @@ export function TripSearchScreen() {
                 party_size: parseInt(partySize) || 1,
                 luggage,
                 ride_type: rideType,
+                // Pass coordinates if available
+                latitude: passedDestination?.latitude,
+                longitude: passedDestination?.longitude,
             });
 
             if (error) {
@@ -164,11 +191,7 @@ export function TripSearchScreen() {
             if (data) {
                 navigation.navigate('FindingMatches', {
                     tripIntentId: data.id,
-                    destination: data.destination,
-                    partySize: data.party_size,
-                    luggage: data.luggage,
-                    rideType: data.ride_type,
-                    departureTime: data.departure_time,
+                    ...data
                 });
             }
         } catch (err) {
@@ -196,67 +219,108 @@ export function TripSearchScreen() {
 
     const canFindMatch = destination.length > 0;
 
+    // Route GeoJSON
+    const getRouteFeature = () => {
+        if (!passedDestination) return null;
+
+        const origin = passedOrigin
+            ? [passedOrigin.longitude, passedOrigin.latitude]
+            : userLocation ? [userLocation.longitude, userLocation.latitude] : null;
+
+        if (!origin) return null;
+
+        return {
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [
+                            origin,
+                            [passedDestination.longitude, passedDestination.latitude]
+                        ]
+                    }
+                }
+            ]
+        };
+    };
+
     return (
         <View style={styles.container}>
             {/* Map Background */}
-            <View style={styles.mapContainer}>
-                <MapView
-                    ref={mapRef}
-                    style={StyleSheet.absoluteFill}
-                    provider={PROVIDER_DEFAULT}
-                    initialRegion={passedDestination ? {
-                        latitude: passedDestination.latitude,
-                        longitude: passedDestination.longitude,
-                        latitudeDelta: 0.1,
-                        longitudeDelta: 0.1,
-                    } : {
-                        latitude: 33.6461,
-                        longitude: -117.8420,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                    }}
-                    showsUserLocation={!passedOrigin}
-                >
-                    {/* Route Line */}
-                    {passedDestination && (passedOrigin || userLocation) && (
-                        <Polyline
-                            coordinates={[
-                                passedOrigin || userLocation!,
-                                { latitude: passedDestination.latitude, longitude: passedDestination.longitude }
-                            ]}
-                            strokeColor={colors.primary}
-                            strokeWidth={4}
-                            lineDashPattern={[0]}
+            <View style={styles.mapContainer} onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                if (width > 0 && height > 0 && !mapDimensions) {
+                    setMapDimensions({ width, height });
+                }
+            }}>
+                {mapDimensions && (
+                    <Mapbox.MapView
+                        style={{ width: mapDimensions.width, height: mapDimensions.height }}
+                        styleURL={Mapbox.StyleURL.Street}
+                        scaleBarEnabled={false}
+                        rotateEnabled={false}
+                        pitchEnabled={false}
+                        attributionEnabled={false}
+                        logoEnabled={false}
+                    >
+                        <Mapbox.Camera
+                            ref={cameraRef}
+                            zoomLevel={12}
+                            animationMode="flyTo"
+                            animationDuration={1000}
                         />
-                    )}
 
-                    {/* Origin Marker */}
-                    {(passedOrigin || userLocation) && (
-                        <Marker
-                            coordinate={passedOrigin || userLocation!}
-                            title="Pickup"
-                        >
-                            <View style={styles.originMarker}>
-                                <View style={styles.originMarkerInner} />
-                            </View>
-                        </Marker>
-                    )}
+                        {/* User Location Puck */}
+                        {!passedOrigin && (
+                            <Mapbox.LocationPuck
+                                pulsing={{
+                                    isEnabled: true,
+                                    color: colors.primary,
+                                    radius: 20.0
+                                }}
+                            />
+                        )}
 
-                    {/* Destination Marker */}
-                    {passedDestination && (
-                        <Marker
-                            coordinate={{
-                                latitude: passedDestination.latitude,
-                                longitude: passedDestination.longitude,
-                            }}
-                            title="Destination"
-                        >
-                            <View style={styles.destMarker}>
-                                <MapPin size={28} color={colors.primary} fill={colors.primary} />
-                            </View>
-                        </Marker>
-                    )}
-                </MapView>
+                        {/* Route Line */}
+                        {getRouteFeature() && (
+                            <Mapbox.ShapeSource id="routeSource" shape={getRouteFeature() as any}>
+                                <Mapbox.LineLayer
+                                    id="routeLine"
+                                    style={{
+                                        lineColor: colors.primary,
+                                        lineWidth: 4,
+                                        lineCap: 'round',
+                                        lineJoin: 'round',
+                                        lineDasharray: [1, 1]
+                                    }}
+                                />
+                            </Mapbox.ShapeSource>
+                        )}
+
+                        {/* Origin Marker */}
+                        {(passedOrigin || userLocation) && (
+                            <Mapbox.PointAnnotation
+                                id="origin"
+                                coordinate={passedOrigin ? [passedOrigin.longitude, passedOrigin.latitude] : [userLocation!.longitude, userLocation!.latitude]}
+                            >
+                                <View style={styles.originMarker} />
+                            </Mapbox.PointAnnotation>
+                        )}
+
+                        {/* Destination Marker */}
+                        {passedDestination && (
+                            <Mapbox.PointAnnotation
+                                id="destination"
+                                coordinate={[passedDestination.longitude, passedDestination.latitude]}
+                            >
+                                <View style={styles.destMarker} />
+                            </Mapbox.PointAnnotation>
+                        )}
+                    </Mapbox.MapView>
+                )}
             </View>
 
             {/* Top Route Display - Tappable to edit */}
@@ -460,30 +524,16 @@ const styles = StyleSheet.create({
     },
     mapContainer: {
         flex: 1,
-    },
-    mapPlaceholder: {
-        flex: 1,
         backgroundColor: colors.slate[100],
-        alignItems: 'center',
-        justifyContent: 'center',
     },
-    mapText: {
-        fontSize: 14,
-        color: colors.text.muted,
-        marginTop: 8,
+    map: {
+        flex: 1,
     },
     topBar: {
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-    },
-    searchHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 12,
     },
     routeHeader: {
         flexDirection: 'row',
@@ -529,22 +579,6 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: colors.slate[100],
         marginLeft: 20,
-    },
-    searchInputContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        gap: 8,
-        ...shadows.card,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 16,
-        color: colors.text.main,
     },
     bottomSheet: {
         position: 'absolute',
@@ -714,22 +748,19 @@ const styles = StyleSheet.create({
         height: 200,
     },
     originMarker: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0, 82, 255, 0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    originMarkerInner: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         backgroundColor: colors.primary,
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: '#fff',
     },
     destMarker: {
-        alignItems: 'center',
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        backgroundColor: colors.primary,
+        borderWidth: 3,
+        borderColor: '#fff',
     },
 });

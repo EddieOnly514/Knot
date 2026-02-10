@@ -1,8 +1,15 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { supabase } from '../lib/supabase';
 import { handleAuthCallback } from '../auth/oauth';
+
+// Configure Google Sign-In
+GoogleSignin.configure({
+    iosClientId: '629746611304-t2ebm9rdont9v7u0dcsale8f0lpg30r7.apps.googleusercontent.com',
+    webClientId: '207315886424-03blbinho47anhbjsjgkf8ebrju4d4hd.apps.googleusercontent.com',
+});
 
 export interface Profile {
     id: string;
@@ -25,6 +32,7 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     isAuthenticated: boolean;
+    signInWithGoogle: () => Promise<{ error: Error | null }>;
     signOut: () => Promise<void>;
     updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
     refreshProfile: () => Promise<void>;
@@ -179,7 +187,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // Google Sign-In
+    const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
+        try {
+            console.log('[AuthProvider] Starting Google Sign-In...');
+
+            // Check if device supports Google Play Services (Android) or has Google Sign-In (iOS)
+            await GoogleSignin.hasPlayServices();
+
+            // Sign in with Google
+            const signInResult = await GoogleSignin.signIn();
+            console.log('[AuthProvider] Google Sign-In success, getting tokens...');
+
+            // Get the ID token
+            const idToken = signInResult.data?.idToken;
+
+            if (!idToken) {
+                throw new Error('No ID token returned from Google Sign-In');
+            }
+
+            console.log('[AuthProvider] Got ID token, signing in to Supabase...');
+
+            // Sign in to Supabase with the Google ID token
+            const { data, error } = await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: idToken,
+            });
+
+            if (error) {
+                console.error('[AuthProvider] Supabase sign-in error:', error);
+                return { error };
+            }
+
+            console.log('[AuthProvider] Supabase sign-in success!');
+            return { error: null };
+        } catch (error: any) {
+            console.error('[AuthProvider] Google Sign-In error:', error);
+
+            // Handle specific Google Sign-In errors
+            if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+                return { error: new Error('Sign-in was cancelled') };
+            } else if (error.code === statusCodes.IN_PROGRESS) {
+                return { error: new Error('Sign-in already in progress') };
+            } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+                return { error: new Error('Google Play Services not available') };
+            }
+
+            return { error: error as Error };
+        }
+    };
+
     const signOut = async () => {
+        try {
+            // Sign out from Google
+            await GoogleSignin.signOut();
+        } catch (error) {
+            console.log('[AuthProvider] Google sign-out error (non-fatal):', error);
+        }
+
+        // Sign out from Supabase
         await supabase.auth.signOut();
         setSession(null);
         setUser(null);
@@ -233,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAuthenticated: !!session || !!profile, // Allow dev profile to auth
+        signInWithGoogle,
         signOut,
         updateProfile,
         refreshProfile,

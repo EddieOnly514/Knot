@@ -30,6 +30,37 @@ import {
     filterRecents,
 } from '../../services/recentsService';
 
+// Calculate distance in miles using Haversine formula
+const calculateDistanceMiles = (
+    lat1: number,
+    lon1: number,
+    lat2: number | undefined,
+    lon2: number | undefined
+): number | null => {
+    if (lat2 === undefined || lon2 === undefined) return null;
+
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
+// Format distance for display (converts meters to miles if present)
+const formatDistance = (meters: number | undefined): string | null => {
+    if (meters === undefined) return null;
+    const miles = meters / 1609.34;
+    if (miles < 0.1) return 'Nearby';
+    if (miles < 10) return `${miles.toFixed(1)} mi`;
+    return `${Math.round(miles)} mi`;
+};
+
 interface DestinationSearchProps {
     placeholder?: string;
     onDestinationSelected: (destination: Destination) => void;
@@ -197,30 +228,41 @@ export function DestinationSearch({
     };
 
     // Render suggestion row
-    const renderSuggestion = ({ item }: { item: Suggestion }) => (
-        <TouchableOpacity
-            style={styles.suggestionRow}
-            onPress={() => handleSelect(item)}
-            activeOpacity={0.7}
-        >
-            <View style={styles.suggestionIcon}>
-                {getCategoryIcon(item.category)}
-            </View>
-            <View style={styles.suggestionText}>
-                <Text style={styles.primaryText} numberOfLines={1}>
-                    {item.primaryText}
-                </Text>
-                <Text style={styles.secondaryText} numberOfLines={1}>
-                    {item.secondaryText}
-                </Text>
-            </View>
-            {item.source === 'recent' && (
-                <View style={styles.recentBadge}>
-                    <Text style={styles.recentBadgeText}>Recent</Text>
+    const renderSuggestion = ({ item }: { item: Suggestion }) => {
+        // Use the distance field from the suggestion (in meters)
+        const distanceText = formatDistance(item.distance);
+
+        return (
+            <TouchableOpacity
+                style={styles.suggestionRow}
+                onPress={() => handleSelect(item)}
+                activeOpacity={0.7}
+            >
+                <View style={styles.suggestionIcon}>
+                    {getCategoryIcon(item.category)}
                 </View>
-            )}
-        </TouchableOpacity>
-    );
+                <View style={styles.suggestionText}>
+                    <Text style={styles.primaryText} numberOfLines={1}>
+                        {item.primaryText}
+                    </Text>
+                    <Text style={styles.secondaryText} numberOfLines={1}>
+                        {item.secondaryText}
+                    </Text>
+                </View>
+                {distanceText && (
+                    <View style={styles.distanceBadge}>
+                        <Navigation size={12} color={colors.text.muted} />
+                        <Text style={styles.distanceText}>{distanceText}</Text>
+                    </View>
+                )}
+                {item.source === 'recent' && !distanceText && (
+                    <View style={styles.recentBadge}>
+                        <Text style={styles.recentBadgeText}>Recent</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -361,6 +403,20 @@ const styles = StyleSheet.create({
     },
     recentBadgeText: {
         fontSize: 11,
+        color: colors.text.muted,
+        fontWeight: '500',
+    },
+    distanceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.slate[100],
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: borderRadius.sm,
+        gap: 4,
+    },
+    distanceText: {
+        fontSize: 12,
         color: colors.text.muted,
         fontWeight: '500',
     },

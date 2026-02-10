@@ -86,6 +86,16 @@ export function PhoneVerificationScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* DEV BYPASS - Remove for production */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={() => navigation.navigate('ProfileSetup')}
+          >
+            <Text style={styles.devButtonText}>DEV Skip</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <ChevronLeft size={24} color={colors.text.main} />
@@ -169,16 +179,6 @@ export function PhoneVerificationScreen() {
         <Text style={styles.footerText}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </Text>
-
-        {/* DEV BYPASS - Remove for production */}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={styles.devButton}
-            onPress={devBypassAuth}
-          >
-            <Text style={styles.devButtonText}>🔧 DEV: Skip Auth</Text>
-          </TouchableOpacity>
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -318,15 +318,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   devButton: {
-    backgroundColor: colors.slate[900],
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.md,
+    backgroundColor: colors.slate[500],
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.sm,
+    zIndex: 100,
   },
   devButtonText: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: '#fff',
   },

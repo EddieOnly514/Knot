@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Platform, Animated } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, Region, LatLng } from 'react-native-maps';
+import { View, StyleSheet, Animated } from 'react-native';
+import Mapbox from '@rnmapbox/maps';
 import { useMap, MapState } from '../../contexts/MapContext';
 import { colors } from '../../design';
 
@@ -14,13 +14,14 @@ interface SmartMapProps {
 }
 
 // Camera padding for fitting bounds
-const EDGE_PADDING = { top: 100, right: 50, bottom: 300, left: 50 };
+// [top, right, bottom, left]
+const EDGE_PADDING = [100, 50, 300, 50];
 
-// Default delta for single point view
-const DEFAULT_DELTA = 0.01;
+// Default delta/zoom
+const DEFAULT_ZOOM = 14;
 
 export function SmartMap({ style }: SmartMapProps) {
-    const mapRef = useRef<MapView>(null);
+    const cameraRef = useRef<Mapbox.Camera>(null);
     const {
         mapState,
         userLocation,
@@ -29,6 +30,7 @@ export function SmartMap({ style }: SmartMapProps) {
     } = useMap();
 
     const [mapReady, setMapReady] = useState(false);
+    const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     // Pulse animation for user marker
@@ -51,19 +53,27 @@ export function SmartMap({ style }: SmartMapProps) {
         return () => pulse.stop();
     }, []);
 
+    const onLayout = (event: any) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width > 0 && height > 0) {
+            setDimensions({ width, height });
+        }
+    };
+
     // Handle camera changes based on state
     useEffect(() => {
-        if (!mapReady || !mapRef.current || !userLocation) return;
+        if (!mapReady || !cameraRef.current || !userLocation) return;
 
         console.log('[SmartMap] State changed to:', mapState);
 
         switch (mapState) {
             case 'IDLE':
-                // Center on user with smooth animation
-                animateToCordinates([{
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
-                }]);
+                // Center on user
+                cameraRef.current.setCamera({
+                    centerCoordinate: [userLocation.longitude, userLocation.latitude],
+                    zoomLevel: DEFAULT_ZOOM,
+                    animationDuration: 1000,
+                });
                 break;
 
             case 'SEARCHING':
@@ -73,9 +83,9 @@ export function SmartMap({ style }: SmartMapProps) {
             case 'PREVIEWING_DESTINATION':
                 // Fit user + preview destination
                 if (previewDestination && userLocation) {
-                    animateToCordinates([
-                        { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                        { latitude: previewDestination.latitude, longitude: previewDestination.longitude },
+                    fitToCoordinates([
+                        [userLocation.longitude, userLocation.latitude],
+                        [previewDestination.longitude, previewDestination.latitude]
                     ]);
                 }
                 break;
@@ -83,42 +93,40 @@ export function SmartMap({ style }: SmartMapProps) {
             case 'DESTINATION_SELECTED':
                 // Fit user + selected destination
                 if (selectedDestination && userLocation) {
-                    animateToCordinates([
-                        { latitude: userLocation.latitude, longitude: userLocation.longitude },
-                        { latitude: selectedDestination.latitude, longitude: selectedDestination.longitude },
+                    fitToCoordinates([
+                        [userLocation.longitude, userLocation.latitude],
+                        [selectedDestination.longitude, selectedDestination.latitude]
                     ]);
                 }
                 break;
         }
-    }, [mapState, mapReady, previewDestination, selectedDestination]);
+    }, [mapState, mapReady, previewDestination, selectedDestination, userLocation]);
 
     // Follow user in IDLE state
     useEffect(() => {
-        if (mapState === 'IDLE' && mapReady && mapRef.current && userLocation) {
-            mapRef.current.animateToRegion({
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: DEFAULT_DELTA,
-                longitudeDelta: DEFAULT_DELTA,
-            }, 500);
+        if (mapState === 'IDLE' && mapReady && cameraRef.current && userLocation) {
+            cameraRef.current.setCamera({
+                centerCoordinate: [userLocation.longitude, userLocation.latitude],
+                animationDuration: 1000,
+            });
         }
     }, [userLocation, mapState, mapReady]);
 
-    const animateToCordinates = (coordinates: LatLng[]) => {
-        if (!mapRef.current) return;
+    const fitToCoordinates = (coordinates: number[][]) => {
+        if (!cameraRef.current) return;
 
-        if (coordinates.length === 1) {
-            mapRef.current.animateToRegion({
-                ...coordinates[0],
-                latitudeDelta: DEFAULT_DELTA,
-                longitudeDelta: DEFAULT_DELTA,
-            }, 500);
-        } else {
-            mapRef.current.fitToCoordinates(coordinates, {
-                edgePadding: EDGE_PADDING,
-                animated: true,
-            });
-        }
+        // Calculate bounds
+        const lngs = coordinates.map(c => c[0]);
+        const lats = coordinates.map(c => c[1]);
+        const sw = [Math.min(...lngs), Math.min(...lats)];
+        const ne = [Math.max(...lngs), Math.max(...lats)];
+
+        cameraRef.current?.fitBounds(
+            sw,
+            ne,
+            EDGE_PADDING,
+            1000 // duration
+        );
     };
 
     const handleMapReady = () => {
@@ -131,85 +139,47 @@ export function SmartMap({ style }: SmartMapProps) {
     const isPreview = !!previewDestination && !selectedDestination;
 
     return (
-        <View style={[styles.container, style]}>
-            <MapView
-                ref={mapRef}
-                style={styles.map}
-                provider={PROVIDER_DEFAULT}
-                showsUserLocation={false} // We'll render our own marker
-                showsMyLocationButton={false}
-                showsCompass={false}
-                showsScale={false}
-                showsIndoors={false}
-                showsBuildings={false}
-                showsPointsOfInterest={false}
-                showsTraffic={false}
-                mapPadding={EDGE_PADDING}
-                onMapReady={handleMapReady}
-                initialRegion={{
-                    latitude: userLocation?.latitude || 37.7749,
-                    longitude: userLocation?.longitude || -122.4194,
-                    latitudeDelta: DEFAULT_DELTA,
-                    longitudeDelta: DEFAULT_DELTA,
-                }}
-            >
-                {/* User Location Marker */}
-                {userLocation && (
-                    <Marker
-                        coordinate={{
-                            latitude: userLocation.latitude,
-                            longitude: userLocation.longitude,
-                        }}
-                        anchor={{ x: 0.5, y: 0.5 }}
-                    >
-                        <View style={styles.userMarkerContainer}>
-                            <Animated.View
-                                style={[
-                                    styles.userMarkerPulse,
-                                    { transform: [{ scale: pulseAnim }] }
-                                ]}
-                            />
-                            <View style={styles.userMarkerDot}>
-                                {userLocation.heading && (
-                                    <View
-                                        style={[
-                                            styles.headingCone,
-                                            { transform: [{ rotate: `${userLocation.heading}deg` }] }
-                                        ]}
-                                    />
-                                )}
-                            </View>
-                        </View>
-                    </Marker>
-                )}
+        <View style={[styles.container, style]} onLayout={onLayout}>
+            {dimensions && dimensions.width > 0 && dimensions.height > 0 && (
+                <Mapbox.MapView
+                    style={{ width: dimensions.width, height: dimensions.height }}
+                    styleURL={Mapbox.StyleURL.Street}
+                    onDidFinishLoadingMap={handleMapReady}
+                    scaleBarEnabled={false}
+                    rotateEnabled={false}
+                    pitchEnabled={false}
+                    attributionEnabled={false}
+                    logoEnabled={false}
+                >
+                    <Mapbox.Camera
+                        ref={cameraRef}
+                        zoomLevel={DEFAULT_ZOOM}
+                        centerCoordinate={userLocation ? [userLocation.longitude, userLocation.latitude] : [-122.4194, 37.7749]}
+                    />
 
-                {/* Destination Marker (Preview or Selected) */}
-                {destinationToShow && (
-                    <Marker
-                        coordinate={{
-                            latitude: destinationToShow.latitude,
-                            longitude: destinationToShow.longitude,
-                        }}
-                        anchor={{ x: 0.5, y: 1 }}
-                    >
-                        <View style={styles.destinationMarkerContainer}>
-                            <View style={[
-                                styles.destinationPin,
-                                isPreview ? styles.previewPin : styles.selectedPin
-                            ]}>
-                                <View style={[
-                                    styles.pinInner,
-                                    isPreview ? styles.previewPinInner : styles.selectedPinInner
-                                ]} />
-                            </View>
-                            <View style={[
-                                styles.pinShadow,
-                                isPreview && styles.previewPinShadow
-                            ]} />
-                        </View>
-                    </Marker>
-                )}
-            </MapView>
+                    {/* User Location - use built-in LocationPuck */}
+                    {userLocation && (
+                        <Mapbox.LocationPuck
+                            pulsing={{
+                                isEnabled: true,
+                                color: colors.primary,
+                                radius: 20.0
+                            }}
+                        />
+                    )}
+
+                    {/* Destination Marker (Preview or Selected) */}
+                    {destinationToShow && (
+                        <Mapbox.PointAnnotation
+                            id="destination"
+                            coordinate={[destinationToShow.longitude, destinationToShow.latitude]}
+                            anchor={{ x: 0.5, y: 1 }}
+                        >
+                            <View style={[styles.destinationPin, isPreview ? styles.previewPin : styles.selectedPin]} />
+                        </Mapbox.PointAnnotation>
+                    )}
+                </Mapbox.MapView>
+            )}
 
             {/* Dim overlay during search */}
             {mapState === 'SEARCHING' && (
@@ -271,44 +241,22 @@ const styles = StyleSheet.create({
         borderBottomColor: colors.primary,
     },
     // Destination marker styles
-    destinationMarkerContainer: {
-        alignItems: 'center',
-    },
     destinationPin: {
-        width: 32,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingTop: 6,
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        backgroundColor: colors.primary,
+        borderWidth: 3,
+        borderColor: '#fff',
     },
     previewPin: {
         opacity: 0.7,
-    },
-    selectedPin: {
-        opacity: 1,
-    },
-    pinInner: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 3,
-    },
-    previewPinInner: {
         backgroundColor: '#fff',
         borderColor: colors.primary,
     },
-    selectedPinInner: {
+    selectedPin: {
+        opacity: 1,
         backgroundColor: colors.primary,
         borderColor: '#fff',
-    },
-    pinShadow: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: 'rgba(0,0,0,0.2)',
-        marginTop: 2,
-    },
-    previewPinShadow: {
-        opacity: 0.5,
     },
 });

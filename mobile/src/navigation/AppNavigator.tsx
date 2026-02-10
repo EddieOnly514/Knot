@@ -58,18 +58,6 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 
-const CreateTripArrivalScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-    <Text style={{ color: colors.text.main }}>Schedule Trip</Text>
-  </View>
-);
-
-const RideLaunchScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-    <Text style={{ color: colors.text.main }}>Launch Ride</Text>
-  </View>
-);
-
 // Loading Screen
 function LoadingScreen() {
   return (
@@ -192,10 +180,8 @@ export function AppNavigator() {
               }}
             />
             <RootStack.Screen name="CreateTripNow" component={CreateTripNowScreen} options={{ headerShown: false }} />
-            <RootStack.Screen name="CreateTripArrival" component={CreateTripArrivalScreen} options={{ headerShown: false }} />
             <RootStack.Screen name="MatchFeed" component={MatchFeedScreen} options={{ headerShown: false }} />
             <RootStack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
-            <RootStack.Screen name="RideLaunch" component={RideLaunchScreen} options={{ headerShown: false }} />
             <RootStack.Screen name="PostTrip" component={PostTripScreen} options={{ headerShown: false }} />
             {/* Account Subpages */}
             <RootStack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />

@@ -78,8 +78,21 @@
           "locationAlwaysAndWhenInUsePermission": "Knot needs your location to find nearby riders."
         }
       ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox",
+          "RNMapboxDownloadToken": false
+        }
+      ],
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.629746611304-t2ebm9rdont9v7u0dcsale8f0lpg30r7"
+        }
+      ]
     ]
   }
 }

@@ -21,7 +21,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import {
     ChevronLeft,
@@ -45,6 +44,7 @@ import {
     recentsToSuggestions,
     filterRecents,
 } from '../../services/recentsService';
+import { KnotMap } from '../../components/common/KnotMap';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -52,19 +52,11 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAP_HEIGHT = SCREEN_HEIGHT * 0.2; // 20% for map
 const DEBOUNCE_MS = 200;
 
-const DEFAULT_REGION = {
-    latitude: 33.6461,
-    longitude: -117.8420,
-    latitudeDelta: 0.03,
-    longitudeDelta: 0.03,
-};
-
 type ActiveInput = 'from' | 'to';
 
 export function PlanRideScreen() {
     const navigation = useNavigation<NavigationProp>();
     const insets = useSafeAreaInsets();
-    const mapRef = useRef<MapView>(null);
     const fromInputRef = useRef<TextInput>(null);
     const toInputRef = useRef<TextInput>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -91,7 +83,6 @@ export function PlanRideScreen() {
                 menuOffset.setValue(newOffset);
             },
             onPanResponderRelease: (_, gestureState) => {
-                const maxDrag = SCREEN_HEIGHT * 0.4;
                 const threshold = 100;
 
                 if (gestureState.dy > threshold) {
@@ -122,7 +113,7 @@ export function PlanRideScreen() {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status === 'granted') {
                 const loc = await Location.getCurrentPositionAsync({
-                    accuracy: Location.Accuracy.Balanced,
+                    accuracy: Location.Accuracy.Highest,
                 });
                 setUserLocation({
                     latitude: loc.coords.latitude,
@@ -265,30 +256,12 @@ export function PlanRideScreen() {
         <View style={styles.container}>
             {/* Map Section (Top 20%) */}
             <View style={[styles.mapSection, { paddingTop: insets.top }]}>
-                <MapView
-                    ref={mapRef}
+                <KnotMap
                     style={styles.map}
-                    provider={PROVIDER_DEFAULT}
-                    initialRegion={userLocation ? {
-                        ...userLocation,
-                        latitudeDelta: 0.02,
-                        longitudeDelta: 0.02,
-                    } : DEFAULT_REGION}
-                    showsUserLocation={false}
-                    showsMyLocationButton={false}
-                >
-                    {/* User location marker */}
-                    {userLocation && (
-                        <Marker
-                            coordinate={userLocation}
-                            title="Your location"
-                        >
-                            <View style={styles.userMarker}>
-                                <View style={styles.userMarkerInner} />
-                            </View>
-                        </Marker>
-                    )}
-                </MapView>
+                    showUserLocation={true}
+                    showLocateButton={false}
+                    interactive={false}
+                />
 
                 {/* Back Button */}
                 <TouchableOpacity
@@ -571,21 +544,5 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 14,
         color: colors.text.muted,
-    },
-    userMarker: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: 'rgba(0, 82, 255, 0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    userMarkerInner: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: colors.primary,
-        borderWidth: 2,
-        borderColor: '#fff',
     },
 });

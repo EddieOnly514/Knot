@@ -40,7 +40,9 @@ function LoginForm() {
     setIsLoading(true);
     const { error } = await signInWithEmailPassword(email, password);
     if (error) {
-      toast.error(error.message ?? "Failed to sign in");
+      const msg =
+        (error as { message?: string }).message ?? "Failed to sign in";
+      toast.error(msg);
       setIsLoading(false);
       return;
     }
@@ -48,6 +50,12 @@ function LoginForm() {
     // Successful password sign-in – middleware/onboarding logic will take over.
     router.push("/home");
     setIsLoading(false);
+  };
+
+  const fillTestAccount = () => {
+    setEmail("sarah@knot-test.dev");
+    setPassword("KnotTest2026!");
+    toast.success("Test credentials filled. Click Sign in.");
   };
 
   return (
@@ -143,15 +151,32 @@ function LoginForm() {
         </p>
 
         {process.env.NODE_ENV === "development" && (
-          <button
-            onClick={() => {
-              devSignIn();
-              router.push("/home");
-            }}
-            className="w-full mt-1 py-2 px-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
-          >
-            🔧 Dev: Test Login (New User)
-          </button>
+          <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-amber-800 text-xs font-medium">
+              Dev: Test accounts (from POST /api/seed-matches)
+            </p>
+            <button
+              type="button"
+              onClick={fillTestAccount}
+              className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
+            >
+              Fill test account (sarah@knot-test.dev)
+            </button>
+            <p className="text-amber-700 text-[11px]">
+              Password: KnotTest2026! — Enable &quot;Email&quot; in Supabase →
+              Auth → Providers if sign-in fails.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                devSignIn();
+                router.push("/home");
+              }}
+              className="w-full py-2 px-4 rounded-lg border border-amber-300 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
+            >
+              🔧 Dev: Mock login (no Supabase)
+            </button>
+          </div>
         )}
       </CardContent>
     </Card>

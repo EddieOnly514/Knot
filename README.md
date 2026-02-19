@@ -74,7 +74,7 @@ npm run dev
 ## Project Structure
 
 ```
-knot-ride-buddy/
+Knot/
 ├── mobile/                 # React Native Expo app
 │   ├── src/
 │   │   ├── components/     # Reusable UI components

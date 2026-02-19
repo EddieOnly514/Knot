@@ -24,7 +24,8 @@ BEGIN
     c := 2 * ATAN2(SQRT(a), SQRT(1-a));
     RETURN r * c;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE
+SET search_path = public;
 
 -- ============================================
 -- FIND POTENTIAL MATCHES FUNCTION
@@ -136,7 +137,8 @@ BEGIN
     ORDER BY match_score DESC, time_diff_minutes ASC
     LIMIT 20;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
 -- ============================================
 -- CHECK MUTUAL MATCH FUNCTION
@@ -157,7 +159,8 @@ BEGIN
     
     RETURN FALSE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
 -- ============================================
 -- EXPRESS INTEREST FUNCTION
@@ -208,10 +211,11 @@ BEGIN
         RETURN v_match_id;
     END IF;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
 -- Grant execute permissions
-GRANT EXECUTE ON FUNCTION haversine_distance TO authenticated;
-GRANT EXECUTE ON FUNCTION find_potential_matches TO authenticated;
-GRANT EXECUTE ON FUNCTION check_and_update_mutual_match TO authenticated;
-GRANT EXECUTE ON FUNCTION express_interest TO authenticated;
+GRANT EXECUTE ON FUNCTION haversine_distance(DECIMAL, DECIMAL, DECIMAL, DECIMAL) TO authenticated;
+GRANT EXECUTE ON FUNCTION find_potential_matches(UUID, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_and_update_mutual_match(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION express_interest(UUID, UUID) TO authenticated;

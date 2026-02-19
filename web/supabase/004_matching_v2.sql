@@ -375,7 +375,8 @@ BEGIN
     ORDER BY match_score DESC, s._time_diff ASC
     LIMIT 10;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
 
 -- Grant permissions
-GRANT EXECUTE ON FUNCTION find_potential_matches TO authenticated;
+GRANT EXECUTE ON FUNCTION find_potential_matches(UUID, INTEGER, INTEGER, INTEGER) TO authenticated;

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.6" />
+    </filter>
+  </defs>
+
+  <!-- shoulders -->
+  <path d="M98 470c28-86 96-136 158-136s130 50 158 136" fill="#E2E8F0" filter="url(#soft)"/>
+  <path d="M98 470c28-86 96-136 158-136s130 50 158 136" fill="none" stroke="rgba(2,6,23,0.08)" stroke-width="2"/>
+
+  <!-- neck -->
+  <path d="M230 316c10 18 20 26 26 26s16-8 26-26" fill="none" stroke="rgba(2,6,23,0.10)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- head -->
+  <circle cx="256" cy="246" r="82" fill="#EAC9A1"/>
+  <circle cx="256" cy="246" r="82" fill="none" stroke="rgba(2,6,23,0.06)" stroke-width="1.5"/>
+
+  <!-- hair -->
+  <path d="M182 228c10-52 44-84 74-84s64 32 74 84c-16 10-32 6-42-6-8-10-18-14-32-14s-24 4-32 14c-10 12-26 16-42 6Z" fill="#2C1B0E"/>
+
+  <!-- face details -->
+  <ellipse cx="232" cy="244" rx="5" ry="6" fill="#2C1B0E"/>
+  <ellipse cx="280" cy="244" rx="5" ry="6" fill="#2C1B0E"/>
+  <path d="M236 282c14 10 26 10 40 0" fill="none" stroke="#D4836B" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- eyebrows -->
+  <path d="M220 228c8-6 18-6 26 0" fill="none" stroke="#2C1B0E" stroke-width="3" stroke-linecap="round"/>
+  <path d="M266 228c8-6 18-6 26 0" fill="none" stroke="#2C1B0E" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,830 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Send,
+  MapPin,
+  CheckCheck,
+  Check,
+  Loader2,
+  MoreVertical,
+  AlertTriangle,
+  Ban,
+  LogOut,
+  Zap,
+  Car,
+  Handshake,
+  Flag,
+} from "lucide-react";
+import {
+  getMessages,
+  sendMessage,
+  markAsRead,
+  subscribeToMessages,
+  updateRideStatus,
+} from "@/lib/services/chatService";
+import type { Message } from "@/lib/services/chatService";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { PageHeader } from "@/components/page-header";
+import { toast } from "sonner";
+import {
+  blockUser,
+  reportUser,
+  unblockUser,
+  isUserBlocked,
+} from "@/lib/services/userSafetyService";
+
+const QUICK_ACTIONS = [
+  { label: "Confirm pickup time", icon: "🕐" },
+  { label: "Running 5 min late", icon: "⏰" },
+  { label: "I've arrived", icon: "✅" },
+  { label: "Cancel ride", icon: "❌" },
+];
+
+const STATUS_STEPS = ["requested", "accepted", "confirmed", "completed"];
+const STATUS_LABELS: Record<string, string> = {
+  requested: "Requested",
+  accepted: "Accepted",
+  confirmed: "Confirmed",
+  completed: "Completed",
+};
+
+interface ChatPartner {
+  name: string;
+  photo: string | null;
+  profile_id: string;
+  origin: string;
+  dest: string;
+  ride_status: string;
+}
+
+export default function ChatThreadPage() {
+  const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const conversationId = params.id as string;
+  const isGroup = searchParams.get("group") === "1";
+  const { profile } = useAuth();
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [partner, setPartner] = useState<ChatPartner | null>(null);
+  const [inputText, setInputText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showSafety, setShowSafety] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [rideStatus, setRideStatus] = useState("accepted");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  // Partner info (1:1 from ride_request; group from ride_groups + ride)
+  useEffect(() => {
+    async function loadPartner() {
+      const supabase = getSupabaseClient();
+      if (!profile) return;
+
+      if (isGroup) {
+        const { data: grp } = await supabase
+          .from("ride_groups")
+          .select("ride_id")
+          .eq("id", conversationId)
+          .single();
+        if (!grp) return;
+        const { data: hostRide } = await supabase
+          .from("rides")
+          .select("origin_name, dest_name")
+          .eq("id", grp.ride_id)
+          .single();
+        const { count } = await supabase
+          .from("ride_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("ride_id", grp.ride_id)
+          .eq("status", "accepted");
+        const participantCount = (count ?? 0) + 1; // host + requesters
+        setPartner({
+          name: `Group (${participantCount})`,
+          photo: null,
+          profile_id: "",
+          origin: hostRide?.origin_name ?? "",
+          dest: hostRide?.dest_name ?? "",
+          ride_status: "accepted",
+        });
+        setRideStatus("accepted");
+        return;
+      }
+
+      const { data: req } = await supabase
+        .from("ride_requests")
+        .select("*")
+        .eq("id", conversationId)
+        .single();
+
+      if (!req) return;
+
+      const { data: ride1 } = await supabase
+        .from("rides")
+        .select("id, user_id, origin_name, dest_name")
+        .eq("id", req.ride_id)
+        .single();
+
+      const { data: ride2 } = await supabase
+        .from("rides")
+        .select("id, user_id, origin_name, dest_name")
+        .eq("id", req.requester_ride_id)
+        .single();
+
+      const partnerRide = ride1?.user_id === profile.id ? ride2 : ride1;
+      if (!partnerRide) return;
+
+      const { data: partnerProfile } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, photo_url")
+        .eq("id", partnerRide.user_id)
+        .single();
+
+      const partnerData: ChatPartner = {
+        name: partnerProfile
+          ? `${partnerProfile.first_name} ${partnerProfile.last_name?.[0] || ""}.`
+          : "Unknown",
+        photo: partnerProfile?.photo_url || null,
+        profile_id: partnerProfile?.id || "",
+        origin: partnerRide.origin_name,
+        dest: partnerRide.dest_name,
+        ride_status: req.ride_status || "accepted",
+      };
+
+      setPartner(partnerData);
+      if (partnerData.profile_id) {
+        try {
+          const blocked = await isUserBlocked(partnerData.profile_id);
+          setIsBlocked(blocked);
+        } catch (err) {
+          console.error("Failed to check block status:", err);
+        }
+      }
+      setRideStatus(req.ride_status || "accepted");
+    }
+
+    loadPartner();
+  }, [conversationId, profile, isGroup]);
+
+  // Messages
+  useEffect(() => {
+    async function load() {
+      try {
+        const msgs = await getMessages(conversationId);
+        setMessages(msgs);
+        await markAsRead(conversationId);
+      } catch (err) {
+        console.error("Failed to load messages:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [conversationId]);
+
+  // Realtime
+  useEffect(() => {
+    const channel = subscribeToMessages(conversationId, (newMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+      markAsRead(conversationId);
+    }, isGroup);
+
+    return () => {
+      const supabase = getSupabaseClient();
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, isGroup]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  const handleSend = async () => {
+    const text = inputText.trim();
+    if (!text || sending) return;
+    setInputText("");
+    setSending(true);
+    try {
+      const msg = await sendMessage(conversationId, text, "text", undefined, isGroup);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    } catch (err) {
+      console.error("Failed to send:", err);
+      if (err instanceof Error && err.message === "Not authenticated") {
+        toast.error("Your session expired. Please log in again.");
+        router.push("/login");
+      } else {
+        toast.error("Failed to send message.");
+      }
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleQuickAction = async (label: string) => {
+    setSending(true);
+    setShowQuickActions(false);
+    try {
+      const msg = await sendMessage(conversationId, label, "quick_action", undefined, isGroup);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+      if (!isGroup) {
+        if (label === "Confirm pickup time" && rideStatus === "accepted") {
+          await updateRideStatus(conversationId, "confirmed");
+          setRideStatus("confirmed");
+        }
+        if (label === "Cancel ride") {
+          await updateRideStatus(conversationId, "cancelled");
+          setRideStatus("cancelled");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to send quick action:", err);
+      if (err instanceof Error && err.message === "Not authenticated") {
+        toast.error("Your session expired. Please log in again.");
+        router.push("/login");
+      } else {
+        toast.error("Failed to send quick action.");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleStatusAction = async (newStatus: "confirmed" | "completed") => {
+    if (isGroup) return; // Status updates are per ride_request; not applicable to group
+    const previousStatus = rideStatus;
+
+    // Optimistic: update UI instantly
+    setRideStatus(newStatus);
+    setUpdatingStatus(true);
+
+    try {
+      // Persist to database
+      await updateRideStatus(conversationId, newStatus);
+
+      // Best-effort system message
+      try {
+        const label =
+          newStatus === "confirmed"
+            ? "Meetup confirmed! See you there."
+            : "Ride completed. Thanks for riding together!";
+        const msg = await sendMessage(conversationId, label, "quick_action", undefined, isGroup);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      } catch (msgErr) {
+        console.warn("Status updated but system message failed:", msgErr);
+      }
+    } catch (err) {
+      // Roll back the optimistic update
+      setRideStatus(previousStatus);
+      console.error("Failed to update status:", err);
+      if (err instanceof Error && err.message === "Not authenticated") {
+        toast.error("Your session expired. Please log in again.");
+        router.push("/login");
+      } else {
+        toast.error("Failed to update ride status.");
+      }
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const formatMsgTime = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const formatDateSeparator = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return "Today";
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const groupedMessages: { date: string; msgs: Message[] }[] = [];
+  messages.forEach((msg) => {
+    const dateKey = new Date(msg.created_at).toDateString();
+    const lastGroup = groupedMessages[groupedMessages.length - 1];
+    if (lastGroup && lastGroup.date === dateKey) {
+      lastGroup.msgs.push(msg);
+    } else {
+      groupedMessages.push({ date: dateKey, msgs: [msg] });
+    }
+  });
+
+  const currentStepIndex = STATUS_STEPS.indexOf(rideStatus);
+
+  return (
+    <div className="flex h-[calc(100vh-4rem)] flex-col">
+      <PageHeader
+        title={partner?.name || "Chat"}
+        subtitle={
+          partner
+            ? `${partner.origin} → ${partner.dest}`
+            : "Coordinate your ride details"
+        }
+        backHref="/messages"
+        rightSlot={
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-zinc-500 hover:text-zinc-900"
+              onClick={() => setShowSafety(!showSafety)}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+            {showSafety && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowSafety(false)}
+                />
+                <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                  {!isGroup && partner?.profile_id && (
+                  <>
+                  <button
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                    onClick={async () => {
+                      setShowSafety(false);
+                      if (!partner) return;
+                      const confirmReport = window.confirm(
+                        "Report this user to Knot? We'll review this conversation.",
+                      );
+                      if (!confirmReport) return;
+
+                      const reason = window.prompt(
+                        "Tell us what happened (optional, but helpful for our review):",
+                      );
+                      // User hit cancel on the reason prompt
+                      if (reason === null) return;
+                      try {
+                        await reportUser(partner.profile_id, reason, conversationId);
+                        alert("Thanks for your report. We'll review this conversation.");
+                      } catch (err) {
+                        console.error("Failed to report user:", err);
+                        alert("Something went wrong sending your report. Please try again.");
+                      }
+                    }}
+                  >
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Report user
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                    onClick={async () => {
+                      setShowSafety(false);
+                      if (!partner) return;
+                      try {
+                        if (!isBlocked) {
+                          const confirmBlock = window.confirm(
+                            "Block this user? You won't see them in future matches.",
+                          );
+                          if (!confirmBlock) return;
+                          await blockUser(partner.profile_id);
+                          setIsBlocked(true);
+                          alert("User blocked. You won't see them in future matches.");
+                        } else {
+                          const confirmUnblock = window.confirm(
+                            "Unblock this user so they can appear in future matches?",
+                          );
+                          if (!confirmUnblock) return;
+                          await unblockUser(partner.profile_id);
+                          setIsBlocked(false);
+                          alert("User unblocked.");
+                        }
+                      } catch (err) {
+                        console.error("Failed to update block status:", err);
+                        alert("Something went wrong. Please try again.");
+                      }
+                    }}
+                  >
+                    <Ban className={`h-4 w-4 ${isBlocked ? "text-zinc-500" : "text-rose-500"}`} />
+                    {isBlocked ? "Unblock user" : "Block user"}
+                  </button>
+                  </>
+                  )}
+                  {!isGroup && (
+                  <>
+                  <div className="my-1 border-t border-zinc-100" />
+                  <button
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-rose-600 hover:bg-rose-50"
+                    onClick={async () => {
+                      setShowSafety(false);
+                      await updateRideStatus(conversationId, "cancelled");
+                      setRideStatus("cancelled");
+                      router.push("/messages");
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Leave ride
+                  </button>
+                  </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        }
+      />
+
+      {/* Status bar (1:1 only; group rides use group chat only) */}
+      {!isGroup && (
+      <div className="mb-2">
+        {rideStatus !== "cancelled" ? (
+          <div className="flex items-center px-1">
+            {STATUS_STEPS.map((step, i) => {
+              const isActive = i <= currentStepIndex;
+              const isCurrent = i === currentStepIndex;
+              return (
+                <div key={step} className="flex flex-1 items-center">
+                  <div className="flex flex-1 flex-col items-center">
+                    <div
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium ${
+                        isCurrent
+                          ? "bg-blue-600 text-white"
+                          : isActive
+                            ? "bg-emerald-500 text-white"
+                            : "bg-zinc-200 text-zinc-400"
+                      }`}
+                    >
+                      {isActive && i < currentStepIndex ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        i + 1
+                      )}
+                    </div>
+                    <span
+                      className={`mt-1 text-[10px] ${
+                        isCurrent
+                          ? "font-semibold text-blue-600"
+                          : isActive
+                            ? "text-emerald-600"
+                            : "text-zinc-400"
+                      }`}
+                    >
+                      {STATUS_LABELS[step]}
+                    </span>
+                  </div>
+                  {i < STATUS_STEPS.length - 1 && (
+                    <div
+                      className={`-mt-4 h-0.5 flex-1 ${
+                        i < currentStepIndex ? "bg-emerald-400" : "bg-zinc-200"
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <Badge className="bg-rose-50 text-xs text-rose-700">
+            Ride cancelled
+          </Badge>
+        )}
+        {rideStatus === "accepted" && (
+          <Button
+            className="mt-2 h-9 w-full rounded-lg bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
+            onClick={() => handleStatusAction("confirmed")}
+            disabled={updatingStatus}
+          >
+            {updatingStatus ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Handshake className="mr-2 h-4 w-4" />
+            )}
+            Confirm meetup
+          </Button>
+        )}
+        {rideStatus === "confirmed" && (
+          <Button
+            className="mt-2 h-9 w-full rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
+            onClick={() => handleStatusAction("completed")}
+            disabled={updatingStatus}
+          >
+            {updatingStatus ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Flag className="mr-2 h-4 w-4" />
+            )}
+            Complete ride
+          </Button>
+        )}
+      </div>
+      )}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-1 py-2">
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="py-10 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+              <Car className="h-6 w-6 text-blue-400" />
+            </div>
+            <p className="text-sm text-zinc-500">
+              Start the conversation and coordinate your ride.
+            </p>
+          </div>
+        ) : (
+          groupedMessages.map((group) => (
+            <div key={group.date}>
+              <div className="my-3 flex items-center justify-center">
+                <span className="rounded-full border border-zinc-100 bg-white px-3 py-1 text-[11px] text-zinc-400">
+                  {formatDateSeparator(group.msgs[0].created_at)}
+                </span>
+              </div>
+              {group.msgs.map((msg) => {
+                const isMine = msg.sender_id === profile?.id;
+
+                if (msg.message_type === "quick_action") {
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`mb-3 flex ${
+                        isMine ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs ${
+                          isMine
+                            ? "rounded-br-md bg-amber-500 text-white"
+                            : "rounded-bl-md bg-amber-100 text-amber-900"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-3.5 w-3.5" />
+                          <span className="text-sm font-medium">
+                            {msg.content}
+                          </span>
+                        </div>
+                        <div
+                          className={`mt-1 flex items-center gap-1 ${
+                            isMine ? "justify-end" : ""
+                          }`}
+                        >
+                          <span
+                            className={`text-[10px] ${
+                              isMine ? "text-amber-100" : "text-amber-700"
+                            }`}
+                          >
+                            {formatMsgTime(msg.created_at)}
+                          </span>
+                          {isMine &&
+                            (msg.read_at ? (
+                              <CheckCheck className="h-3 w-3 text-amber-100" />
+                            ) : (
+                              <Check className="h-3 w-3 text-amber-200" />
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (msg.message_type === "location") {
+                  const meta = msg.metadata as {
+                    lat: number;
+                    lng: number;
+                    map_url: string;
+                  } | null;
+                  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+                  const staticMapUrl =
+                    meta && apiKey
+                      ? `https://maps.googleapis.com/maps/api/staticmap?center=${meta.lat},${meta.lng}&zoom=15&size=300x150&markers=color:red%7C${meta.lat},${meta.lng}&key=${apiKey}`
+                      : null;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`mb-3 flex ${
+                        isMine ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[80%] overflow-hidden rounded-2xl ${
+                          isMine
+                            ? "rounded-br-md bg-blue-600 text-white"
+                            : "rounded-bl-md border border-zinc-200 bg-white"
+                        }`}
+                      >
+                        {staticMapUrl && (
+                          <a
+                            href={meta?.map_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <img
+                              src={staticMapUrl}
+                              alt="Location"
+                              className="h-[120px] w-full object-cover"
+                            />
+                          </a>
+                        )}
+                        <div className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5" />
+                            <span className="text-sm font-medium">
+                              Shared location
+                            </span>
+                          </div>
+                          {meta?.map_url && (
+                            <a
+                              href={meta.map_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`mt-1 block text-xs underline ${
+                                isMine ? "text-blue-200" : "text-blue-600"
+                              }`}
+                            >
+                              Open in Google Maps
+                            </a>
+                          )}
+                          <div
+                            className={`mt-1 flex items-center gap-1 ${
+                              isMine ? "justify-end" : ""
+                            }`}
+                          >
+                            <span
+                              className={`text-[10px] ${
+                                isMine ? "text-blue-200" : "text-zinc-400"
+                              }`}
+                            >
+                              {formatMsgTime(msg.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (msg.message_type === "system") {
+                  return (
+                    <div key={msg.id} className="my-3 flex justify-center">
+                      <span className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] text-zinc-500">
+                        {msg.content}
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`mb-3 flex ${
+                      isMine ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
+                        isMine
+                          ? "rounded-br-md bg-blue-600 text-white"
+                          : "rounded-bl-md border border-zinc-200 bg-white text-zinc-900"
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <div
+                        className={`mt-1 flex items-center gap-1 ${
+                          isMine ? "justify-end" : ""
+                        }`}
+                      >
+                        <span
+                          className={`text-[10px] ${
+                            isMine ? "text-blue-200" : "text-zinc-400"
+                          }`}
+                        >
+                          {formatMsgTime(msg.created_at)}
+                        </span>
+                        {isMine &&
+                          (msg.read_at ? (
+                            <CheckCheck className="h-3 w-3 text-blue-200" />
+                          ) : (
+                            <Check className="h-3 w-3 text-blue-300" />
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick actions */}
+      {showQuickActions && (
+        <div className="border-t border-zinc-200 bg-white px-3 py-2 text-[11px]">
+          <div className="flex flex-wrap gap-2">
+            {QUICK_ACTIONS.map((action) => (
+              <button
+                key={action.label}
+                className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-2 font-medium text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                onClick={() => handleQuickAction(action.label)}
+                disabled={sending}
+              >
+                {action.icon} {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input area */}
+      <div className="border-t border-zinc-200 bg-white">
+        <div className="flex items-center gap-2 px-3 py-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-9 w-9 ${
+              showQuickActions ? "bg-blue-50 text-blue-600" : "text-zinc-400"
+            }`}
+            onClick={() => setShowQuickActions(!showQuickActions)}
+          >
+            <Zap className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-zinc-400"
+            disabled
+          >
+            <Zap className="h-5 w-5 opacity-0" />
+          </Button>
+          <div className="relative flex-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Type a message..."
+              className="h-10 w-full rounded-full bg-zinc-100 px-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={rideStatus === "cancelled"}
+            />
+          </div>
+          <Button
+            size="icon"
+            className="h-10 w-10 rounded-full bg-blue-600 text-white hover:bg-blue-700"
+            onClick={handleSend}
+            disabled={!inputText.trim() || sending || rideStatus === "cancelled"}
+          >
+            {sending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <div className="px-6 pb-3">
+          <p className="text-center text-[10px] text-zinc-400">
+            Knot is a matching platform only. Always meet in safe, public
+            locations.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+

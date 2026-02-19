@@ -112,41 +112,51 @@ ALTER TABLE public.meetup_confirmations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_ratings ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Users can read all profiles but only update their own
+DROP POLICY IF EXISTS "Profiles are viewable by all authenticated users" ON public.profiles;
 CREATE POLICY "Profiles are viewable by all authenticated users" ON public.profiles
     FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Trip Intents: Users can manage their own, view searching trips
+DROP POLICY IF EXISTS "Users can view searching trip intents" ON public.trip_intents;
 CREATE POLICY "Users can view searching trip intents" ON public.trip_intents
     FOR SELECT USING (status = 'searching' OR user_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can insert their own trip intents" ON public.trip_intents;
 CREATE POLICY "Users can insert their own trip intents" ON public.trip_intents
     FOR INSERT WITH CHECK (user_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can update their own trip intents" ON public.trip_intents;
 CREATE POLICY "Users can update their own trip intents" ON public.trip_intents
     FOR UPDATE USING (user_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Users can delete their own trip intents" ON public.trip_intents;
 CREATE POLICY "Users can delete their own trip intents" ON public.trip_intents
     FOR DELETE USING (user_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
 -- Matches: Users can view matches they're part of
+DROP POLICY IF EXISTS "Users can view their matches" ON public.matches;
 CREATE POLICY "Users can view their matches" ON public.matches
     FOR SELECT USING (
         user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
         user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
     );
 
+DROP POLICY IF EXISTS "Users can insert matches" ON public.matches;
 CREATE POLICY "Users can insert matches" ON public.matches
     FOR INSERT WITH CHECK (
         user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
         user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
     );
 
+DROP POLICY IF EXISTS "Users can update their matches" ON public.matches;
 CREATE POLICY "Users can update their matches" ON public.matches
     FOR UPDATE USING (
         user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
@@ -154,32 +164,46 @@ CREATE POLICY "Users can update their matches" ON public.matches
     );
 
 -- Messages: Users can view/send messages in their matches
-CREATE POLICY "Users can view messages in their matches" ON public.messages
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM public.matches 
-            WHERE matches.id = messages.match_id 
-            AND (
-                matches.user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
-                matches.user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
-            )
-        )
-    );
+-- Only create these policies if messages table has match_id (old schema)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'messages' 
+        AND column_name = 'match_id'
+    ) THEN
+        DROP POLICY IF EXISTS "Users can view messages in their matches" ON public.messages;
+        EXECUTE 'CREATE POLICY "Users can view messages in their matches" ON public.messages
+            FOR SELECT USING (
+                EXISTS (
+                    SELECT 1 FROM public.matches 
+                    WHERE matches.id = messages.match_id 
+                    AND (
+                        matches.user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
+                        matches.user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
+                    )
+                )
+            )';
 
-CREATE POLICY "Users can send messages in their matches" ON public.messages
-    FOR INSERT WITH CHECK (
-        sender_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) AND
-        EXISTS (
-            SELECT 1 FROM public.matches 
-            WHERE matches.id = messages.match_id 
-            AND (
-                matches.user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
-                matches.user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
-            )
-        )
-    );
+        DROP POLICY IF EXISTS "Users can send messages in their matches" ON public.messages;
+        EXECUTE 'CREATE POLICY "Users can send messages in their matches" ON public.messages
+            FOR INSERT WITH CHECK (
+                sender_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) AND
+                EXISTS (
+                    SELECT 1 FROM public.matches 
+                    WHERE matches.id = messages.match_id 
+                    AND (
+                        matches.user_1 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
+                        matches.user_2 IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
+                    )
+                )
+            )';
+    END IF;
+END $$;
 
 -- Meetup Confirmations: Users can manage their own confirmations
+DROP POLICY IF EXISTS "Users can view confirmations in their matches" ON public.meetup_confirmations;
 CREATE POLICY "Users can view confirmations in their matches" ON public.meetup_confirmations
     FOR SELECT USING (
         EXISTS (
@@ -192,16 +216,19 @@ CREATE POLICY "Users can view confirmations in their matches" ON public.meetup_c
         )
     );
 
+DROP POLICY IF EXISTS "Users can create their own confirmations" ON public.meetup_confirmations;
 CREATE POLICY "Users can create their own confirmations" ON public.meetup_confirmations
     FOR INSERT WITH CHECK (user_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
 -- Trip Ratings: Users can view ratings about themselves, create ratings for completed trips
+DROP POLICY IF EXISTS "Users can view ratings about them" ON public.trip_ratings;
 CREATE POLICY "Users can view ratings about them" ON public.trip_ratings
     FOR SELECT USING (
         rated_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()) OR 
         rater_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid())
     );
 
+DROP POLICY IF EXISTS "Users can create ratings" ON public.trip_ratings;
 CREATE POLICY "Users can create ratings" ON public.trip_ratings
     FOR INSERT WITH CHECK (rater_id IN (SELECT id FROM public.profiles WHERE user_id = auth.uid()));
 
@@ -216,8 +243,10 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ language 'plpgsql'
+SET search_path = public;
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW
@@ -236,7 +265,8 @@ BEGIN
     );
     RETURN NEW;
 END;
-$$ language 'plpgsql' SECURITY DEFINER;
+$$ language 'plpgsql' SECURITY DEFINER
+SET search_path = public;
 
 -- Trigger to auto-create profile on signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -253,11 +283,43 @@ CREATE INDEX IF NOT EXISTS idx_trip_intents_user_id ON public.trip_intents(user_
 CREATE INDEX IF NOT EXISTS idx_trip_intents_status ON public.trip_intents(status);
 CREATE INDEX IF NOT EXISTS idx_trip_intents_departure_time ON public.trip_intents(departure_time);
 CREATE INDEX IF NOT EXISTS idx_matches_users ON public.matches(user_1, user_2);
-CREATE INDEX IF NOT EXISTS idx_messages_match_id ON public.messages(match_id);
+-- Only create index if match_id column exists (old schema)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'messages' 
+        AND column_name = 'match_id'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_messages_match_id ON public.messages(match_id);
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at);
 
 -- ============================================
 -- ENABLE REALTIME
 -- ============================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.matches;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = 'messages'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = 'matches'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.matches;
+    END IF;
+END $$;

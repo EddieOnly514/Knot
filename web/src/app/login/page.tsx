@@ -1,153 +1,181 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Mail, Chrome } from "lucide-react";
+import { Loader2, Mail, Chrome, Lock } from "lucide-react";
 
 function LoginForm() {
-    const { signInWithGoogle, signInWithEmail } = useAuth();
-    const [email, setEmail] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [emailSent, setEmailSent] = useState(false);
-    const searchParams = useSearchParams();
-    const error = searchParams.get("error");
+  const {
+    signInWithGoogle,
+    signInWithEmailPassword,
+    devSignIn,
+  } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
 
-    const handleGoogleSignIn = async () => {
-        setIsLoading(true);
-        const { error } = await signInWithGoogle();
-        if (error) {
-            toast.error("Failed to sign in with Google");
-            setIsLoading(false);
-        }
-    };
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      toast.error("Failed to sign in with Google");
+      setIsLoading(false);
+    }
+  };
 
-    const handleEmailSignIn = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!email) return;
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
 
-        setIsLoading(true);
-        const { error } = await signInWithEmail(email);
-        if (error) {
-            toast.error("Failed to send magic link");
-            setIsLoading(false);
-        } else {
-            setEmailSent(true);
-            toast.success("Check your email for the magic link!");
-            setIsLoading(false);
-        }
-    };
+    setIsLoading(true);
+    const { error } = await signInWithEmailPassword(email, password);
+    if (error) {
+      toast.error(error.message ?? "Failed to sign in");
+      setIsLoading(false);
+      return;
+    }
 
-    return (
-        <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl">
-            <CardHeader className="text-center">
-                <CardTitle className="text-white text-xl">Welcome back</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {error && (
-                    <div className="p-3 bg-red-500/20 rounded-lg text-red-200 text-sm text-center">
-                        Authentication failed. Please try again.
-                    </div>
-                )}
+    // Successful password sign-in – middleware/onboarding logic will take over.
+    router.push("/home");
+    setIsLoading(false);
+  };
 
-                {/* Google Sign In */}
-                <Button
-                    variant="outline"
-                    size="lg"
-                    className="w-full bg-white hover:bg-gray-100 text-gray-900 border-0 h-12"
-                    onClick={handleGoogleSignIn}
-                    disabled={isLoading}
-                >
-                    {isLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    ) : (
-                        <Chrome className="w-5 h-5 mr-2" />
-                    )}
-                    Continue with Google
-                </Button>
+  return (
+    <Card className="border-zinc-200 bg-white/90 shadow-xl backdrop-blur rounded-3xl">
+      <CardHeader className="text-center pb-2">
+        <CardTitle className="text-zinc-900 text-xl">Welcome back</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5 pt-2">
+        {error && (
+          <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-700 text-sm text-center">
+            Authentication failed. Please try again.
+          </div>
+        )}
 
-                <div className="relative">
-                    <Separator className="bg-white/20" />
-                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-transparent text-white/60 text-sm px-2">
-                        or
-                    </span>
-                </div>
+        <form onSubmit={handleEmailSignIn} className="space-y-4">
+            <div className="space-y-3">
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <Input
+                  type="email"
+                  placeholder="Enter email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <Input
+                  type="password"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
 
-                {/* Email Magic Link */}
-                {emailSent ? (
-                    <div className="text-center p-4 bg-green-500/20 rounded-lg">
-                        <Mail className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                        <p className="text-green-200">
-                            Check your email for the login link!
-                        </p>
-                    </div>
-                ) : (
-                    <form onSubmit={handleEmailSignIn} className="space-y-3">
-                        <Input
-                            type="email"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                            disabled={isLoading}
-                        />
-                        <Button
-                            type="submit"
-                            variant="secondary"
-                            size="lg"
-                            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white border-0"
-                            disabled={isLoading || !email}
-                        >
-                            {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                            ) : (
-                                <Mail className="w-5 h-5 mr-2" />
-                            )}
-                            Send Magic Link
-                        </Button>
-                    </form>
-                )}
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
+              disabled={isLoading || !email || !password}
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              ) : null}
+              Sign in
+            </Button>
+          </form>
 
-                <p className="text-center text-white/60 text-xs pt-4">
-                    By continuing, you agree to Knot&apos;s Terms of Service and
-                    Privacy Policy.
-                </p>
+        <div className="relative">
+          <Separator className="bg-zinc-100" />
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-400 text-xs px-2">
+            or
+          </span>
+        </div>
 
-                {process.env.NODE_ENV === "development" && (
-                    <button
-                        onClick={() => window.location.href = "/home"}
-                        className="w-full mt-3 py-2 px-4 rounded-lg bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-sm hover:bg-yellow-500/30 transition-colors"
-                    >
-                        🔧 Dev: Skip Login
-                    </button>
-                )}
-            </CardContent>
-        </Card>
-    );
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full h-12 rounded-full bg-white hover:bg-zinc-50 text-zinc-900 border-zinc-200 text-sm"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          ) : (
+            <Chrome className="w-5 h-5 mr-2" />
+          )}
+          Sign in with Google
+        </Button>
+
+        <p className="text-center text-zinc-400 text-[11px]">
+          By continuing, you agree to Knot&apos;s Terms of Service and Privacy
+          Policy.
+        </p>
+
+        <p className="text-center text-xs text-zinc-500">
+          New to Knot?{" "}
+          <Link
+            href="/signup"
+            className="font-semibold text-[#0052FF] hover:underline"
+          >
+            Sign up
+          </Link>
+        </p>
+
+        {process.env.NODE_ENV === "development" && (
+          <button
+            onClick={() => {
+              devSignIn();
+              router.push("/home");
+            }}
+            className="w-full mt-1 py-2 px-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
+          >
+            🔧 Dev: Test Login (New User)
+          </button>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                {/* Logo & Tagline */}
-                <div className="text-center mb-8">
-                    <h1 className="text-5xl font-bold text-white mb-2">Knot</h1>
-                    <p className="text-blue-200 text-lg">
-                        Split rides. Stay safe. Save money.
+        <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+            <div className="w-full max-w-md space-y-6">
+                <div className="text-center space-y-1">
+                    <h1 className="text-3xl font-semibold tracking-tight text-blue-600">
+                        Knot
+                    </h1>
+                    <p className="text-sm text-zinc-500">
+                        Welcome back. Sign in to keep splitting rides.
                     </p>
                 </div>
 
                 <Suspense
                     fallback={
-                        <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl">
+                        <Card className="border-zinc-200 bg-white shadow-xl">
                             <CardContent className="p-8 text-center">
-                                <Loader2 className="w-8 h-8 animate-spin text-white mx-auto" />
+                                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
                             </CardContent>
                         </Card>
                     }

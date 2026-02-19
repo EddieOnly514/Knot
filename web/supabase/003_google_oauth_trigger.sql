@@ -46,7 +46,8 @@ BEGIN
     );
     RETURN NEW;
 END;
-$$ language 'plpgsql' SECURITY DEFINER;
+$$ language 'plpgsql' SECURITY DEFINER
+SET search_path = public;
 
 -- Re-create the trigger (idempotent)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

@@ -1,52 +1,47 @@
 export * from "./database";
 
-// Re-export Profile from AuthContext for convenience
 export type { Profile } from "@/contexts/AuthContext";
 
-// Potential match result from find_potential_matches RPC (V2)
+// Match result from find_matches_v3 RPC
 export interface PotentialMatch {
-    trip_intent_id: string;
+    ride_id: string;
     user_id: string;
-    // Address info
-    departure_address: string | null;
-    departure_city: string | null;
-    destination: string;
-    destination_address: string | null;
-    destination_city: string | null;
-    departure_time: string;
-    party_size: number;
-    luggage: string;
-    car_preference: string;
-    // Computed distances
-    origin_distance_meters: number | null;
-    dest_distance_meters: number | null;
-    time_diff_minutes: number;
-    combined_party_size: number;
-    // Score
-    match_score: number;
-    score_origin: number;
-    score_destination: number;
-    score_time: number;
-    score_party: number;
-    score_luggage: number;
-    score_car_pref: number;
-    match_label: string;
-    estimated_savings_cents: number | null;
+    ride_type: "offering" | "seeking";
+    // Location
+    origin_name: string;
+    dest_name: string;
+    // Time window
+    departure_earliest: string;
+    departure_latest: string;
+    departure_preferred: string | null;
+    // Capacity
+    seats_available: number;
+    seats_needed: number;
+    space_capacity: number;
+    // Preferences
+    gender_pref: string;
+    quiet_ride: boolean;
+    music_ok: boolean;
     // Profile
     first_name: string;
     last_name: string;
     photo_url: string | null;
+    bio: string | null;
     rating: number;
     total_rides: number;
-    is_verified: boolean;
-}
-
-// Chat message
-export interface Message {
-    id: string;
-    created_at: string;
-    match_id: string;
-    sender_id: string;
-    content: string;
-    read: boolean;
+    phone_verified: boolean;
+    email_verified: boolean;
+    id_verified: boolean;
+    // Scores
+    total_score: number;
+    score_route: number;
+    score_time: number;
+    score_trust: number;
+    score_space: number;
+    score_prefs: number;
+    // Metadata
+    origin_distance_miles: number | null;
+    dest_distance_miles: number | null;
+    time_overlap_minutes: number;
+    match_label: string;
 }

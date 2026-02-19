@@ -2,6 +2,36 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+    const pathname = request.nextUrl.pathname;
+
+    // Routes that require an authenticated user
+    const protectedPaths = [
+        "/home",
+        "/post",
+        "/matches",
+        "/chat",
+        "/messages",
+        "/profile",
+        "/settings",
+        "/history",
+        "/onboarding",
+    ];
+    const authPaths = ["/login", "/signup"];
+    const isOnboardingPath = pathname.startsWith("/onboarding");
+
+    const isProtectedPath = protectedPaths.some((path) =>
+        pathname.startsWith(path)
+    );
+    const isAuthPath = authPaths.some((path) => pathname.startsWith(path));
+    const needsAuthCheck = isProtectedPath || isAuthPath || isOnboardingPath;
+
+    // Fast-path: for routes that don't care about auth, skip Supabase entirely
+    if (!needsAuthCheck) {
+        return NextResponse.next({
+            request,
+        });
+    }
+
     let supabaseResponse = NextResponse.next({
         request,
     });
@@ -35,11 +65,6 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Protected routes - redirect to login if not authenticated
-    const protectedPaths = ["/home", "/post", "/matches", "/chat", "/profile", "/settings"];
-    const isProtectedPath = protectedPaths.some((path) =>
-        request.nextUrl.pathname.startsWith(path)
-    );
-
     if (isProtectedPath && !user) {
         // Skip auth redirect in development
         if (process.env.NODE_ENV === "development") {
@@ -50,16 +75,36 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
-    // Redirect authenticated users away from auth pages
-    const authPaths = ["/login", "/signup"];
-    const isAuthPath = authPaths.some((path) =>
-        request.nextUrl.pathname.startsWith(path)
-    );
+    // For authenticated users, check onboarding completion only when needed.
+    // We intentionally skip this query on regular app routes to keep
+    // client-side navigation fast.
+    if (user && (isAuthPath || isOnboardingPath)) {
+        // Skip in development
+        if (process.env.NODE_ENV === "development") {
+            return supabaseResponse;
+        }
 
-    if (isAuthPath && user) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/home";
-        return NextResponse.redirect(url);
+        // Check if profile has been completed (school is the onboarding gate)
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("school")
+            .eq("user_id", user.id)
+            .single();
+
+        const isNewUser = !profile?.school;
+
+        if (isAuthPath && isNewUser) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/onboarding";
+            return NextResponse.redirect(url);
+        }
+
+        // Redirect completed users away from onboarding and auth pages.
+        if ((isAuthPath || isOnboardingPath) && !isNewUser) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/home";
+            return NextResponse.redirect(url);
+        }
     }
 
     return supabaseResponse;

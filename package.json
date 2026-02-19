@@ -1,0 +1,9 @@
+{
+  "name": "knot-ride-buddy-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "devDependencies": {
+    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4"
+  }
+}

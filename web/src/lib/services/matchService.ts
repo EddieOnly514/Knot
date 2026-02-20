@@ -85,6 +85,7 @@ export async function getAcceptedMatchCount(rideId: string): Promise<number> {
 
 /**
  * Accept or reject a match request.
+ * When accepted, also set ride_status to 'accepted' so the chat shows step 2 (Confirm meetup) instead of Requested.
  * Throws with message containing "ride_match_cap_exceeded" if either ride already has 4 matches.
  */
 export async function respondToRequest(
@@ -93,11 +94,28 @@ export async function respondToRequest(
 ) {
     const supabase = getSupabaseClient();
 
+    const updates = response === "accepted"
+        ? { status: "accepted", ride_status: "accepted" }
+        : { status: response };
+
     const { error } = await supabase
         .from("ride_requests")
-        .update({ status: response })
+        .update(updates)
         .eq("id", requestId);
 
+    if (error) throw error;
+}
+
+/**
+ * Withdraw (remove) a pending request that the current user sent.
+ * Updates status to 'rejected' so the request no longer appears as pending.
+ */
+export async function withdrawRequest(requestId: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+        .from("ride_requests")
+        .update({ status: "rejected" })
+        .eq("id", requestId);
     if (error) throw error;
 }
 

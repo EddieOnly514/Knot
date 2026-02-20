@@ -108,6 +108,8 @@ ALTER TABLE messages
     DROP CONSTRAINT IF EXISTS messages_conversation_id_check;
 
 ALTER TABLE messages
+    DROP CONSTRAINT IF EXISTS messages_conversation_or_group_check;
+ALTER TABLE messages
     ADD CONSTRAINT messages_conversation_or_group_check
     CHECK (
         (conversation_id IS NOT NULL AND ride_group_id IS NULL)
@@ -123,6 +125,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_ride_group
 -- =============================================
 
 -- When a ride (ride_id) gets its 2nd accepted requester, we have 3 participants → create group.
+-- Also migrate all existing 1:1 messages (for accepted requesters of this ride) into the group
+-- so the group chat shows full history.
 CREATE OR REPLACE FUNCTION maybe_create_ride_group()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -130,6 +134,7 @@ SET search_path = public
 AS $$
 DECLARE
     v_accepted_count INTEGER;
+    v_group_id UUID;
 BEGIN
     IF NEW.status <> 'accepted' THEN
         RETURN NEW;
@@ -145,6 +150,22 @@ BEGIN
         INSERT INTO ride_groups (ride_id)
         VALUES (NEW.ride_id)
         ON CONFLICT (ride_id) DO NOTHING;
+
+        -- Get the group id (either just inserted or existing)
+        SELECT id INTO v_group_id FROM ride_groups WHERE ride_id = NEW.ride_id LIMIT 1;
+
+        -- Migrate all 1:1 messages from accepted ride_requests for this ride into the group,
+        -- so the group chat shows previous messages.
+        IF v_group_id IS NOT NULL THEN
+            UPDATE messages
+            SET conversation_id = NULL,
+                ride_group_id = v_group_id
+            WHERE conversation_id IN (
+                SELECT id FROM ride_requests
+                WHERE ride_id = NEW.ride_id AND status = 'accepted'
+            )
+              AND ride_group_id IS NULL;
+        END IF;
     END IF;
 
     RETURN NEW;

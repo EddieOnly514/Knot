@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:simple": "next dev",
+    "dev:phone": "next dev --turbopack --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

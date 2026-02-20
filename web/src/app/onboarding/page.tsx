@@ -66,9 +66,9 @@ export default function OnboardingPage() {
         }
     }, [loading, isAuthenticated, router]);
 
-    // Redirect if already onboarded (but not while saving)
+    // Redirect if already onboarded (but not while saving) — gate on first name
     useEffect(() => {
-        if (!loading && !saving && profile?.school) {
+        if (!loading && !saving && profile?.first_name) {
             router.push("/home");
         }
     }, [loading, saving, profile, router]);
@@ -147,17 +147,13 @@ export default function OnboardingPage() {
             toast.error("Please enter your first name");
             return;
         }
-        if (!school.trim()) {
-            toast.error("Please enter your school");
-            return;
-        }
 
         setSaving(true);
         try {
             const result = await updateProfile({
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
-                school: school.trim(),
+                school: school.trim() || null,
                 phone: phone || null,
                 conversation_pref: conversationPref,
                 music_pref: musicPref,
@@ -258,7 +254,7 @@ export default function OnboardingPage() {
                         {/* School */}
                         <div>
                             <Label className="text-xs text-zinc-600 flex items-center gap-1.5 mb-1.5">
-                                <GraduationCap className="w-3.5 h-3.5" /> School *
+                                <GraduationCap className="w-3.5 h-3.5" /> School / company
                             </Label>
                             <Input
                                 value={school}

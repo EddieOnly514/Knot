@@ -71,10 +71,19 @@ npm install
 npm run dev
 ```
 
+### Supabase (Web) — Email confirmation
+
+For **email/password signups** (not Google), users receive a verification email and must confirm before signing in. To enable this:
+
+1. In [Supabase Dashboard](https://supabase.com/dashboard) → your project → **Authentication** → **Providers** → **Email**.
+2. Turn on **Confirm email**. Save.
+
+After that, signup sends a confirmation email; the user clicks the link, is verified, and is redirected to onboarding. Login shows a friendly message and “Resend verification email” if they try to sign in before confirming.
+
 ## Project Structure
 
 ```
-knot-ride-buddy/
+Knot/
 ├── mobile/                 # React Native Expo app
 │   ├── src/
 │   │   ├── components/     # Reusable UI components

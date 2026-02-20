@@ -9,18 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Mail, Chrome, Lock } from "lucide-react";
+import { Loader2, Mail, Chrome, Lock, MailCheck } from "lucide-react";
 
 function SignupForm() {
   const {
     signInWithGoogle,
     signUpWithEmailPassword,
+    resendEmailConfirmation,
     devSignIn,
   } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -38,9 +41,15 @@ function SignupForm() {
     if (!email || !password) return;
 
     setIsLoading(true);
-    const { error } = await signUpWithEmailPassword(email, password);
-    if (error) {
-      toast.error(error.message ?? "Failed to sign up");
+    setNeedsEmailConfirmation(false);
+    const { error: signUpError, needsEmailConfirmation: needsConfirm } = await signUpWithEmailPassword(email, password);
+    if (signUpError) {
+      toast.error(signUpError.message ?? "Failed to sign up");
+      setIsLoading(false);
+      return;
+    }
+    if (needsConfirm) {
+      setNeedsEmailConfirmation(true);
       setIsLoading(false);
       return;
     }
@@ -52,6 +61,54 @@ function SignupForm() {
     router.push("/onboarding");
     setIsLoading(false);
   };
+
+  const handleResendVerification = async () => {
+    if (!email) return;
+    setResendLoading(true);
+    const { error } = await resendEmailConfirmation(email);
+    if (error) {
+      toast.error(error.message ?? "Failed to resend email");
+    } else {
+      toast.success("Verification email sent. Check your inbox.");
+    }
+    setResendLoading(false);
+  };
+
+  if (needsEmailConfirmation) {
+    return (
+      <Card className="border-zinc-200 bg-white/90 shadow-xl backdrop-blur rounded-3xl">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-zinc-900 text-xl flex items-center justify-center gap-2">
+            <MailCheck className="w-5 h-5 text-emerald-500" />
+            Check your email
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-2 text-center">
+          <p className="text-sm text-zinc-600">
+            We sent a verification link to <strong className="text-zinc-900">{email}</strong>. Click the link to verify your account and finish signing up.
+          </p>
+          <p className="text-xs text-zinc-500">
+            Didn&apos;t get the email? Check spam or resend below.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={handleResendVerification}
+            disabled={resendLoading}
+          >
+            {resendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Resend verification email"}
+          </Button>
+          <Link href="/login" className="block">
+            <Button variant="outline" className="w-full rounded-full">
+              Back to log in
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-zinc-200 bg-white/90 shadow-xl backdrop-blur rounded-3xl">
@@ -78,7 +135,7 @@ function SignupForm() {
                   placeholder="Enter email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
                   disabled={isLoading}
                 />
               </div>
@@ -91,7 +148,7 @@ function SignupForm() {
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
                   disabled={isLoading}
                 />
               </div>
@@ -165,7 +222,13 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+    <div
+      className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-6"
+      style={{
+        paddingLeft: "max(1rem, env(safe-area-inset-left))",
+        paddingRight: "max(1rem, env(safe-area-inset-right))",
+      }}
+    >
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight text-blue-600">

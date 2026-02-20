@@ -39,7 +39,7 @@ export function PageHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="-ml-2 h-9 w-9 text-zinc-600 hover:text-zinc-900"
+          className="-ml-2 h-11 w-11 min-h-[44px] min-w-[44px] text-zinc-600 hover:text-zinc-900 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0"
           onClick={handleBack}
         >
           <ArrowLeft className="h-5 w-5" />

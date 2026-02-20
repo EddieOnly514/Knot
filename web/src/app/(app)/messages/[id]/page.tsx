@@ -5,6 +5,13 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Send,
   MapPin,
@@ -19,6 +26,10 @@ import {
   Car,
   Handshake,
   Flag,
+  ArrowLeft,
+  Navigation,
+  Clock,
+  ChevronRight,
 } from "lucide-react";
 import {
   getMessages,
@@ -29,7 +40,6 @@ import {
 } from "@/lib/services/chatService";
 import type { Message } from "@/lib/services/chatService";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import {
   blockUser,
@@ -37,12 +47,13 @@ import {
   unblockUser,
   isUserBlocked,
 } from "@/lib/services/userSafetyService";
+import { invalidateHomeCache } from "@/lib/homeCache";
 
 const QUICK_ACTIONS = [
-  { label: "Confirm pickup time", icon: "🕐" },
-  { label: "Running 5 min late", icon: "⏰" },
-  { label: "I've arrived", icon: "✅" },
-  { label: "Cancel ride", icon: "❌" },
+  { label: "Confirm pickup time" },
+  { label: "Running 5 min late" },
+  { label: "I've arrived" },
+  { label: "Cancel ride" },
 ];
 
 const STATUS_STEPS = ["requested", "accepted", "confirmed", "completed"];
@@ -60,6 +71,20 @@ interface ChatPartner {
   origin: string;
   dest: string;
   ride_status: string;
+  /** 1:1: host ride id; group: host ride id */
+  ride_id?: string;
+  /** 1:1 only: requester ride id */
+  requester_ride_id?: string;
+}
+
+interface RideDetail {
+  id: string;
+  origin_name: string;
+  dest_name: string;
+  departure_earliest: string | null;
+  departure_latest: string | null;
+  departure_preferred: string | null;
+  ride_type: string | null;
 }
 
 export default function ChatThreadPage() {
@@ -77,9 +102,12 @@ export default function ChatThreadPage() {
   const [loading, setLoading] = useState(true);
   const [showSafety, setShowSafety] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [rideStatus, setRideStatus] = useState("accepted");
+  const [rideStatus, setRideStatus] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [showRideDetail, setShowRideDetail] = useState(false);
+  const [rideDetailLoading, setRideDetailLoading] = useState(false);
+  const [rideDetails, setRideDetails] = useState<RideDetail[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +147,7 @@ export default function ChatThreadPage() {
           origin: hostRide?.origin_name ?? "",
           dest: hostRide?.dest_name ?? "",
           ride_status: "accepted",
+          ride_id: grp?.ride_id,
         });
         setRideStatus("accepted");
         return;
@@ -162,6 +191,8 @@ export default function ChatThreadPage() {
         origin: partnerRide.origin_name,
         dest: partnerRide.dest_name,
         ride_status: req.ride_status || "accepted",
+        ride_id: req.ride_id,
+        requester_ride_id: req.requester_ride_id,
       };
 
       setPartner(partnerData);
@@ -178,6 +209,29 @@ export default function ChatThreadPage() {
 
     loadPartner();
   }, [conversationId, profile, isGroup]);
+
+  // Fetch ride details when ride detail dialog is opened
+  useEffect(() => {
+    if (!showRideDetail || !partner) return;
+    const ids: string[] = [];
+    if (partner.ride_id) ids.push(partner.ride_id);
+    if (partner.requester_ride_id && partner.requester_ride_id !== partner.ride_id)
+      ids.push(partner.requester_ride_id);
+    if (ids.length === 0) {
+      setRideDetails([]);
+      return;
+    }
+    setRideDetailLoading(true);
+    (async () => {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase
+        .from("rides")
+        .select("id, origin_name, dest_name, departure_earliest, departure_latest, departure_preferred, ride_type")
+        .in("id", ids);
+      setRideDetails((data as RideDetail[]) ?? []);
+      setRideDetailLoading(false);
+    })();
+  }, [showRideDetail, partner]);
 
   // Messages
   useEffect(() => {
@@ -284,6 +338,10 @@ export default function ChatThreadPage() {
       // Persist to database
       await updateRideStatus(conversationId, newStatus);
 
+      if (newStatus === "completed") {
+        invalidateHomeCache();
+      }
+
       // Best-effort system message
       try {
         const label =
@@ -348,122 +406,248 @@ export default function ChatThreadPage() {
 
   const currentStepIndex = STATUS_STEPS.indexOf(rideStatus);
 
-  return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <PageHeader
-        title={partner?.name || "Chat"}
-        subtitle={
-          partner
-            ? `${partner.origin} → ${partner.dest}`
-            : "Coordinate your ride details"
-        }
-        backHref="/messages"
-        rightSlot={
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-zinc-500 hover:text-zinc-900"
-              onClick={() => setShowSafety(!showSafety)}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-            {showSafety && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowSafety(false)}
-                />
-                <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
-                  {!isGroup && partner?.profile_id && (
-                  <>
-                  <button
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
-                    onClick={async () => {
-                      setShowSafety(false);
-                      if (!partner) return;
-                      const confirmReport = window.confirm(
-                        "Report this user to Knot? We'll review this conversation.",
-                      );
-                      if (!confirmReport) return;
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/messages");
+  };
 
-                      const reason = window.prompt(
-                        "Tell us what happened (optional, but helpful for our review):",
-                      );
-                      // User hit cancel on the reason prompt
-                      if (reason === null) return;
-                      try {
-                        await reportUser(partner.profile_id, reason, conversationId);
-                        alert("Thanks for your report. We'll review this conversation.");
-                      } catch (err) {
-                        console.error("Failed to report user:", err);
-                        alert("Something went wrong sending your report. Please try again.");
-                      }
-                    }}
-                  >
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    Report user
-                  </button>
-                  <button
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
-                    onClick={async () => {
-                      setShowSafety(false);
-                      if (!partner) return;
-                      try {
-                        if (!isBlocked) {
-                          const confirmBlock = window.confirm(
-                            "Block this user? You won't see them in future matches.",
-                          );
-                          if (!confirmBlock) return;
-                          await blockUser(partner.profile_id);
-                          setIsBlocked(true);
-                          alert("User blocked. You won't see them in future matches.");
-                        } else {
-                          const confirmUnblock = window.confirm(
-                            "Unblock this user so they can appear in future matches?",
-                          );
-                          if (!confirmUnblock) return;
-                          await unblockUser(partner.profile_id);
-                          setIsBlocked(false);
-                          alert("User unblocked.");
-                        }
-                      } catch (err) {
-                        console.error("Failed to update block status:", err);
-                        alert("Something went wrong. Please try again.");
-                      }
-                    }}
-                  >
-                    <Ban className={`h-4 w-4 ${isBlocked ? "text-zinc-500" : "text-rose-500"}`} />
-                    {isBlocked ? "Unblock user" : "Block user"}
-                  </button>
-                  </>
-                  )}
-                  {!isGroup && (
-                  <>
-                  <div className="my-1 border-t border-zinc-100" />
-                  <button
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-rose-600 hover:bg-rose-50"
-                    onClick={async () => {
-                      setShowSafety(false);
-                      await updateRideStatus(conversationId, "cancelled");
-                      setRideStatus("cancelled");
-                      router.push("/messages");
-                    }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Leave ride
-                  </button>
-                  </>
-                  )}
+  const formatRideTime = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-2 h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 text-zinc-600 hover:text-zinc-900 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            {!isGroup && partner?.profile_id ? (
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-lg p-1 -m-1 text-left hover:bg-zinc-100 transition-colors"
+                onClick={() => router.push(`/profile/${partner.profile_id}`)}
+              >
+                <Avatar className="h-9 w-9 shrink-0">
+                  <AvatarImage src={partner.photo || undefined} />
+                  <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+                    {partner.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <h1 className="truncate text-base font-semibold text-zinc-900 sm:text-lg">
+                    {partner.name}
+                  </h1>
+                  <p className="text-xs text-zinc-500">Tap to view profile</p>
                 </div>
-              </>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                {partner?.photo != null && (
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarImage src={partner.photo || undefined} />
+                    <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+                      {partner?.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                <h1 className="truncate text-base font-semibold text-zinc-900 sm:text-lg">
+                  {partner?.name || "Chat"}
+                </h1>
+              </div>
+            )}
+            {partner && (
+              <button
+                type="button"
+                className="mt-0.5 flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800 transition-colors"
+                onClick={() => setShowRideDetail(true)}
+              >
+                <Send className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                <span className="truncate">{partner.origin}</span>
+                <span className="shrink-0">→</span>
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                <span className="truncate">{partner.dest}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              </button>
+            )}
+            {!partner && (
+              <p className="text-xs text-zinc-500">Coordinate your ride details</p>
             )}
           </div>
-        }
-      />
+        </div>
+        <div className="relative shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 min-h-[44px] min-w-[44px] text-zinc-500 hover:text-zinc-900 touch-manipulation md:h-8 md:w-8 md:min-h-0 md:min-w-0"
+            onClick={() => setShowSafety(!showSafety)}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+          {showSafety && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowSafety(false)}
+              />
+              <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                {!isGroup && partner?.profile_id && (
+                <>
+                <button
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                  onClick={async () => {
+                    setShowSafety(false);
+                    if (!partner) return;
+                    const confirmReport = window.confirm(
+                      "Report this user to Knot? We'll review this conversation.",
+                    );
+                    if (!confirmReport) return;
 
-      {/* Status bar (1:1 only; group rides use group chat only) */}
-      {!isGroup && (
+                    const reason = window.prompt(
+                      "Tell us what happened (optional, but helpful for our review):",
+                    );
+                    if (reason === null) return;
+                    try {
+                      await reportUser(partner.profile_id, reason, conversationId);
+                      alert("Thanks for your report. We'll review this conversation.");
+                    } catch (err) {
+                      console.error("Failed to report user:", err);
+                      alert("Something went wrong sending your report. Please try again.");
+                    }
+                  }}
+                >
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Report user
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                  onClick={async () => {
+                    setShowSafety(false);
+                    if (!partner) return;
+                    try {
+                      if (!isBlocked) {
+                        const confirmBlock = window.confirm(
+                          "Block this user? You won't see them in future matches.",
+                        );
+                        if (!confirmBlock) return;
+                        await blockUser(partner.profile_id);
+                        setIsBlocked(true);
+                        alert("User blocked. You won't see them in future matches.");
+                      } else {
+                        const confirmUnblock = window.confirm(
+                          "Unblock this user so they can appear in future matches?",
+                        );
+                        if (!confirmUnblock) return;
+                        await unblockUser(partner.profile_id);
+                        setIsBlocked(false);
+                        alert("User unblocked.");
+                      }
+                    } catch (err) {
+                      console.error("Failed to update block status:", err);
+                      alert("Something went wrong. Please try again.");
+                    }
+                  }}
+                >
+                  <Ban className={`h-4 w-4 ${isBlocked ? "text-zinc-500" : "text-rose-500"}`} />
+                  {isBlocked ? "Unblock user" : "Block user"}
+                </button>
+                </>
+                )}
+                {!isGroup && (
+                <>
+                <div className="my-1 border-t border-zinc-100" />
+                <button
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-rose-600 hover:bg-rose-50"
+                  onClick={async () => {
+                    setShowSafety(false);
+                    await updateRideStatus(conversationId, "cancelled");
+                    setRideStatus("cancelled");
+                    router.push("/messages");
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Leave ride
+                </button>
+                </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      <Dialog open={showRideDetail} onOpenChange={setShowRideDetail}>
+        <DialogContent className="sm:max-w-md" showCloseButton={true}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-blue-600" />
+              Ride details
+            </DialogTitle>
+          </DialogHeader>
+          {rideDetailLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+            </div>
+          ) : rideDetails.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              {partner ? `${partner.origin} → ${partner.dest}` : "No ride details."}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {rideDetails.map((ride, i) => (
+                <div
+                  key={ride.id}
+                  className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4"
+                >
+                  <div className="flex items-start gap-2">
+                    <Navigation className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="font-medium text-zinc-900">{ride.origin_name}</p>
+                      <p className="text-xs text-zinc-500">↓ to</p>
+                      <p className="font-medium text-zinc-900">{ride.dest_name}</p>
+                    </div>
+                  </div>
+                  {(ride.departure_earliest || ride.departure_latest || ride.departure_preferred) && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-zinc-600">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      {ride.departure_preferred && (
+                        <span>Preferred: {formatRideTime(ride.departure_preferred)}</span>
+                      )}
+                      {(ride.departure_earliest || ride.departure_latest) && (
+                        <span>
+                          Window: {formatRideTime(ride.departure_earliest) ?? "—"} – {formatRideTime(ride.departure_latest) ?? "—"}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {ride.ride_type && (
+                    <p className="mt-2 text-[11px] text-zinc-400 capitalize">{ride.ride_type}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Status bar (1:1 only). Hide until rideStatus loaded from server to avoid flashing "Confirm meetup". */}
+      {!isGroup && rideStatus !== null && (
       <div className="mb-2">
         {rideStatus !== "cancelled" ? (
           <div className="flex items-center px-1">
@@ -547,8 +731,8 @@ export default function ChatThreadPage() {
       </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-1 py-2">
+      {/* Messages — only this area scrolls; white background to match chat design */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-white px-4 py-3">
         {loading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
@@ -584,12 +768,11 @@ export default function ChatThreadPage() {
                       <div
                         className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs ${
                           isMine
-                            ? "rounded-br-md bg-amber-500 text-white"
-                            : "rounded-bl-md bg-amber-100 text-amber-900"
+                            ? "rounded-br-md bg-blue-600 text-white"
+                            : "rounded-bl-md bg-blue-50 text-blue-900"
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <Zap className="h-3.5 w-3.5" />
                           <span className="text-sm font-medium">
                             {msg.content}
                           </span>
@@ -601,16 +784,16 @@ export default function ChatThreadPage() {
                         >
                           <span
                             className={`text-[10px] ${
-                              isMine ? "text-amber-100" : "text-amber-700"
+                              isMine ? "text-blue-200" : "text-blue-700"
                             }`}
                           >
                             {formatMsgTime(msg.created_at)}
                           </span>
                           {isMine &&
                             (msg.read_at ? (
-                              <CheckCheck className="h-3 w-3 text-amber-100" />
+                              <CheckCheck className="h-3 w-3 text-blue-200" />
                             ) : (
-                              <Check className="h-3 w-3 text-amber-200" />
+                              <Check className="h-3 w-3 text-blue-300" />
                             ))}
                         </div>
                       </div>
@@ -755,39 +938,35 @@ export default function ChatThreadPage() {
             {QUICK_ACTIONS.map((action) => (
               <button
                 key={action.label}
-                className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-2 font-medium text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                type="button"
+                className="min-h-[44px] rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2.5 font-medium text-zinc-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 touch-manipulation"
                 onClick={() => handleQuickAction(action.label)}
                 disabled={sending}
               >
-                {action.icon} {action.label}
+                {action.label}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Input area */}
-      <div className="border-t border-zinc-200 bg-white">
-        <div className="flex items-center gap-2 px-3 py-3">
+      {/* Input area — safe-area for notched devices */}
+      <div
+        className="border-t border-zinc-200 bg-white"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="flex items-center gap-1 px-3 py-3 sm:gap-0">
           <Button
             variant="ghost"
             size="icon"
-            className={`h-9 w-9 ${
+            className={`h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0 ${
               showQuickActions ? "bg-blue-50 text-blue-600" : "text-zinc-400"
             }`}
             onClick={() => setShowQuickActions(!showQuickActions)}
           >
             <Zap className="h-5 w-5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-zinc-400"
-            disabled
-          >
-            <Zap className="h-5 w-5 opacity-0" />
-          </Button>
-          <div className="relative flex-1">
+          <div className="relative min-w-0 flex-1">
             <input
               ref={inputRef}
               type="text"
@@ -800,13 +979,13 @@ export default function ChatThreadPage() {
                 }
               }}
               placeholder="Type a message..."
-              className="h-10 w-full rounded-full bg-zinc-100 px-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-11 min-h-[44px] w-full rounded-full bg-zinc-100 px-4 text-base text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 md:h-10 md:min-h-0 md:text-sm"
               disabled={rideStatus === "cancelled"}
             />
           </div>
           <Button
             size="icon"
-            className="h-10 w-10 rounded-full bg-blue-600 text-white hover:bg-blue-700"
+            className="h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 touch-manipulation md:h-10 md:w-10 md:min-h-0 md:min-w-0"
             onClick={handleSend}
             disabled={!inputText.trim() || sending || rideStatus === "cancelled"}
           >
@@ -817,7 +996,7 @@ export default function ChatThreadPage() {
             )}
           </Button>
         </div>
-        <div className="px-6 pb-3">
+        <div className="px-4 pb-3 md:px-6">
           <p className="text-center text-[10px] text-zinc-400">
             Knot is a matching platform only. Always meet in safe, public
             locations.

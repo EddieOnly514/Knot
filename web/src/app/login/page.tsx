@@ -15,12 +15,16 @@ function LoginForm() {
   const {
     signInWithGoogle,
     signInWithEmailPassword,
+    resendEmailConfirmation,
     devSignIn,
   } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -38,11 +42,18 @@ function LoginForm() {
     if (!email || !password) return;
 
     setIsLoading(true);
+    setEmailNotConfirmed(false);
     const { error } = await signInWithEmailPassword(email, password);
     if (error) {
-      const msg =
-        (error as { message?: string }).message ?? "Failed to sign in";
-      toast.error(msg);
+      const msg = (error as { message?: string }).message ?? "Failed to sign in";
+      const isUnconfirmed =
+        /email not confirmed|confirm your email/i.test(msg);
+      if (isUnconfirmed) {
+        setEmailNotConfirmed(true);
+        toast.error("Please verify your email before signing in.");
+      } else {
+        toast.error(msg);
+      }
       setIsLoading(false);
       return;
     }
@@ -52,10 +63,48 @@ function LoginForm() {
     setIsLoading(false);
   };
 
+  const handleResendVerification = async () => {
+    if (!email) return;
+    setResendLoading(true);
+    const { error } = await resendEmailConfirmation(email);
+    if (error) {
+      toast.error(error.message ?? "Failed to resend email");
+    } else {
+      toast.success("Verification email sent. Check your inbox.");
+      setEmailNotConfirmed(false);
+    }
+    setResendLoading(false);
+  };
+
   const fillTestAccount = () => {
     setEmail("sarah@knot-test.dev");
     setPassword("KnotTest2026!");
     toast.success("Test credentials filled. Click Sign in.");
+  };
+
+  const fillGroupChatTestAccount = () => {
+    setEmail("david@knot-test.dev");
+    setPassword("KnotTest2026!");
+    toast.success("Group chat test account filled. Go to Messages after sign-in.");
+  };
+
+  const seedTestAccounts = async () => {
+    setIsSeeding(true);
+    try {
+      const res = await fetch("/api/seed-matches", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? `Seed failed (${res.status})`);
+        return;
+      }
+      setEmail("sarah@knot-test.dev");
+      setPassword("KnotTest2026!");
+      toast.success("Test accounts created. You can sign in now.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to create test accounts");
+    } finally {
+      setIsSeeding(false);
+    }
   };
 
   return (
@@ -70,6 +119,22 @@ function LoginForm() {
           </div>
         )}
 
+        {emailNotConfirmed && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center space-y-2">
+            <p>Your email isn&apos;t verified yet. Check your inbox for the verification link, or resend it below.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full border-amber-300 text-amber-800 hover:bg-amber-100"
+              onClick={handleResendVerification}
+              disabled={resendLoading}
+            >
+              {resendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Resend verification email"}
+            </Button>
+          </div>
+        )}
+
         <form onSubmit={handleEmailSignIn} className="space-y-4">
             <div className="space-y-3">
               <div className="relative">
@@ -81,7 +146,7 @@ function LoginForm() {
                   placeholder="Enter email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
                   disabled={isLoading}
                 />
               </div>
@@ -94,7 +159,7 @@ function LoginForm() {
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400"
+                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
                   disabled={isLoading}
                 />
               </div>
@@ -150,21 +215,49 @@ function LoginForm() {
           </Link>
         </p>
 
-        {process.env.NODE_ENV === "development" && (
+        {(typeof window === "undefined"
+          ? process.env.NODE_ENV === "development"
+          : window.location.hostname === "localhost" ||
+            window.location.hostname === "127.0.0.1") && (
           <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <p className="text-amber-800 text-xs font-medium">
-              Dev: Test accounts (from POST /api/seed-matches)
+              Dev: Test accounts for simulated match
             </p>
+            <button
+              type="button"
+              onClick={seedTestAccounts}
+              disabled={isSeeding}
+              className="w-full py-2 px-4 rounded-lg bg-amber-200 border border-amber-400 text-amber-900 text-xs font-medium hover:bg-amber-300 transition-colors disabled:opacity-60"
+            >
+              {isSeeding ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin inline mr-2" />
+                  Creating test accounts…
+                </>
+              ) : (
+                "1. Create test accounts (run seed)"
+              )}
+            </button>
             <button
               type="button"
               onClick={fillTestAccount}
               className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
             >
-              Fill test account (sarah@knot-test.dev)
+              2. Fill 1:1 test account (sarah@knot-test.dev)
+            </button>
+            <button
+              type="button"
+              onClick={fillGroupChatTestAccount}
+              className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
+            >
+              3. Fill group chat test account (david@knot-test.dev)
             </button>
             <p className="text-amber-700 text-[11px]">
-              Password: KnotTest2026! — Enable &quot;Email&quot; in Supabase →
-              Auth → Providers if sign-in fails.
+              Password: KnotTest2026! — Then click Sign in. If sign-in fails,
+              enable &quot;Email&quot; in Supabase → Auth → Providers.
+            </p>
+            <p className="text-amber-700 text-[11px]">
+              Group chat: after sign-in go to Messages; you&apos;ll see &quot;Group (3)&quot; or &quot;Group (4)&quot;. Also try sophia@, alex@, chris@, jordan@, taylor@, riley@.
             </p>
             <button
               type="button"
@@ -185,7 +278,13 @@ function LoginForm() {
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+        <div
+          className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-6"
+          style={{
+            paddingLeft: "max(1rem, env(safe-area-inset-left))",
+            paddingRight: "max(1rem, env(safe-area-inset-right))",
+          }}
+        >
             <div className="w-full max-w-md space-y-6">
                 <div className="text-center space-y-1">
                     <h1 className="text-3xl font-semibold tracking-tight text-blue-600">

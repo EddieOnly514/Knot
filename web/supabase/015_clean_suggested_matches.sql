@@ -7,7 +7,8 @@
 -- =============================================
 
 -- Remove cached match rows for (ride_id, requester_ride_id) in either direction
--- whenever a ride_request is inserted or updated (any status).
+-- whenever a ride_request is inserted or updated (any status), or when a ride
+-- is completed (ride_status -> 'completed') so the pair is no longer suggested.
 CREATE OR REPLACE FUNCTION ride_requests_clean_ride_matches()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -23,7 +24,7 @@ $$;
 
 DROP TRIGGER IF EXISTS ride_requests_clean_ride_matches_trigger ON ride_requests;
 CREATE TRIGGER ride_requests_clean_ride_matches_trigger
-    AFTER INSERT OR UPDATE OF ride_id, requester_ride_id, status
+    AFTER INSERT OR UPDATE OF ride_id, requester_ride_id, status, ride_status
     ON ride_requests
     FOR EACH ROW
     EXECUTE FUNCTION ride_requests_clean_ride_matches();

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { getMyRequests } from "@/lib/services/matchService";
 
 export default function ProfilePage() {
   const { profile, user, updateProfile } = useAuth();
@@ -63,6 +64,17 @@ export default function ProfilePage() {
   const [genderPref, setGenderPref] = useState(
     profile?.gender_preference || "any",
   );
+  const [completedRidesCount, setCompletedRidesCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    getMyRequests(profile.id)
+      .then((requests) => {
+        const count = requests.filter((r) => r.ride_status === "completed").length;
+        setCompletedRidesCount(count);
+      })
+      .catch(() => setCompletedRidesCount(0));
+  }, [profile?.id]);
 
   useEffect(() => {
     if (profile && !isEditing) {
@@ -210,7 +222,7 @@ export default function ProfilePage() {
       />
 
       {/* Avatar + name */}
-      <Card className="border-zinc-200 bg-blue-50">
+      <Card className="border-zinc-200 bg-white">
         <CardContent className="relative flex flex-col items-center gap-2 p-3">
           <Button
             variant="ghost"
@@ -344,7 +356,7 @@ export default function ProfilePage() {
             <div className="flex items-center justify-center gap-1">
               <Car className="h-4 w-4 text-blue-500" />
               <span className="text-lg font-semibold text-zinc-900">
-                {profile?.completed_rides ?? profile?.total_rides ?? 0}
+                {completedRidesCount ?? profile?.completed_rides ?? profile?.total_rides ?? 0}
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-zinc-500">Rides</p>

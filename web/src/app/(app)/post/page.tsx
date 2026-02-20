@@ -268,7 +268,7 @@ export default function PostRidePage() {
   const [spaceCapacity, setSpaceCapacity] = useState("1");
 
   const [quietRide, setQuietRide] = useState(false);
-  const [musicOk, setMusicOk] = useState(true);
+  const [musicOk, setMusicOk] = useState(false);
   const [genderPref, setGenderPref] =
     useState<"any" | "male" | "female">("any");
   const [notes, setNotes] = useState("");
@@ -461,7 +461,7 @@ export default function PostRidePage() {
               <MapPin className="h-4 w-4 text-blue-600" />
               Route
             </CardTitle>
-            <p className="mt-0.5 text-[11px] text-zinc-500">
+            <p className="mt-0.5 text-[11px] font-medium text-zinc-500">
               Use a general area like UCLA or LAX. You can share the exact meetup spot later in chat.
             </p>
           </CardHeader>

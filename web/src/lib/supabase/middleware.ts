@@ -84,14 +84,14 @@ export async function updateSession(request: NextRequest) {
             return supabaseResponse;
         }
 
-        // Check if profile has been completed (school is the onboarding gate)
+        // Check if profile has been completed (first name is the onboarding gate)
         const { data: profile } = await supabase
             .from("profiles")
-            .select("school")
+            .select("first_name")
             .eq("user_id", user.id)
             .single();
 
-        const isNewUser = !profile?.school;
+        const isNewUser = !profile?.first_name;
 
         if (isAuthPath && isNewUser) {
             const url = request.nextUrl.clone();

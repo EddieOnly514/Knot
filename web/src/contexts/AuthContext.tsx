@@ -55,7 +55,8 @@ interface AuthContextType {
     signUpWithEmailPassword: (
         email: string,
         password: string
-    ) => Promise<{ error: Error | null }>;
+    ) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
+    resendEmailConfirmation: (email: string) => Promise<{ error: Error | null }>;
     signInWithEmailPassword: (
         email: string,
         password: string
@@ -285,16 +286,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signUpWithEmailPassword = async (
         email: string,
         password: string
-    ): Promise<{ error: Error | null }> => {
+    ): Promise<{ error: Error | null; needsEmailConfirmation?: boolean }> => {
         try {
-            const { error } = await supabase.auth.signUp({
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
                 },
             });
-            return { error: error || null };
+            if (error) return { error };
+            // When "Confirm email" is enabled in Supabase, no session is created until the user clicks the link
+            const needsEmailConfirmation = !!data?.user && !data?.session;
+            return { error: null, needsEmailConfirmation };
+        } catch (error) {
+            return { error: error as Error };
+        }
+    };
+
+    const resendEmailConfirmation = async (
+        email: string
+    ): Promise<{ error: Error | null }> => {
+        try {
+            const { error } = await supabase.auth.resend({
+                type: "signup",
+                email,
+            });
+            return { error: error ?? null };
         } catch (error) {
             return { error: error as Error };
         }
@@ -363,10 +381,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAuthenticated: !!session,
-        isNewUser: !!session && !!profile && !profile.school,
+        isNewUser: !!session && !!profile && !profile.first_name,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmailPassword,
+        resendEmailConfirmation,
         signInWithEmailPassword,
         signOut,
         devSignIn,

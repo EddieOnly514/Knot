@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { BottomNav } from "@/components/bottom-nav";
 import { SidebarNav } from "@/components/sidebar-nav";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -45,16 +44,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl">
+    <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-900">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1">
         <SidebarNav />
-        <main className="flex-1 px-4 pb-20 pt-5 md:px-10 md:pb-8 md:pt-10">
+        <main className="app-main flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-14 md:px-10 md:pt-10">
           {children}
         </main>
       </div>
-
-      {/* Mobile bottom navigation */}
-      <BottomNav />
     </div>
   );
 }

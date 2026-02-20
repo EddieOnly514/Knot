@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -39,11 +39,15 @@ function formatTimeAgo(dateStr: string): string {
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
   const cachedConversations = profile
     ? conversationsCache.get(profile.id)
     : undefined;
+  // When arriving from "accept request" we pass ?refresh=1 to force fresh list (1:1 → group)
+  const forceRefresh = searchParams.get("refresh") === "1";
   const cacheIsValid =
+    !forceRefresh &&
     !!profile &&
     !!cachedConversations &&
     Date.now() - cachedConversations.fetchedAt < CONVERSATION_CACHE_TTL_MS;
@@ -51,7 +55,7 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>(
     cacheIsValid ? cachedConversations!.data : [],
   );
-  const [loading, setLoading] = useState(!cacheIsValid);
+  const [loading, setLoading] = useState(!cacheIsValid || forceRefresh);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -63,6 +67,9 @@ export default function MessagesPage() {
   useEffect(() => {
     async function load() {
       try {
+        if (forceRefresh && profile?.id) {
+          conversationsCache.delete(profile.id);
+        }
         const data = await getConversations(profile?.id);
         setConversations(data);
         if (profile?.id) {
@@ -70,6 +77,9 @@ export default function MessagesPage() {
             fetchedAt: Date.now(),
             data,
           });
+        }
+        if (forceRefresh) {
+          router.replace("/messages", { scroll: false });
         }
       } catch (err) {
         console.error("Failed to load conversations:", err);
@@ -80,10 +90,11 @@ export default function MessagesPage() {
     if (profile) {
       load();
     }
-  }, [profile]);
+  }, [profile, forceRefresh, router]);
 
   const activeConversations = conversations.filter(
-    (conv) => conv.ride_status !== "completed",
+    (conv) =>
+      conv.ride_status !== "completed" && conv.ride_status !== "cancelled",
   );
 
   const filteredConversations = useMemo(() => {

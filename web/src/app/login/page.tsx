@@ -213,6 +213,13 @@ function LoginForm() {
           >
             Sign up
           </Link>
+          {" · "}
+          <Link
+            href="/waitlist"
+            className="font-semibold text-[#0052FF] hover:underline"
+          >
+            Join waitlist
+          </Link>
         </p>
 
         {(typeof window === "undefined"
@@ -257,7 +264,7 @@ function LoginForm() {
               enable &quot;Email&quot; in Supabase → Auth → Providers.
             </p>
             <p className="text-amber-700 text-[11px]">
-              Group chat: after sign-in go to Messages; you&apos;ll see &quot;Group (3)&quot; or &quot;Group (4)&quot;. Also try sophia@, alex@, chris@, jordan@, taylor@, riley@.
+              <strong>1:1 → group test:</strong> Sign in as david@… → Messages (1:1 with Sophia) → Home → accept Alex&apos;s request → Messages shows Group (3) with same messages. Chris@… already has Group (4).
             </p>
             <button
               type="button"

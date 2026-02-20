@@ -30,6 +30,7 @@ import {
   Navigation,
   Clock,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import {
   getMessages,
@@ -37,6 +38,8 @@ import {
   markAsRead,
   subscribeToMessages,
   updateRideStatus,
+  updateRideStatusForGroup,
+  leaveGroup,
 } from "@/lib/services/chatService";
 import type { Message } from "@/lib/services/chatService";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -87,6 +90,13 @@ interface RideDetail {
   ride_type: string | null;
 }
 
+interface GroupParticipant {
+  id: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+}
+
 export default function ChatThreadPage() {
   const router = useRouter();
   const params = useParams();
@@ -108,6 +118,13 @@ export default function ChatThreadPage() {
   const [showRideDetail, setShowRideDetail] = useState(false);
   const [rideDetailLoading, setRideDetailLoading] = useState(false);
   const [rideDetails, setRideDetails] = useState<RideDetail[]>([]);
+  const [groupParticipants, setGroupParticipants] = useState<GroupParticipant[]>([]);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, { name: string; photo: string | null }>>({});
+  const [conversationNotFound, setConversationNotFound] = useState(false);
+  const [isGroupHost, setIsGroupHost] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +135,7 @@ export default function ChatThreadPage() {
 
   // Partner info (1:1 from ride_request; group from ride_groups + ride)
   useEffect(() => {
+    setConversationNotFound(false);
     async function loadPartner() {
       const supabase = getSupabaseClient();
       if (!profile) return;
@@ -128,28 +146,47 @@ export default function ChatThreadPage() {
           .select("ride_id")
           .eq("id", conversationId)
           .single();
-        if (!grp) return;
+        if (!grp) {
+          setConversationNotFound(true);
+          return;
+        }
         const { data: hostRide } = await supabase
           .from("rides")
-          .select("origin_name, dest_name")
+          .select("id, user_id, origin_name, dest_name")
           .eq("id", grp.ride_id)
           .single();
-        const { count } = await supabase
+        const { data: acceptedReqs } = await supabase
           .from("ride_requests")
-          .select("id", { count: "exact", head: true })
+          .select("requester_ride_id, ride_status")
           .eq("ride_id", grp.ride_id)
           .eq("status", "accepted");
-        const participantCount = (count ?? 0) + 1; // host + requesters
+        const participantCount = 1 + (acceptedReqs?.length ?? 0); // host + requesters
+        const groupRideStatus = (acceptedReqs?.[0] as { ride_status?: string } | undefined)?.ride_status ?? "accepted";
+        const profileIds: string[] = [];
+        if (hostRide?.user_id) profileIds.push(hostRide.user_id);
+        if (acceptedReqs?.length) {
+          const { data: requesterRides } = await supabase
+            .from("rides")
+            .select("user_id")
+            .in("id", acceptedReqs.map((r: { requester_ride_id: string }) => r.requester_ride_id));
+          (requesterRides || []).forEach((r: { user_id: string }) => profileIds.push(r.user_id));
+        }
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, photo_url")
+          .in("id", [...new Set(profileIds)]);
+        setGroupParticipants((profiles as GroupParticipant[]) ?? []);
         setPartner({
           name: `Group (${participantCount})`,
           photo: null,
           profile_id: "",
           origin: hostRide?.origin_name ?? "",
           dest: hostRide?.dest_name ?? "",
-          ride_status: "accepted",
+          ride_status: groupRideStatus,
           ride_id: grp?.ride_id,
         });
-        setRideStatus("accepted");
+        setRideStatus(groupRideStatus);
+        setIsGroupHost(hostRide?.user_id === profile.id);
         return;
       }
 
@@ -159,7 +196,21 @@ export default function ChatThreadPage() {
         .eq("id", conversationId)
         .single();
 
-      if (!req) return;
+      if (!req) {
+        setConversationNotFound(true);
+        return;
+      }
+
+      // 1:1 upgraded to group: if this ride now has a ride_group, redirect to group chat
+      const { data: existingGroup } = await supabase
+        .from("ride_groups")
+        .select("id")
+        .eq("ride_id", req.ride_id)
+        .maybeSingle();
+      if (existingGroup?.id) {
+        router.replace(`/messages/${existingGroup.id}?group=1`, { scroll: false });
+        return;
+      }
 
       const { data: ride1 } = await supabase
         .from("rides")
@@ -249,6 +300,28 @@ export default function ChatThreadPage() {
     load();
   }, [conversationId]);
 
+  // Sender profiles for group chat (so we can show name + avatar per message)
+  useEffect(() => {
+    if (!isGroup || messages.length === 0) return;
+    const senderIds = [...new Set(messages.map((m) => m.sender_id))];
+    if (senderIds.length === 0) return;
+    (async () => {
+      const supabase = getSupabaseClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, photo_url")
+        .in("id", senderIds);
+      const map: Record<string, { name: string; photo: string | null }> = {};
+      (data || []).forEach((p: { id: string; first_name: string; last_name: string; photo_url: string | null }) => {
+        map[p.id] = {
+          name: `${p.first_name} ${p.last_name?.[0] ?? ""}.`.trim(),
+          photo: p.photo_url,
+        };
+      });
+      setSenderProfiles(map);
+    })();
+  }, [isGroup, conversationId, messages]);
+
   // Realtime
   useEffect(() => {
     const channel = subscribeToMessages(conversationId, (newMsg) => {
@@ -272,6 +345,7 @@ export default function ChatThreadPage() {
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || sending) return;
+    if (!isGroup && isBlocked) return;
     setInputText("");
     setSending(true);
     try {
@@ -303,12 +377,20 @@ export default function ChatThreadPage() {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-      if (!isGroup) {
-        if (label === "Confirm pickup time" && rideStatus === "accepted") {
+      if (label === "Confirm pickup time" && rideStatus === "accepted") {
+        if (isGroup && partner?.ride_id) {
+          await updateRideStatusForGroup(partner.ride_id, "confirmed");
+          setRideStatus("confirmed");
+        } else if (!isGroup) {
           await updateRideStatus(conversationId, "confirmed");
           setRideStatus("confirmed");
         }
-        if (label === "Cancel ride") {
+      }
+      if (label === "Cancel ride") {
+        if (isGroup && partner?.ride_id) {
+          await leaveGroup(partner.ride_id);
+          router.push("/messages");
+        } else if (!isGroup) {
           await updateRideStatus(conversationId, "cancelled");
           setRideStatus("cancelled");
         }
@@ -327,7 +409,6 @@ export default function ChatThreadPage() {
   };
 
   const handleStatusAction = async (newStatus: "confirmed" | "completed") => {
-    if (isGroup) return; // Status updates are per ride_request; not applicable to group
     const previousStatus = rideStatus;
 
     // Optimistic: update UI instantly
@@ -335,8 +416,11 @@ export default function ChatThreadPage() {
     setUpdatingStatus(true);
 
     try {
-      // Persist to database
-      await updateRideStatus(conversationId, newStatus);
+      if (isGroup && partner?.ride_id) {
+        await updateRideStatusForGroup(partner.ride_id, newStatus);
+      } else {
+        await updateRideStatus(conversationId, newStatus);
+      }
 
       if (newStatus === "completed") {
         invalidateHomeCache();
@@ -425,6 +509,35 @@ export default function ChatThreadPage() {
     });
   };
 
+  if (conversationNotFound) {
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-ml-2 h-11 w-11 shrink-0 text-zinc-600"
+            onClick={() => router.push("/messages")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4">
+          <p className="text-center text-sm text-zinc-600">
+            Conversation not found. It may have been removed or you don&apos;t have access.
+          </p>
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={() => router.push("/messages")}
+          >
+            Back to Messages
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="mb-4 flex items-center justify-between gap-3">
@@ -438,7 +551,22 @@ export default function ChatThreadPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1">
-            {!isGroup && partner?.profile_id ? (
+            {isGroup && partner ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="truncate text-base font-semibold text-zinc-900 sm:text-lg">
+                  {partner.name}
+                </h1>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 h-8 px-2 text-xs text-zinc-500 hover:text-zinc-900"
+                  onClick={() => setShowGroupMembers(true)}
+                >
+                  <Users className="h-4 w-4 mr-1" />
+                  View members
+                </Button>
+              </div>
+            ) : !isGroup && partner?.profile_id ? (
               <button
                 type="button"
                 className="flex items-center gap-2 rounded-lg p-1 -m-1 text-left hover:bg-zinc-100 transition-colors"
@@ -569,23 +697,17 @@ export default function ChatThreadPage() {
                 </button>
                 </>
                 )}
-                {!isGroup && (
-                <>
                 <div className="my-1 border-t border-zinc-100" />
                 <button
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-rose-600 hover:bg-rose-50"
-                  onClick={async () => {
+                  onClick={() => {
                     setShowSafety(false);
-                    await updateRideStatus(conversationId, "cancelled");
-                    setRideStatus("cancelled");
-                    router.push("/messages");
+                    setShowLeaveConfirm(true);
                   }}
                 >
                   <LogOut className="h-4 w-4" />
-                  Leave ride
+                  {isGroup ? "Leave group" : "Leave ride"}
                 </button>
-                </>
-                )}
               </div>
             </>
           )}
@@ -646,8 +768,98 @@ export default function ChatThreadPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Status bar (1:1 only). Hide until rideStatus loaded from server to avoid flashing "Confirm meetup". */}
-      {!isGroup && rideStatus !== null && (
+      <Dialog open={showGroupMembers} onOpenChange={setShowGroupMembers}>
+        <DialogContent className="sm:max-w-md" showCloseButton={true}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              Group members
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {groupParticipants.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg border border-zinc-100 p-3 text-left hover:bg-zinc-50 transition-colors"
+                onClick={() => {
+                  setShowGroupMembers(false);
+                  router.push(`/profile/${p.id}`);
+                }}
+              >
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarImage src={p.photo_url || undefined} />
+                  <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+                    {(p.first_name?.[0] ?? "?")}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-zinc-900">
+                  {p.first_name} {p.last_name?.[0] ?? ""}.
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400 ml-auto" />
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <DialogContent className="sm:max-w-md" showCloseButton={true}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogOut className="h-5 w-5 text-rose-500" />
+              {isGroup ? "Leave group?" : "Leave ride?"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-zinc-600">
+            {isGroup
+              ? "You will be removed from this group and the conversation will disappear from your messages."
+              : "This ride will be cancelled and the conversation will disappear from your messages."}
+          </p>
+          <div className="flex gap-2 justify-end mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLeaveConfirm(false)}
+              disabled={leaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700"
+              disabled={leaving}
+              onClick={async () => {
+                setLeaving(true);
+                try {
+                  if (isGroup && partner?.ride_id) {
+                    await leaveGroup(partner.ride_id);
+                  } else {
+                    await updateRideStatus(conversationId, "cancelled");
+                    setRideStatus("cancelled");
+                  }
+                  setShowLeaveConfirm(false);
+                  router.push("/messages");
+                } catch (err) {
+                  console.error("Leave failed:", err);
+                  toast.error(err instanceof Error ? err.message : "Failed to leave.");
+                } finally {
+                  setLeaving(false);
+                }
+              }}
+            >
+              {leaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                isGroup ? "Leave group" : "Leave ride"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status bar. Hide until rideStatus loaded from server to avoid flashing "Confirm meetup". */}
+      {rideStatus !== null && (
       <div className="mb-2">
         {rideStatus !== "cancelled" ? (
           <div className="flex items-center px-1">
@@ -756,6 +968,7 @@ export default function ChatThreadPage() {
               </div>
               {group.msgs.map((msg) => {
                 const isMine = msg.sender_id === profile?.id;
+                const sender = isGroup ? senderProfiles[msg.sender_id] : null;
 
                 if (msg.message_type === "quick_action") {
                   return (
@@ -765,36 +978,49 @@ export default function ChatThreadPage() {
                         isMine ? "justify-end" : "justify-start"
                       }`}
                     >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs ${
-                          isMine
-                            ? "rounded-br-md bg-blue-600 text-white"
-                            : "rounded-bl-md bg-blue-50 text-blue-900"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            {msg.content}
-                          </span>
-                        </div>
+                      <div className={`max-w-[80%] flex ${isMine ? "flex-col items-end" : "flex-col items-start"}`}>
+                        {isGroup && !isMine && sender && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={sender.photo || undefined} />
+                              <AvatarFallback className="text-[10px] bg-zinc-200 text-zinc-600">
+                                {sender.name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-[11px] font-medium text-zinc-600">{sender.name}</span>
+                          </div>
+                        )}
                         <div
-                          className={`mt-1 flex items-center gap-1 ${
-                            isMine ? "justify-end" : ""
+                          className={`rounded-2xl px-4 py-2.5 text-xs ${
+                            isMine
+                              ? "rounded-br-md bg-blue-600 text-white"
+                              : "rounded-bl-md bg-blue-50 text-blue-900"
                           }`}
                         >
-                          <span
-                            className={`text-[10px] ${
-                              isMine ? "text-blue-200" : "text-blue-700"
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {msg.content}
+                            </span>
+                          </div>
+                          <div
+                            className={`mt-1 flex items-center gap-1 ${
+                              isMine ? "justify-end" : ""
                             }`}
                           >
-                            {formatMsgTime(msg.created_at)}
-                          </span>
-                          {isMine &&
-                            (msg.read_at ? (
-                              <CheckCheck className="h-3 w-3 text-blue-200" />
-                            ) : (
-                              <Check className="h-3 w-3 text-blue-300" />
-                            ))}
+                            <span
+                              className={`text-[10px] ${
+                                isMine ? "text-blue-200" : "text-blue-700"
+                              }`}
+                            >
+                              {formatMsgTime(msg.created_at)}
+                            </span>
+                            {isMine &&
+                              (msg.read_at ? (
+                                <CheckCheck className="h-3 w-3 text-blue-200" />
+                              ) : (
+                                <Check className="h-3 w-3 text-blue-300" />
+                              ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -819,13 +1045,25 @@ export default function ChatThreadPage() {
                         isMine ? "justify-end" : "justify-start"
                       }`}
                     >
-                      <div
-                        className={`max-w-[80%] overflow-hidden rounded-2xl ${
-                          isMine
-                            ? "rounded-br-md bg-blue-600 text-white"
-                            : "rounded-bl-md border border-zinc-200 bg-white"
-                        }`}
-                      >
+                      <div className={`max-w-[80%] flex flex-col ${isMine ? "items-end" : "items-start"}`}>
+                        {isGroup && !isMine && sender && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={sender.photo || undefined} />
+                              <AvatarFallback className="text-[10px] bg-zinc-200 text-zinc-600">
+                                {sender.name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-[11px] font-medium text-zinc-600">{sender.name}</span>
+                          </div>
+                        )}
+                        <div
+                          className={`overflow-hidden rounded-2xl ${
+                            isMine
+                              ? "rounded-br-md bg-blue-600 text-white"
+                              : "rounded-bl-md border border-zinc-200 bg-white"
+                          }`}
+                        >
                         {staticMapUrl && (
                           <a
                             href={meta?.map_url}
@@ -872,6 +1110,7 @@ export default function ChatThreadPage() {
                             </span>
                           </div>
                         </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -894,32 +1133,45 @@ export default function ChatThreadPage() {
                       isMine ? "justify-end" : "justify-start"
                     }`}
                   >
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                        isMine
-                          ? "rounded-br-md bg-blue-600 text-white"
-                          : "rounded-bl-md border border-zinc-200 bg-white text-zinc-900"
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <div className={`max-w-[80%] flex flex-col ${isMine ? "items-end" : "items-start"}`}>
+                      {isGroup && !isMine && sender && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={sender.photo || undefined} />
+                            <AvatarFallback className="text-[10px] bg-zinc-200 text-zinc-600">
+                              {sender.name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-[11px] font-medium text-zinc-600">{sender.name}</span>
+                        </div>
+                      )}
                       <div
-                        className={`mt-1 flex items-center gap-1 ${
-                          isMine ? "justify-end" : ""
+                        className={`rounded-2xl px-4 py-2.5 text-sm ${
+                          isMine
+                            ? "rounded-br-md bg-blue-600 text-white"
+                            : "rounded-bl-md border border-zinc-200 bg-white text-zinc-900"
                         }`}
                       >
-                        <span
-                          className={`text-[10px] ${
-                            isMine ? "text-blue-200" : "text-zinc-400"
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <div
+                          className={`mt-1 flex items-center gap-1 ${
+                            isMine ? "justify-end" : ""
                           }`}
                         >
-                          {formatMsgTime(msg.created_at)}
-                        </span>
-                        {isMine &&
-                          (msg.read_at ? (
-                            <CheckCheck className="h-3 w-3 text-blue-200" />
-                          ) : (
-                            <Check className="h-3 w-3 text-blue-300" />
-                          ))}
+                          <span
+                            className={`text-[10px] ${
+                              isMine ? "text-blue-200" : "text-zinc-400"
+                            }`}
+                          >
+                            {formatMsgTime(msg.created_at)}
+                          </span>
+                          {isMine &&
+                            (msg.read_at ? (
+                              <CheckCheck className="h-3 w-3 text-blue-200" />
+                            ) : (
+                              <Check className="h-3 w-3 text-blue-300" />
+                            ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -947,6 +1199,13 @@ export default function ChatThreadPage() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Blocked user notice (1:1 only) */}
+      {!isGroup && isBlocked && (
+        <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-2 text-center text-xs text-zinc-600">
+          You have blocked this user. You can&apos;t send messages. Unblock from the menu above.
         </div>
       )}
 
@@ -980,14 +1239,14 @@ export default function ChatThreadPage() {
               }}
               placeholder="Type a message..."
               className="h-11 min-h-[44px] w-full rounded-full bg-zinc-100 px-4 text-base text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 md:h-10 md:min-h-0 md:text-sm"
-              disabled={rideStatus === "cancelled"}
+              disabled={rideStatus === "cancelled" || (!isGroup && isBlocked)}
             />
           </div>
           <Button
             size="icon"
             className="h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 rounded-full bg-blue-600 text-white hover:bg-blue-700 touch-manipulation md:h-10 md:w-10 md:min-h-0 md:min-w-0"
             onClick={handleSend}
-            disabled={!inputText.trim() || sending || rideStatus === "cancelled"}
+            disabled={!inputText.trim() || sending || rideStatus === "cancelled" || (!isGroup && isBlocked)}
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -444,6 +444,57 @@ async function createTestRides(
             seatsNeeded: 1,
             spaceCapacity: 1,
         },
+        {
+            key: "jordan_seeking_sfo",
+            userId: profileIds[`jordan@${TEST_DOMAIN}`],
+            rideType: "seeking",
+            originName: "San Francisco International Airport (SFO)",
+            originLat: 37.6213,
+            originLng: -122.379,
+            destName: "Stanford University, Palo Alto, CA",
+            destLat: 37.4275,
+            destLng: -122.1697,
+            earliest: tomorrowAtHour(14, 10),
+            latest: tomorrowAtHour(15, 10),
+            preferred: tomorrowAtHour(14, 35),
+            seatsAvailable: 1,
+            seatsNeeded: 1,
+            spaceCapacity: 1,
+        },
+        {
+            key: "taylor_seeking_sfo",
+            userId: profileIds[`taylor@${TEST_DOMAIN}`],
+            rideType: "seeking",
+            originName: "San Francisco International Airport (SFO)",
+            originLat: 37.6213,
+            originLng: -122.379,
+            destName: "Stanford University, Palo Alto, CA",
+            destLat: 37.4275,
+            destLng: -122.1697,
+            earliest: tomorrowAtHour(14, 20),
+            latest: tomorrowAtHour(15, 20),
+            preferred: tomorrowAtHour(14, 50),
+            seatsAvailable: 1,
+            seatsNeeded: 1,
+            spaceCapacity: 1,
+        },
+        {
+            key: "riley_seeking_sfo",
+            userId: profileIds[`riley@${TEST_DOMAIN}`],
+            rideType: "seeking",
+            originName: "San Francisco International Airport (SFO)",
+            originLat: 37.6213,
+            originLng: -122.379,
+            destName: "Stanford University, Palo Alto, CA",
+            destLat: 37.4275,
+            destLng: -122.1697,
+            earliest: tomorrowAtHour(14, 25),
+            latest: tomorrowAtHour(15, 25),
+            preferred: tomorrowAtHour(14, 55),
+            seatsAvailable: 1,
+            seatsNeeded: 1,
+            spaceCapacity: 1,
+        },
 
         // ── Route C: BUR → UCLA (group of 4 + 1 pending) ──
         {
@@ -592,18 +643,30 @@ async function createTestMatches(
             status: "accepted",
             rideStatus: "accepted",
         },
-        // Route B: group of 3 (David ↔ Sophia, David ↔ Alex)
+        // Route B (flow test): 0 accepted, 4 pending — max group = 4 people (host + 3). Accept 1→1:1, 2→GC3, 3→GC4 (max), 4th→blocked
         {
             rideKey: "david_offering",
             requesterKey: "sophia_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
+            status: "pending",
+            rideStatus: "requested",
         },
         {
             rideKey: "david_offering",
             requesterKey: "alex_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
+            status: "pending",
+            rideStatus: "requested",
+        },
+        {
+            rideKey: "david_offering",
+            requesterKey: "jordan_seeking_sfo",
+            status: "pending",
+            rideStatus: "requested",
+        },
+        {
+            rideKey: "david_offering",
+            requesterKey: "taylor_seeking_sfo",
+            status: "pending",
+            rideStatus: "requested",
         },
         // Route C: group of 4 (Chris ↔ Jordan, Taylor, Riley) + Quinn pending
         {
@@ -656,13 +719,13 @@ async function createTestMatches(
         });
     }
 
-    // Give triggers a moment to create ride_groups
+    // Give triggers a moment to create ride_groups (only Chris has 2+ accepted here; David has 1 accepted + 1 pending)
     await new Promise((r) => setTimeout(r, 500));
 
     const { data: groups } = await supabase
         .from("ride_groups")
         .select("id, ride_id")
-        .in("ride_id", [rideIds.david_offering, rideIds.chris_offering]);
+        .in("ride_id", [rideIds.chris_offering]);
 
     const groupMap: Record<string, string> = {};
     (groups || []).forEach(
@@ -670,17 +733,15 @@ async function createTestMatches(
             (groupMap[g.ride_id] = g.id)
     );
 
-    // If triggers didn't fire, insert groups manually
-    for (const hostKey of ["david_offering", "chris_offering"]) {
-        if (!groupMap[rideIds[hostKey]]) {
-            const { data, error } = await supabase
-                .from("ride_groups")
-                .insert({ ride_id: rideIds[hostKey] })
-                .select("id")
-                .single();
-            if (!error && data) {
-                groupMap[rideIds[hostKey]] = data.id;
-            }
+    // If trigger didn't fire for Chris's ride, insert group manually (David's stays 1:1 until user accepts Alex)
+    if (!groupMap[rideIds.chris_offering]) {
+        const { data, error } = await supabase
+            .from("ride_groups")
+            .insert({ ride_id: rideIds.chris_offering })
+            .select("id")
+            .single();
+        if (!error && data) {
+            groupMap[rideIds.chris_offering] = data.id;
         }
     }
 
@@ -729,44 +790,7 @@ async function createTestMessages(
         ]);
     }
 
-    // Route B: group messages (David + Sophia + Alex)
-    const groupB = groupMap[rideIds.david_offering];
-    if (groupB) {
-        await supabase.from("messages").insert([
-            {
-                conversation_id: null,
-                ride_group_id: groupB,
-                sender_id: p("david"),
-                content:
-                    "Hey everyone! SFO pickup at arrivals — gray Honda Accord. Look for my Knot sign.",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupB,
-                sender_id: p("sophia"),
-                content:
-                    "Got it! My flight lands at 2:15, should be there by 2:35.",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupB,
-                sender_id: p("alex"),
-                content:
-                    "Thanks David! I'll be at international arrivals. Is that ok?",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupB,
-                sender_id: p("david"),
-                content:
-                    "Yep, I'll do a loop. International first then domestic.",
-                message_type: "text",
-            },
-        ]);
-    }
+    // Route B: no messages (flow test — 0 accepted until user accepts from Home)
 
     // Route C: group messages (Chris + Jordan + Taylor + Riley)
     const groupC = groupMap[rideIds.chris_offering];
@@ -868,8 +892,8 @@ export async function POST() {
                     {
                         route: "SFO → Stanford",
                         driver: "David Kim",
-                        riders: ["Sophia Taylor", "Alex Rivera"],
-                        type: "Group of 3 with group chat",
+                        riders: "5 pending (Sophia, Alex, Jordan, Taylor, Riley)",
+                        type: "Flow test: accept 1→1:1, 2→GC3, 3→GC4 (max 4 people), 4th blocked",
                     },
                     {
                         route: "BUR → UCLA",

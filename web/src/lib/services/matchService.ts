@@ -35,7 +35,7 @@ function toMatchRequestErrorMessage(err: { message?: string; code?: string } | n
         return "You don't have permission to send this request.";
     }
     if (msg.includes("ride_match_cap_exceeded")) {
-        return "This ride already has the maximum number of matches.";
+        return "Reached max ride limit. Group can have at most 4 people.";
     }
     return msg || "Failed to send request.";
 }
@@ -67,8 +67,8 @@ export async function sendMatchRequest(
     return data.id;
 }
 
-/** Max number of people a ride can match with (cap is 4). */
-export const MAX_MATCHES_PER_RIDE = 4;
+/** Max number of accepted matches per ride (group = host + 3 = 4 people max). */
+export const MAX_MATCHES_PER_RIDE = 3;
 
 /**
  * Returns how many accepted matches this ride already has (0–4).
@@ -86,7 +86,7 @@ export async function getAcceptedMatchCount(rideId: string): Promise<number> {
 /**
  * Accept or reject a match request.
  * When accepted, also set ride_status to 'accepted' so the chat shows step 2 (Confirm meetup) instead of Requested.
- * Throws with message containing "ride_match_cap_exceeded" if either ride already has 4 matches.
+ * Throws with message containing "ride_match_cap_exceeded" if either ride already has 3 matches (4 people max).
  */
 export async function respondToRequest(
     requestId: string,
@@ -103,7 +103,13 @@ export async function respondToRequest(
         .update(updates)
         .eq("id", requestId);
 
-    if (error) throw error;
+    if (error) {
+        const msg =
+            typeof (error as { message?: string }).message === "string"
+                ? (error as { message: string }).message
+                : "Request update failed";
+        throw new Error(msg);
+    }
 }
 
 /**
@@ -116,7 +122,13 @@ export async function withdrawRequest(requestId: string): Promise<void> {
         .from("ride_requests")
         .update({ status: "rejected" })
         .eq("id", requestId);
-    if (error) throw error;
+    if (error) {
+        const msg =
+            typeof (error as { message?: string }).message === "string"
+                ? (error as { message: string }).message
+                : "Failed to withdraw request";
+        throw new Error(msg);
+    }
 }
 
 /**

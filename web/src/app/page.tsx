@@ -4,6 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   ArrowRight,
   MessageSquare,
@@ -12,15 +23,83 @@ import {
   TrendingUp,
   CheckCircle2,
   Sparkles,
+  Loader2,
 } from "lucide-react";
+
+const WAITLIST_SCHOOLS = ["UCI", "UCLA", "USC", "UCSD", "Cal Poly", "other"] as const;
+const WAITLIST_AIRPORTS = ["LAX", "SNA", "SAN", "LGB", "ONT", "Other"] as const;
+type WaitlistSchool = (typeof WAITLIST_SCHOOLS)[number];
+type WaitlistAirport = (typeof WAITLIST_AIRPORTS)[number];
+interface WaitlistStats {
+  total: number;
+  bySchool: Record<string, number>;
+}
 
 export default function LandingPage() {
   const [activeAccordion, setActiveAccordion] = useState<number | null>(0);
+  const [waitlistSchool, setWaitlistSchool] = useState<WaitlistSchool | "">("");
+  const [waitlistSchoolOther, setWaitlistSchoolOther] = useState("");
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistAirport, setWaitlistAirport] = useState<WaitlistAirport | "">("");
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [waitlistStats, setWaitlistStats] = useState<WaitlistStats | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const howItWorksRef = useRef<HTMLDivElement>(null);
   const mapBgRef = useRef<HTMLDivElement>(null);
   const dotsBgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/waitlist/stats")
+      .then((res) => res.json())
+      .then((data: WaitlistStats) => setWaitlistStats(data))
+      .catch(() => setWaitlistStats({ total: 146, bySchool: {} }));
+  }, []);
+
+  const waitlistTotal = waitlistStats?.total ?? 146;
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!waitlistSchool || !waitlistEmail.trim() || !waitlistAirport) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
+    if (waitlistSchool === "other" && !waitlistSchoolOther.trim()) {
+      toast.error("Please type your school name.");
+      return;
+    }
+    setWaitlistSubmitting(true);
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          school: waitlistSchool,
+          email: waitlistEmail.trim(),
+          airport: waitlistAirport,
+          ...(waitlistSchool === "other" && { school_other: waitlistSchoolOther.trim() }),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Something went wrong. Please try again.");
+        setWaitlistSubmitting(false);
+        return;
+      }
+      toast.success("You're on the list! We'll be in touch for early access.");
+      setWaitlistEmail("");
+      setWaitlistSchool("");
+      setWaitlistSchoolOther("");
+      setWaitlistAirport("");
+      const statsRes = await fetch("/api/waitlist/stats");
+      const newStats = await statsRes.json();
+      setWaitlistStats(newStats);
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setWaitlistSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -190,6 +269,16 @@ export default function LandingPage() {
 
 
           <div className="flex items-center gap-4">
+            <a
+              href="#waitlist-form"
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Early access
+            </a>
             <Link
               href="/login"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
@@ -243,13 +332,28 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/signup">
+                <a
+                  href="#waitlist-form"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
                   <Button
                     size="lg"
                     className="h-12 px-7 text-base bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-full transition-transform hover:scale-[1.03]"
                   >
-                    Get Started
+                    Join early access
                     <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </a>
+                <Link href="/signup">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-12 px-7 text-base border border-gray-200 text-gray-900 hover:bg-gray-50 rounded-full"
+                  >
+                    Sign up
                   </Button>
                 </Link>
                 <a
@@ -377,6 +481,128 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Waitlist — Early access */}
+      <section
+        id="waitlist-form"
+        className="scroll-mt-20 py-16 px-6 bg-white/60 backdrop-blur-[2px] border-t border-gray-100/50 relative z-10"
+      >
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-10">
+            <h3 className="text-3xl font-bold text-[#0F172A]">
+              Flying out for spring break?
+            </h3>
+            <p className="mt-3 text-lg text-gray-600">
+              Split your airport ride with students from your school. Match with nearby students, share the ride, and cut the cost.
+            </p>
+            <p className="mt-2 text-sm text-gray-500">
+              Built by students. Focused on safety + same-campus matching.
+            </p>
+          </div>
+          <Card className="border-gray-200 bg-white shadow-xl rounded-2xl">
+            <CardContent className="p-6 sm:p-8">
+              <h4 className="text-lg font-semibold text-[#0F172A] mb-5">
+                Join early access
+              </h4>
+              <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="waitlist-school" className="text-gray-700">
+                    School
+                  </Label>
+                  <Select
+                    value={waitlistSchool}
+                    onValueChange={(v) => setWaitlistSchool(v as WaitlistSchool)}
+                    required
+                  >
+                    <SelectTrigger
+                      id="waitlist-school"
+                      className="w-full h-11 rounded-full border-gray-200 bg-white"
+                    >
+                      <SelectValue placeholder="Select your school" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WAITLIST_SCHOOLS.map((s) => (
+                        <SelectItem key={s} value={s} className="rounded-lg">
+                          {s === "other" ? "Other" : s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {waitlistSchool === "other" && (
+                    <Input
+                      id="waitlist-school-other"
+                      type="text"
+                      placeholder="Type your school name"
+                      value={waitlistSchoolOther}
+                      onChange={(e) => setWaitlistSchoolOther(e.target.value)}
+                      className="mt-2 h-11 rounded-full border-gray-200"
+                      maxLength={200}
+                    />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="waitlist-email" className="text-gray-700">
+                    Email
+                  </Label>
+                  <Input
+                    id="waitlist-email"
+                    type="email"
+                    placeholder="you@school.edu"
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    className="h-11 rounded-full border-gray-200"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="waitlist-airport" className="text-gray-700">
+                    Airport traveling to
+                  </Label>
+                  <Select
+                    value={waitlistAirport}
+                    onValueChange={(v) => setWaitlistAirport(v as WaitlistAirport)}
+                    required
+                  >
+                    <SelectTrigger
+                      id="waitlist-airport"
+                      className="w-full h-11 rounded-full border-gray-200 bg-white"
+                    >
+                      <SelectValue placeholder="Select airport" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WAITLIST_AIRPORTS.map((a) => (
+                        <SelectItem key={a} value={a} className="rounded-lg">
+                          {a}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
+                  disabled={waitlistSubmitting}
+                >
+                  {waitlistSubmitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    "Join early access"
+                  )}
+                </Button>
+              </form>
+              <p className="mt-4 text-xs text-gray-500 text-center">
+                We'll only message you about launch + important ride updates. No spam.
+              </p>
+            </CardContent>
+          </Card>
+          <div className="mt-8 text-center">
+            <p className="text-xl font-semibold text-[#0F172A]">
+              {waitlistTotal.toLocaleString()} students joined early access
+            </p>
           </div>
         </div>
       </section>

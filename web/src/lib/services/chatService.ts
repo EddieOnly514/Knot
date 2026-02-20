@@ -88,7 +88,7 @@ export async function getConversations(profileId?: string): Promise<Conversation
     if (error) throw error;
     if (!requests || requests.length === 0) return [];
 
-    // Rides that have a group (3+ participants): one group convo per such ride
+    // Rides that have a group (2+ accepted = 3+ people); everyone in that ride sees the group.
     const allRideIdsInRequests = [...new Set(requests.flatMap((r: { ride_id: string; requester_ride_id: string }) => [r.ride_id, r.requester_ride_id]))];
     const { data: rideGroups } = await supabase
         .from("ride_groups")
@@ -100,18 +100,21 @@ export async function getConversations(profileId?: string): Promise<Conversation
         rideIdToGroup.set(g.ride_id, g)
     );
 
-    // Group requests by ride_id (host ride); if host has a group, we'll show one group convo
     const rideIdsWithGroup = new Set(rideIdToGroup.keys());
+
+    // 1:1 = only rides that do NOT have a group (single accepted requester)
     const requests1to1 = requests.filter(
         (r: { ride_id: string }) => !rideIdsWithGroup.has(r.ride_id)
     );
+
+    // Group convo = ride has a group and I'm the host or one of the requesters
     const groupRideIds = [...rideIdsWithGroup].filter((rideId) => {
-        const involved = requests.some(
+        return requests.some(
             (r: { ride_id: string; requester_ride_id: string }) =>
-                r.ride_id === rideId && myRideIds.includes(r.requester_ride_id) ||
-                r.requester_ride_id === rideId && myRideIds.includes(r.ride_id)
+                (r.ride_id === rideId && myRideIds.includes(r.ride_id)) ||
+                (r.ride_id === rideId && myRideIds.includes(r.requester_ride_id)) ||
+                (r.requester_ride_id === rideId && myRideIds.includes(r.ride_id))
         );
-        return involved;
     });
 
     const otherRideIds = [
@@ -429,6 +432,102 @@ export async function updateRideStatus(
             .from("rides")
             .update({ status: "completed" })
             .in("id", [ride_id, requester_ride_id]);
+    }
+}
+
+/**
+ * Update ride_status for all accepted ride_requests in a group (same ride_id).
+ * Used when any participant confirms meetup or completes the ride.
+ */
+export async function updateRideStatusForGroup(
+    rideId: string,
+    status: "confirmed" | "completed"
+): Promise<void> {
+    const supabase = getSupabaseClient();
+
+    const { data: requests, error: fetchError } = await supabase
+        .from("ride_requests")
+        .select("id, requester_ride_id")
+        .eq("ride_id", rideId)
+        .eq("status", "accepted");
+
+    if (fetchError) throw fetchError;
+    if (!requests?.length) {
+        throw new Error("No accepted requests found for this ride.");
+    }
+
+    const { error: updateError } = await supabase
+        .from("ride_requests")
+        .update({ ride_status: status })
+        .eq("ride_id", rideId)
+        .eq("status", "accepted");
+
+    if (updateError) throw updateError;
+
+    if (status === "completed") {
+        const requesterRideIds = requests.map((r) => r.requester_ride_id);
+        await supabase
+            .from("rides")
+            .update({ status: "completed" })
+            .in("id", [rideId, ...requesterRideIds]);
+    }
+}
+
+/**
+ * Leave a group: requester cancels their ride_request; host cancels all requests for the ride.
+ * Determines host vs requester server-side so it doesn't rely on possibly stale UI state.
+ */
+export async function leaveGroup(rideId: string): Promise<void> {
+    const supabase = getSupabaseClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.id) throw new Error("Not authenticated.");
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+    const profileId = profile?.id ?? user.id;
+
+    // Check if current user owns the ride (host)
+    const { data: hostRide } = await supabase
+        .from("rides")
+        .select("id")
+        .eq("id", rideId)
+        .eq("user_id", profileId)
+        .single();
+
+    if (hostRide) {
+        // Host: cancel all requests for this ride
+        const { error } = await supabase
+            .from("ride_requests")
+            .update({ status: "rejected", ride_status: "cancelled" })
+            .eq("ride_id", rideId);
+        if (error) throw error;
+        return;
+    }
+
+    // Requester: find my ride_request (requester_ride_id = one of my rides)
+    const { data: myRides } = await supabase
+        .from("rides")
+        .select("id")
+        .eq("user_id", profileId);
+
+    const myRideIds = (myRides ?? []).map((r) => r.id);
+    if (myRideIds.length === 0) throw new Error("No ride found for current user.");
+
+    const { data, error } = await supabase
+        .from("ride_requests")
+        .update({ status: "rejected", ride_status: "cancelled" })
+        .eq("ride_id", rideId)
+        .in("requester_ride_id", myRideIds)
+        .select("id");
+
+    if (error) throw error;
+    if (!data?.length) {
+        throw new Error("You are not a participant in this group.");
     }
 }
 

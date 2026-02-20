@@ -475,15 +475,20 @@ export default function HomePage() {
       await respondToRequest(requestId, response);
       if (response === "accepted") {
         toast.success("Request accepted! Starting chat...");
-        router.push("/messages");
+        router.push("/messages?refresh=1");
       } else {
         toast.success("Request declined");
       }
       fetchRequests();
       fetchSuggestedMatches();
     } catch (err) {
-      console.error("[HomePage] Respond error:", err);
-      toast.error("Failed to respond to request");
+      const message = toErrorDetails(err);
+      console.error("[HomePage] Respond error:", message, err);
+      const friendlyMessage =
+        typeof message === "string" && message.includes("ride_match_cap_exceeded")
+          ? "Reached max ride limit. Group can have at most 4 people."
+          : message || "Failed to respond to request";
+      toast.error(friendlyMessage);
     } finally {
       setRespondingId(null);
     }
@@ -498,8 +503,9 @@ export default function HomePage() {
       fetchRequests();
       fetchSuggestedMatches();
     } catch (err) {
-      console.error("[HomePage] Withdraw error:", err);
-      toast.error("Failed to remove request");
+      const message = toErrorDetails(err);
+      console.error("[HomePage] Withdraw error:", message, err);
+      toast.error(message || "Failed to remove request");
     } finally {
       setWithdrawingRequestId(null);
     }

@@ -261,8 +261,8 @@ export default function PostRidePage() {
   const [depHour, setDepHour] = useState("");
   const [depMinute, setDepMinute] = useState("00");
   const [depPeriod, setDepPeriod] = useState("AM");
-  const [tolerance, setTolerance] = useState("15");
-  const [customTolerance, setCustomTolerance] = useState("");
+  // Flexibility: 15, 30, 60 (1 hr), 120 (2 hr), or "all_day"
+  const [tolerance, setTolerance] = useState<string>("15");
 
   const [seatsNeeded, setSeatsNeeded] = useState("1");
   const [spaceCapacity, setSpaceCapacity] = useState("1");
@@ -295,8 +295,15 @@ export default function PostRidePage() {
         setDepHour(String(h % 12 || 12));
         setDepMinute(m <= 15 ? "00" : m <= 45 ? "30" : "00");
         const diffMin = Math.round((l.getTime() - e.getTime()) / (2 * 60 * 1000));
-        const t = String(diffMin);
-        setTolerance(["10", "15", "20"].includes(t) ? t : "15");
+        const dayMs = 24 * 60 * 60 * 1000;
+        const spanMs = l.getTime() - e.getTime();
+        if (spanMs >= dayMs * 0.9) {
+          setTolerance("all_day");
+        } else {
+          const options = [15, 30, 60, 120];
+          const closest = options.reduce((a, b) => (Math.abs(a - diffMin) <= Math.abs(b - diffMin) ? a : b));
+          setTolerance(String(closest));
+        }
         setSeatsNeeded(String(ride.seats_needed));
         setSpaceCapacity(String(ride.space_capacity));
         setQuietRide(ride.quiet_ride);
@@ -339,16 +346,24 @@ export default function PostRidePage() {
     }
 
     const departureTime = buildTime(date, depHour, depMinute, depPeriod);
-    const toleranceMin =
-      tolerance === "custom"
-        ? parseInt(customTolerance) || 15
-        : parseInt(tolerance);
-    const departureEarliest = new Date(
-      departureTime.getTime() - toleranceMin * 60 * 1000,
-    );
-    const departureLatest = new Date(
-      departureTime.getTime() + toleranceMin * 60 * 1000,
-    );
+    let departureEarliest: Date;
+    let departureLatest: Date;
+    if (tolerance === "all_day") {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      departureEarliest = d;
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      departureLatest = end;
+    } else {
+      const toleranceMin = parseInt(tolerance, 10) || 15;
+      departureEarliest = new Date(
+        departureTime.getTime() - toleranceMin * 60 * 1000,
+      );
+      departureLatest = new Date(
+        departureTime.getTime() + toleranceMin * 60 * 1000,
+      );
+    }
 
     setIsSubmitting(true);
 
@@ -589,46 +604,31 @@ export default function PostRidePage() {
 
             <div>
               <Label className="text-xs text-zinc-600">
-                Flexibility (± minutes)
+                Flexibility
               </Label>
-              <div className="mt-2 grid grid-cols-4 gap-2">
-                {["10", "15", "20"].map((val) => (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  { value: "15", label: "15 min" },
+                  { value: "30", label: "30 min" },
+                  { value: "60", label: "1 hr" },
+                  { value: "120", label: "2 hr" },
+                  { value: "all_day", label: "All day" },
+                ].map(({ value, label }) => (
                   <Button
-                    key={val}
+                    key={value}
                     type="button"
-                    variant={tolerance === val ? "default" : "outline"}
+                    variant={tolerance === value ? "default" : "outline"}
                     className={[
                       "h-9 text-xs",
-                      tolerance === val
+                      tolerance === value
                         ? "bg-blue-600 text-white"
                         : "bg-white text-zinc-700",
                     ].join(" ")}
-                    onClick={() => setTolerance(val)}
+                    onClick={() => setTolerance(value)}
                   >
-                    ±{val}
+                    {label}
                   </Button>
                 ))}
-                {tolerance === "custom" ? (
-                  <Input
-                    type="number"
-                    value={customTolerance}
-                    onChange={(e) => setCustomTolerance(e.target.value)}
-                    placeholder="Min"
-                    className="h-9 bg-blue-600 text-center text-xs text-white placeholder:text-blue-100"
-                    min={5}
-                    max={120}
-                    autoFocus
-                  />
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 bg-white text-xs text-zinc-700"
-                    onClick={() => setTolerance("custom")}
-                  >
-                    Custom
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>

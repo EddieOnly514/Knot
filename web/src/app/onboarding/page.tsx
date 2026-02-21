@@ -49,6 +49,7 @@ export default function OnboardingPage() {
     const [conversationPref, setConversationPref] = useState("chill");
     const [musicPref, setMusicPref] = useState("no_preference");
     const [genderPref, setGenderPref] = useState("any");
+    const [bio, setBio] = useState("");
 
     // Pre-fill from existing profile data only (not Google metadata — user should type their own name)
     useEffect(() => {
@@ -56,6 +57,7 @@ export default function OnboardingPage() {
             setFirstName((profile.first_name || "").trim());
             setLastName((profile.last_name || "").trim());
             setPhone(profile.phone || "");
+            setBio(profile.bio || "");
         }
     }, [profile]);
 
@@ -155,6 +157,7 @@ export default function OnboardingPage() {
                 last_name: lastName.trim(),
                 school: school.trim() || null,
                 phone: phone || null,
+                bio: bio.trim() || null,
                 conversation_pref: conversationPref,
                 music_pref: musicPref,
                 gender_preference: genderPref,
@@ -275,6 +278,21 @@ export default function OnboardingPage() {
                                 placeholder="(555) 555-5555"
                                 className="h-11"
                             />
+                        </div>
+
+                        {/* Bio */}
+                        <div>
+                            <Label className="text-xs text-zinc-600 mb-1.5 block">
+                                Bio (optional)
+                            </Label>
+                            <textarea
+                                value={bio}
+                                onChange={(e) => setBio(e.target.value.slice(0, 240))}
+                                placeholder="A short bio so riders know who they're sharing a ride with."
+                                className="w-full min-h-[80px] rounded-md border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                maxLength={240}
+                            />
+                            <p className="mt-1 text-[11px] text-zinc-400">{bio.length}/240</p>
                         </div>
                     </CardContent>
                 </Card>

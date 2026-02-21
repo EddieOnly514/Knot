@@ -139,19 +139,19 @@ export default function PublicProfilePage() {
                     </CardContent>
                 </Card>
 
-                {/* Bio */}
-                {(profile.bio && profile.bio.trim().length > 0) && (
-                    <Card>
-                        <CardContent className="p-5">
-                            <h3 className="font-semibold text-slate-900 mb-2">
-                                About
-                            </h3>
-                            <p className="text-sm text-slate-700 whitespace-pre-line">
-                                {profile.bio}
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
+                {/* Bio — always show About section */}
+                <Card>
+                    <CardContent className="p-5">
+                        <h3 className="font-semibold text-slate-900 mb-2">
+                            About
+                        </h3>
+                        <p className="text-sm text-slate-700 whitespace-pre-line">
+                            {profile.bio && profile.bio.trim().length > 0
+                                ? profile.bio
+                                : "No bio added."}
+                        </p>
+                    </CardContent>
+                </Card>
 
                 {/* Trust & Verification */}
                 <Card>

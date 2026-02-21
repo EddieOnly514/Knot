@@ -14,11 +14,14 @@ export async function GET(request: Request) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error && data?.user) {
             // Send new users to onboarding: profile created very recently or first_name empty
-            const { data: profile } = await supabase
+            const { data: profileRow } = await supabase
                 .from("profiles")
                 .select("first_name, created_at")
                 .eq("user_id", data.user.id)
                 .single();
+
+            type ProfileRow = { first_name: string | null; created_at: string } | null;
+            const profile = profileRow as ProfileRow;
 
             const isNewProfile =
                 !profile ||

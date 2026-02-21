@@ -108,7 +108,7 @@ export default function LandingPage() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
     const createObserver = (
-      ref: React.RefObject<HTMLElement>,
+      ref: React.RefObject<HTMLElement | null>,
       className: string
     ) => {
       const observer = new IntersectionObserver(

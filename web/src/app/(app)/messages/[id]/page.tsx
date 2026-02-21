@@ -488,7 +488,7 @@ export default function ChatThreadPage() {
     }
   });
 
-  const currentStepIndex = STATUS_STEPS.indexOf(rideStatus);
+  const currentStepIndex = rideStatus != null ? STATUS_STEPS.indexOf(rideStatus) : -1;
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {

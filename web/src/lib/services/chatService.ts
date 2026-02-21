@@ -465,7 +465,7 @@ export async function updateRideStatusForGroup(
     if (updateError) throw updateError;
 
     if (status === "completed") {
-        const requesterRideIds = requests.map((r) => r.requester_ride_id);
+        const requesterRideIds = requests.map((r: { requester_ride_id: string }) => r.requester_ride_id);
         await supabase
             .from("rides")
             .update({ status: "completed" })
@@ -515,7 +515,7 @@ export async function leaveGroup(rideId: string): Promise<void> {
         .select("id")
         .eq("user_id", profileId);
 
-    const myRideIds = (myRides ?? []).map((r) => r.id);
+    const myRideIds = (myRides ?? []).map((r: { id: string }) => r.id);
     if (myRideIds.length === 0) throw new Error("No ride found for current user.");
 
     const { data, error } = await supabase

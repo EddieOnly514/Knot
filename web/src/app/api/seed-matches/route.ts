@@ -317,29 +317,29 @@ async function createTestUsers(supabase: Supabase) {
             .single();
         if (!profile)
             throw new Error(`Profile not created for ${u.email}`);
-        profileIds[u.email] = profile.id;
+        profileIds[u.email] = (profile as { id: string }).id;
     }
 
-    // Enrich profiles
+    // Enrich profiles (cast needed: Supabase client types can infer never for tables without generated types)
+    const profileUpdate = (u: (typeof FAKE_USERS)[number]) => ({
+        school: u.school,
+        bio: u.bio,
+        rating: u.rating,
+        completed_rides: u.completedRides,
+        total_rides: u.totalRides,
+        phone_verified: u.phoneVerified,
+        email_verified: u.emailVerified,
+        id_verified: u.idVerified,
+        conversation_pref: u.conversationPref,
+        music_pref: u.musicPref,
+        smoking_pref: u.smokingPref,
+        photo_url: u.photoUrl,
+        is_verified: u.idVerified,
+    });
     for (const u of FAKE_USERS) {
-        const { error } = await supabase
-            .from("profiles")
-            .update({
-                school: u.school,
-                bio: u.bio,
-                rating: u.rating,
-                completed_rides: u.completedRides,
-                total_rides: u.totalRides,
-                phone_verified: u.phoneVerified,
-                email_verified: u.emailVerified,
-                id_verified: u.idVerified,
-                conversation_pref: u.conversationPref,
-                music_pref: u.musicPref,
-                smoking_pref: u.smokingPref,
-                photo_url: u.photoUrl,
-                is_verified: u.idVerified,
-            })
-            .eq("id", profileIds[u.email]);
+        // Cast: Supabase client types can infer never for profiles without generated types
+        const table = supabase.from("profiles") as unknown as { update: (p: unknown) => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> } };
+        const { error } = await table.update(profileUpdate(u)).eq("id", profileIds[u.email]);
         if (error)
             throw new Error(
                 `Failed to update profile ${u.email}: ${error.message}`
@@ -585,8 +585,7 @@ async function createTestRides(
     ];
 
     for (const r of rides) {
-        const { data, error } = await supabase
-            .from("rides")
+        const { data, error } = await (supabase.from("rides") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } } })
             .insert({
                 user_id: r.userId,
                 ride_type: r.rideType,
@@ -697,8 +696,7 @@ async function createTestMatches(
 
     // Insert one at a time so triggers fire in order
     for (const pair of matchPairs) {
-        const { data, error } = await supabase
-            .from("ride_requests")
+        const { data, error } = await (supabase.from("ride_requests") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } } })
             .insert({
                 ride_id: rideIds[pair.rideKey],
                 requester_ride_id: rideIds[pair.requesterKey],
@@ -735,8 +733,7 @@ async function createTestMatches(
 
     // If trigger didn't fire for Chris's ride, insert group manually (David's stays 1:1 until user accepts Alex)
     if (!groupMap[rideIds.chris_offering]) {
-        const { data, error } = await supabase
-            .from("ride_groups")
+        const { data, error } = await (supabase.from("ride_groups") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }> } } })
             .insert({ ride_id: rideIds.chris_offering })
             .select("id")
             .single();
@@ -762,7 +759,7 @@ async function createTestMessages(
         (r) => r.requesterRideId === rideIds.mike_seeking
     );
     if (singleReq) {
-        await supabase.from("messages").insert([
+        await (supabase.from("messages") as unknown as { insert: (p: unknown) => Promise<unknown> }).insert([
             {
                 conversation_id: singleReq.id,
                 ride_group_id: null,
@@ -795,7 +792,7 @@ async function createTestMessages(
     // Route C: group messages (Chris + Jordan + Taylor + Riley)
     const groupC = groupMap[rideIds.chris_offering];
     if (groupC) {
-        await supabase.from("messages").insert([
+        await (supabase.from("messages") as unknown as { insert: (p: unknown) => Promise<unknown> }).insert([
             {
                 conversation_id: null,
                 ride_group_id: groupC,
@@ -841,7 +838,7 @@ async function createTestMessages(
 
 export async function POST() {
     try {
-        const supabase = getAdmin();
+        const supabase = getAdmin() as Supabase;
 
         // 1. Clean up old test data
         const cleaned = await cleanupTestUsers(supabase);
@@ -930,7 +927,7 @@ export async function POST() {
 
 export async function DELETE() {
     try {
-        const supabase = getAdmin();
+        const supabase = getAdmin() as Supabase;
         const cleaned = await cleanupTestUsers(supabase);
         return NextResponse.json({
             success: true,

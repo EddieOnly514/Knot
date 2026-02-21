@@ -527,7 +527,7 @@ function MatchesContent() {
         }
       } else if (profile) {
         const myRides = await getMyRides(profile.id);
-        const selected = myRides.find((r) => r.id === id) ?? myRides[0];
+        const selected = myRides.find((r: { id: string; origin_name: string; dest_name: string }) => r.id === id) ?? myRides[0];
         if (selected) {
           setRideSummary({ origin: selected.origin_name, dest: selected.dest_name });
         }

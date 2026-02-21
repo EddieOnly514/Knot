@@ -23,9 +23,10 @@ export async function GET(request: Request) {
             type ProfileRow = { first_name: string | null; created_at: string } | null;
             const profile = profileRow as ProfileRow;
 
+            const hasName = profile?.first_name?.trim();
             const isNewProfile =
                 !profile ||
-                !profile.first_name?.trim() ||
+                !hasName ||
                 (profile.created_at &&
                     Date.now() - new Date(profile.created_at).getTime() <
                         ONBOARDING_NEW_PROFILE_SECONDS * 1000);

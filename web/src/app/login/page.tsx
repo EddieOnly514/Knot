@@ -58,8 +58,8 @@ function LoginForm() {
       return;
     }
 
-    // Successful password sign-in – middleware/onboarding logic will take over.
-    router.push("/home");
+    // Send to create-profile; middleware will redirect existing users to /home
+    router.push("/onboarding");
     setIsLoading(false);
   };
 

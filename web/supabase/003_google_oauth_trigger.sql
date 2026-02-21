@@ -1,47 +1,27 @@
 -- Knot Web Migration: Update handle_new_user for Google OAuth
 -- Run this in Supabase SQL Editor
 --
--- Google OAuth provides user metadata differently than phone/email signup:
--- - full_name (instead of first_name / last_name)
--- - avatar_url (profile picture)
--- - email (verified by Google)
---
--- This updated trigger handles both cases.
+-- New users must go through onboarding to set their name. We create the profile
+-- with empty first_name/last_name so the app redirects them to onboarding.
+-- Email and photo_url are set from OAuth for display/prefill on the onboarding page.
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_first_name TEXT;
-    v_last_name TEXT;
-    v_full_name TEXT;
     v_photo_url TEXT;
     v_email TEXT;
 BEGIN
-    -- Extract name from metadata
-    v_first_name := COALESCE(NEW.raw_user_meta_data->>'first_name', '');
-    v_last_name := COALESCE(NEW.raw_user_meta_data->>'last_name', '');
-    v_full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', '');
     v_photo_url := COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', NULL);
     v_email := COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', NULL);
 
-    -- If first_name is empty but full_name exists (Google OAuth), split it
-    IF v_first_name = '' AND v_full_name != '' THEN
-        v_first_name := SPLIT_PART(v_full_name, ' ', 1);
-        v_last_name := TRIM(SUBSTRING(v_full_name FROM LENGTH(v_first_name) + 1));
-    END IF;
-
-    -- Fallback: use email prefix as first name
-    IF v_first_name = '' AND v_email IS NOT NULL THEN
-        v_first_name := SPLIT_PART(v_email, '@', 1);
-    END IF;
-
+    -- Insert with empty first_name/last_name so user is sent to onboarding to register
     INSERT INTO public.profiles (user_id, email, phone, first_name, last_name, photo_url)
     VALUES (
         NEW.id,
         v_email,
         NEW.phone,
-        v_first_name,
-        v_last_name,
+        '',
+        '',
         v_photo_url
     );
     RETURN NEW;

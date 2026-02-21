@@ -96,7 +96,7 @@ export async function updateSession(request: NextRequest) {
             .eq("user_id", user.id)
             .single();
 
-        const isNewUser = !profile?.first_name;
+        const isNewUser = !profile?.first_name?.trim();
 
         // New users on login/signup → send to onboarding
         if (isAuthPath && isNewUser) {

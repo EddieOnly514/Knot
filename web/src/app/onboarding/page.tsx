@@ -50,14 +50,23 @@ export default function OnboardingPage() {
     const [musicPref, setMusicPref] = useState("no_preference");
     const [genderPref, setGenderPref] = useState("any");
 
-    // Pre-fill once profile loads
+    // Pre-fill once profile loads; use user_metadata (e.g. Google name) when profile name is empty
     useEffect(() => {
         if (profile) {
-            setFirstName(profile.first_name || "");
-            setLastName(profile.last_name || "");
+            const fromProfileFirst = (profile.first_name || "").trim();
+            const fromProfileLast = (profile.last_name || "").trim();
+            if (fromProfileFirst || fromProfileLast) {
+                setFirstName(fromProfileFirst);
+                setLastName(fromProfileLast);
+            } else if (user?.user_metadata) {
+                const fullName = user.user_metadata.full_name || user.user_metadata.name || "";
+                const parts = fullName.trim().split(/\s+/);
+                setFirstName(parts[0] || "");
+                setLastName(parts.slice(1).join(" ") || "");
+            }
             setPhone(profile.phone || "");
         }
-    }, [profile]);
+    }, [profile, user?.user_metadata]);
 
     // Redirect if not authenticated (and not loading)
     useEffect(() => {
@@ -68,7 +77,7 @@ export default function OnboardingPage() {
 
     // Redirect if already onboarded (but not while saving) — gate on first name
     useEffect(() => {
-        if (!loading && !saving && profile?.first_name) {
+        if (!loading && !saving && profile?.first_name?.trim()) {
             router.push("/home");
         }
     }, [loading, saving, profile, router]);

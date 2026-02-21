@@ -124,19 +124,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     .single();
 
                 if (fetchError && fetchError.code === "PGRST116") {
-                    // No profile found — trigger may not have fired yet, create one
+                    // No profile found — trigger may not have fired yet, create one with empty name
+                    // so user is sent to onboarding to register (name prefill happens on onboarding page)
                     console.log("[AuthProvider] No profile found, creating...");
                     const metadata = authUser.user_metadata || {};
-                    const fullName = metadata.full_name || metadata.name || "";
-                    const parts = fullName.split(" ");
 
                     const { data: newProfile, error: insertError } = await supabase
                         .from("profiles")
                         .insert({
                             user_id: authUser.id,
                             email: authUser.email || null,
-                            first_name: parts[0] || authUser.email?.split("@")[0] || "",
-                            last_name: parts.slice(1).join(" ") || "",
+                            first_name: "",
+                            last_name: "",
                             photo_url: metadata.avatar_url || metadata.picture || null,
                         })
                         .select()
@@ -398,7 +397,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAuthenticated: !!session,
-        isNewUser: !!session && !!profile && !profile.first_name,
+        // New = has session but no profile yet (still loading) or profile has no name (needs onboarding)
+        isNewUser: !!session && (!profile || !profile.first_name?.trim()),
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmailPassword,

@@ -29,10 +29,10 @@ import {
   Music,
   Calendar,
 } from "lucide-react";
-import { findMatches, sendMatchRequest } from "@/lib/services/matchService";
+import { findMatches, sendMatchRequest, collapseMatchesIntoItems } from "@/lib/services/matchService";
 import { getMyRides } from "@/lib/services/rideService";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
-import type { PotentialMatch } from "@/types";
+import type { PotentialMatch, MatchItem } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -51,13 +51,13 @@ function estimateSavingsDollars(match: PotentialMatch) {
 }
 
 function MatchDetailDialog({
-  match,
+  item,
   open,
   onOpenChange,
   myRideId,
   onRequested,
 }: {
-  match: PotentialMatch | null;
+  item: MatchItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   myRideId: string | null;
@@ -66,7 +66,11 @@ function MatchDetailDialog({
   const router = useRouter();
   const [requesting, setRequesting] = useState(false);
 
-  if (!match) return null;
+  if (!item) return null;
+
+  const match = item.kind === "single" ? item.match : item.primaryMatch;
+  const targetRideId = item.kind === "group" ? item.groupHostRideId : match.ride_id;
+  const isGroup = item.kind === "group" && item.groupSize >= 2;
 
   const matchPct = Math.max(0, Math.min(100, Math.round(match.total_score)));
 
@@ -74,8 +78,8 @@ function MatchDetailDialog({
     if (!myRideId) return;
     setRequesting(true);
     try {
-      await sendMatchRequest(myRideId, match.ride_id);
-      toast.success(`Request sent to ${match.first_name}`);
+      await sendMatchRequest(myRideId, targetRideId);
+      toast.success(isGroup ? "Request sent to the group" : `Request sent to ${match.first_name}`);
       onRequested();
       onOpenChange(false);
     } catch (err) {
@@ -97,9 +101,16 @@ function MatchDetailDialog({
             <DialogTitle className="text-lg">
               Match details
             </DialogTitle>
-            <Badge className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">
-              {matchPct}% Match
-            </Badge>
+            <div className="flex items-center gap-2">
+              {isGroup && (
+                <Badge variant="secondary" className="rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+                  Already in a group of {item.groupSize}
+                </Badge>
+              )}
+              <Badge className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">
+                {matchPct}% Match
+              </Badge>
+            </div>
           </div>
         </DialogHeader>
 
@@ -126,6 +137,11 @@ function MatchDetailDialog({
                         </span>
                       )}
                     </div>
+                    {isGroup && item.allMatches.length > 1 && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        With: {item.allMatches.filter((m) => m.ride_id !== match.ride_id).map((m) => `${m.first_name}${m.last_name?.[0] ? ` ${m.last_name[0]}.` : ""}`).join(", ")}
+                      </p>
+                    )}
                     <div className="mt-1 flex items-center gap-3 text-sm text-zinc-500">
                       <span className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -483,11 +499,134 @@ function MatchCard({
   );
 }
 
+function GroupMatchCard({
+  item,
+  myRideId,
+  onRequested,
+  onShowInfo,
+}: {
+  item: Extract<MatchItem, { kind: "group" }>;
+  myRideId: string;
+  onRequested: () => void;
+  onShowInfo: () => void;
+}) {
+  const [requesting, setRequesting] = useState(false);
+  const router = useRouter();
+  const { primaryMatch, groupSize, groupHostRideId } = item;
+  const matchPct = Math.max(0, Math.min(100, Math.round(primaryMatch.total_score)));
+  const originTime = formatTime(primaryMatch.departure_earliest);
+
+  const handleRequest = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRequesting(true);
+    try {
+      await sendMatchRequest(myRideId, groupHostRideId);
+      toast.success("Request sent to the group");
+      onRequested();
+    } catch (err) {
+      console.error("Failed to send request:", err);
+      toast.error("Failed to send request");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
+  return (
+    <Card
+      className="overflow-hidden border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+      onClick={onShowInfo}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={primaryMatch.photo_url || undefined} />
+            <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+              {primaryMatch.first_name?.[0] || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="truncate text-sm font-semibold text-zinc-900">
+                  {primaryMatch.first_name} {primaryMatch.last_name?.[0] ? `${primaryMatch.last_name[0]}.` : ""}
+                </p>
+                {primaryMatch.origin_distance_miles != null && (
+                  <span className="shrink-0 text-xs text-zinc-400">
+                    {primaryMatch.origin_distance_miles.toFixed(1)} mi
+                  </span>
+                )}
+              </div>
+              <Badge className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                {matchPct}%
+              </Badge>
+            </div>
+            <div className="mt-0.5 flex items-center gap-2 text-xs">
+              <Badge variant="secondary" className="rounded-full bg-amber-100 px-2 py-0 text-[10px] font-semibold text-amber-800">
+                Already in a group of {groupSize}
+              </Badge>
+              <span className="flex items-center gap-1 text-zinc-500">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                {primaryMatch.rating.toFixed(1)}
+              </span>
+              <span className="text-zinc-500">•</span>
+              <span className="text-zinc-500">{primaryMatch.total_rides} rides</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 cursor-pointer rounded-xl bg-zinc-50 p-3 text-xs transition-colors hover:bg-zinc-100" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-semibold text-zinc-900">
+                  {primaryMatch.origin_name}
+                </p>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                <p className="truncate text-sm font-semibold text-zinc-900">
+                  {primaryMatch.dest_name}
+                </p>
+              </div>
+              <p className="mt-0.5 text-[11px] text-zinc-500">
+                {originTime} · Party of {primaryMatch.seats_needed}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="outline"
+            className="h-9 rounded-full text-xs font-semibold"
+            onClick={() => router.push(`/profile/${primaryMatch.user_id}`)}
+          >
+            View Profile
+          </Button>
+          <Button
+            className="h-9 rounded-full bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
+            onClick={handleRequest}
+            disabled={requesting}
+          >
+            {requesting ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              "Match Request"
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MatchesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, loading: authLoading } = useAuth();
   const [matches, setMatches] = useState<PotentialMatch[]>([]);
+  const [matchItems, setMatchItems] = useState<MatchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [rideId, setRideId] = useState<string | null>(null);
   const [rideSummary, setRideSummary] = useState<{
@@ -496,7 +635,7 @@ function MatchesContent() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("best");
-  const [detailMatch, setDetailMatch] = useState<PotentialMatch | null>(null);
+  const [detailItem, setDetailItem] = useState<MatchItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const loadMatches = useCallback(async () => {
@@ -543,6 +682,7 @@ function MatchesContent() {
         .or(`ride_id.eq.${id},requester_ride_id.eq.${id}`)
         .in("status", ["accepted", "pending"]);
 
+      let filtered: PotentialMatch[];
       if (existingRequests && existingRequests.length > 0) {
         const matchedRideIds = new Set(
           existingRequests.map(
@@ -550,13 +690,15 @@ function MatchesContent() {
               r.ride_id === id ? r.requester_ride_id : r.ride_id,
           ),
         );
-        const filtered = results.filter(
+        filtered = results.filter(
           (m: PotentialMatch) => !matchedRideIds.has(m.ride_id),
         );
-        setMatches(filtered);
       } else {
-        setMatches(results);
+        filtered = results;
       }
+      setMatches(filtered);
+      const items = await collapseMatchesIntoItems(filtered);
+      setMatchItems(items);
     } catch (err) {
       const message =
         err instanceof Error
@@ -576,32 +718,37 @@ function MatchesContent() {
     loadMatches();
   }, [loadMatches]);
 
-  const sortedMatches = useMemo(() => {
-    if (matches.length === 0) return [];
-    const list = [...matches];
+  const getScoreMatch = (item: MatchItem): PotentialMatch =>
+    item.kind === "single" ? item.match : item.primaryMatch;
+
+  const sortedMatchItems = useMemo(() => {
+    if (matchItems.length === 0) return [];
+    const list = [...matchItems];
     const closestScore = (m: PotentialMatch) => {
       const a = m.origin_distance_miles ?? 9999;
       const b = m.dest_distance_miles ?? 9999;
       return a + b;
     };
     list.sort((a, b) => {
+      const ma = getScoreMatch(a);
+      const mb = getScoreMatch(b);
       switch (sortKey) {
         case "earliest":
           return (
-            new Date(a.departure_earliest).getTime() -
-            new Date(b.departure_earliest).getTime()
+            new Date(ma.departure_earliest).getTime() -
+            new Date(mb.departure_earliest).getTime()
           );
         case "closest":
-          return closestScore(a) - closestScore(b);
+          return closestScore(ma) - closestScore(mb);
         case "cheapest":
-          return estimateSavingsDollars(b) - estimateSavingsDollars(a);
+          return estimateSavingsDollars(mb) - estimateSavingsDollars(ma);
         case "best":
         default:
-          return b.total_score - a.total_score;
+          return mb.total_score - ma.total_score;
       }
     });
     return list;
-  }, [matches, sortKey]);
+  }, [matchItems, sortKey]);
 
   if (loading) {
     return (
@@ -647,7 +794,7 @@ function MatchesContent() {
     );
   }
 
-  if (matches.length === 0) {
+  if (matchItems.length === 0) {
     return (
       <div className="py-16 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
@@ -709,26 +856,39 @@ function MatchesContent() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {sortedMatches.map((match) => (
-          <MatchCard
-            key={match.ride_id}
-            match={match}
-            myRideId={rideId!}
-            onRequested={loadMatches}
-            onShowInfo={() => {
-              setDetailMatch(match);
-              setDetailOpen(true);
-            }}
-          />
-        ))}
+        {sortedMatchItems.map((item) =>
+          item.kind === "single" ? (
+            <MatchCard
+              key={item.match.ride_id}
+              match={item.match}
+              myRideId={rideId!}
+              onRequested={loadMatches}
+              onShowInfo={() => {
+                setDetailItem(item);
+                setDetailOpen(true);
+              }}
+            />
+          ) : (
+            <GroupMatchCard
+              key={item.groupHostRideId}
+              item={item}
+              myRideId={rideId!}
+              onRequested={loadMatches}
+              onShowInfo={() => {
+                setDetailItem(item);
+                setDetailOpen(true);
+              }}
+            />
+          ),
+        )}
       </div>
 
       <MatchDetailDialog
-        match={detailMatch}
+        item={detailItem}
         open={detailOpen}
         onOpenChange={(open) => {
           setDetailOpen(open);
-          if (!open) setDetailMatch(null);
+          if (!open) setDetailItem(null);
         }}
         myRideId={rideId}
         onRequested={loadMatches}

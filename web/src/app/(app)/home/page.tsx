@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { getMyRides, cancelRide } from "@/lib/services/rideService";
 import { getMyRequests, respondToRequest, withdrawRequest } from "@/lib/services/matchService";
-import { findMatches, sendMatchRequest } from "@/lib/services/matchService";
+import { findMatches, sendMatchRequest, collapseMatchesIntoItems } from "@/lib/services/matchService";
 import type { RideRequest } from "@/lib/services/matchService";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import type { PotentialMatch } from "@/types";
+import type { PotentialMatch, MatchItem } from "@/types";
 import {
   getHomeCache,
   setHomeCache,
@@ -107,18 +107,21 @@ interface Ride {
 function SuggestedMatchCard({
   match,
   matchPct,
+  groupSize,
   requesting,
   onConnect,
   onViewProfile,
 }: {
   match: PotentialMatch;
   matchPct: number;
+  groupSize?: number;
   requesting: boolean;
   onConnect: () => void;
   onViewProfile: () => void;
 }) {
   const [tripExpanded, setTripExpanded] = useState(false);
   const originTime = formatMatchTime(match.departure_earliest);
+  const isGroup = groupSize != null && groupSize >= 2;
 
   return (
     <Card className="overflow-hidden border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -146,13 +149,18 @@ function SuggestedMatchCard({
                 {matchPct}%
               </Badge>
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-xs text-zinc-500">
-              <span className="flex items-center gap-1">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+              {isGroup && (
+                <Badge variant="secondary" className="rounded-full bg-amber-100 px-2 py-0 text-[10px] font-semibold text-amber-800">
+                  Already in a group of {groupSize}
+                </Badge>
+              )}
+              <span className="flex items-center gap-1 text-zinc-500">
                 <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                 {match.rating.toFixed(1)}
               </span>
-              <span>•</span>
-              <span>{match.total_rides} rides</span>
+              <span className="text-zinc-500">•</span>
+              <span className="text-zinc-500">{match.total_rides} rides</span>
             </div>
           </div>
         </div>
@@ -295,8 +303,8 @@ export default function HomePage() {
   const [requests, setRequests] = useState<RideRequest[]>(
     cacheIsValid ? (homeCache!.requests as RideRequest[]) : [],
   );
-  const [suggestedMatches, setSuggestedMatches] = useState<PotentialMatch[]>(
-    cacheIsValid ? (homeCache!.suggestedMatches as PotentialMatch[]) : [],
+  const [suggestedMatches, setSuggestedMatches] = useState<MatchItem[]>(
+    cacheIsValid ? (homeCache!.suggestedMatches as MatchItem[]) : [],
   );
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [requestingMatchRideId, setRequestingMatchRideId] = useState<string | null>(
@@ -325,7 +333,7 @@ export default function HomePage() {
     if (!cacheIsValid || !cache) return;
     setRides(cache.rides as Ride[]);
     setRequests(cache.requests as RideRequest[]);
-    setSuggestedMatches(cache.suggestedMatches as PotentialMatch[]);
+    setSuggestedMatches(cache.suggestedMatches as MatchItem[]);
     setLoadingRides(false);
     setLoadingRequests(false);
   }, [cacheIsValid]);
@@ -337,7 +345,7 @@ export default function HomePage() {
       const base =
         current && current.profileId === profile.id
           ? current
-          : { profileId: profile.id, fetchedAt: 0, rides: [] as Ride[], requests: [] as RideRequest[], suggestedMatches: [] as PotentialMatch[] };
+          : { profileId: profile.id, fetchedAt: 0, rides: [] as Ride[], requests: [] as RideRequest[], suggestedMatches: [] as MatchItem[] };
       setHomeCache({
         profileId: profile.id,
         fetchedAt: Date.now(),
@@ -428,7 +436,8 @@ export default function HomePage() {
         );
         filtered = results.filter((m) => !matchedRideIds.has(m.ride_id));
       }
-      const nextMatches = filtered.slice(0, 3);
+      const items = await collapseMatchesIntoItems(filtered);
+      const nextMatches = items.slice(0, 3);
       setSuggestedMatches(nextMatches);
       persistCache({ suggestedMatches: nextMatches });
     } catch (err) {
@@ -861,16 +870,20 @@ export default function HomePage() {
 
         {!loadingMatches && suggestedMatches.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {suggestedMatches.map((m) => {
-              const matchPct = Math.max(0, Math.min(100, Math.round(m.total_score)));
+            {suggestedMatches.map((item) => {
+              const match = item.kind === "single" ? item.match : item.primaryMatch;
+              const targetRideId = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
+              const matchPct = Math.max(0, Math.min(100, Math.round(match.total_score)));
+              const key = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
               return (
                 <SuggestedMatchCard
-                  key={m.ride_id}
-                  match={m}
+                  key={key}
+                  match={match}
                   matchPct={matchPct}
-                  requesting={requestingMatchRideId === m.ride_id}
-                  onConnect={() => handleConnect(m.ride_id)}
-                  onViewProfile={() => router.push(`/profile/${m.user_id}`)}
+                  groupSize={item.kind === "group" ? item.groupSize : undefined}
+                  requesting={requestingMatchRideId === targetRideId}
+                  onConnect={() => handleConnect(targetRideId)}
+                  onViewProfile={() => router.push(`/profile/${match.user_id}`)}
                 />
               );
             })}

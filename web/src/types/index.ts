@@ -45,3 +45,14 @@ export interface PotentialMatch {
     time_overlap_minutes: number;
     match_label: string;
 }
+
+/** Single match card (one person) or grouped (already in a group of N). */
+export type MatchItem =
+    | { kind: "single"; match: PotentialMatch }
+    | {
+          kind: "group";
+          groupSize: number;
+          groupHostRideId: string;
+          primaryMatch: PotentialMatch;
+          allMatches: PotentialMatch[];
+      };

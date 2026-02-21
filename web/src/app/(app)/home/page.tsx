@@ -524,6 +524,7 @@ export default function HomePage() {
       .flatMap((r) => [r.ride_id, r.requester_ride_id]),
   );
   const activeRides = rides.filter((r) => !matchedRideIds.has(r.id));
+  const firstActiveRideId = activeRides[0]?.id ?? null;
 
   const activeRideCount = activeRides.length;
   // Only count completed rides for stats (Total Saved, Rides Shared, CO2 Reduced)

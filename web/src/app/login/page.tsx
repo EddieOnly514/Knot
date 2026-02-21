@@ -222,10 +222,7 @@ function LoginForm() {
           </Link>
         </p>
 
-        {(typeof window === "undefined"
-          ? process.env.NODE_ENV === "development"
-          : window.location.hostname === "localhost" ||
-            window.location.hostname === "127.0.0.1") && (
+        {process.env.NODE_ENV === "development" && (
           <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <p className="text-amber-800 text-xs font-medium">
               Dev: Test accounts for simulated match

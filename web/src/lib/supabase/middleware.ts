@@ -4,6 +4,20 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
+    // If a Supabase auth `code` param landed on the wrong page (e.g. "/" due
+    // to a misconfigured redirect URL in the Supabase dashboard), forward the
+    // request to /auth/callback so the code still gets exchanged for a session.
+    if (
+        !pathname.startsWith("/auth/callback") &&
+        request.nextUrl.searchParams.has("code") &&
+        (request.nextUrl.searchParams.has("next") ||
+            request.nextUrl.searchParams.get("code")?.length === 36)
+    ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/auth/callback";
+        return NextResponse.redirect(url);
+    }
+
     // Routes that require an authenticated user
     const protectedPaths = [
         "/home",
@@ -66,7 +80,6 @@ export async function updateSession(request: NextRequest) {
 
     // Protected routes - redirect to login if not authenticated
     if (isProtectedPath && !user) {
-        // Skip auth redirect in development
         if (process.env.NODE_ENV === "development") {
             return supabaseResponse;
         }
@@ -75,16 +88,8 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
-    // For authenticated users, check onboarding completion only when needed.
-    // We intentionally skip this query on regular app routes to keep
-    // client-side navigation fast.
-    if (user && (isAuthPath || isOnboardingPath)) {
-        // Skip in development
-        if (process.env.NODE_ENV === "development") {
-            return supabaseResponse;
-        }
-
-        // Check if profile has been completed (first name is the onboarding gate)
+    // For authenticated users: ensure new users complete onboarding before app routes
+    if (user && (isProtectedPath || isAuthPath || isOnboardingPath)) {
         const { data: profile } = await supabase
             .from("profiles")
             .select("first_name")
@@ -93,13 +98,21 @@ export async function updateSession(request: NextRequest) {
 
         const isNewUser = !profile?.first_name;
 
+        // New users on login/signup → send to onboarding
         if (isAuthPath && isNewUser) {
             const url = request.nextUrl.clone();
             url.pathname = "/onboarding";
             return NextResponse.redirect(url);
         }
 
-        // Redirect completed users away from onboarding and auth pages.
+        // New users on any protected route (e.g. /home after email sign-in) → onboarding
+        if (isProtectedPath && isNewUser) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/onboarding";
+            return NextResponse.redirect(url);
+        }
+
+        // Completed users on auth or onboarding → send to app
         if ((isAuthPath || isOnboardingPath) && !isNewUser) {
             const url = request.nextUrl.clone();
             url.pathname = "/home";

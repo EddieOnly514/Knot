@@ -487,7 +487,7 @@ export default function ProfilePage() {
                   <SelectContent>
                     <SelectItem value="yes">Yes please</SelectItem>
                     <SelectItem value="no">No thanks</SelectItem>
-                    <SelectItem value="no_preference">Don&apos;t care</SelectItem>
+                    <SelectItem value="no_preference">Any music</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -530,8 +530,8 @@ export default function ProfilePage() {
                 <span className="text-sm font-medium text-zinc-900">
                   {profile?.music_pref === "yes" && "Yes"}
                   {profile?.music_pref === "no" && "No"}
-                  {profile?.music_pref === "no_preference" && "Don&apos;t care"}
-                  {!profile?.music_pref && "Don&apos;t care"}
+                  {profile?.music_pref === "no_preference" && "Any music"}
+                  {!profile?.music_pref && "Any music"}
                 </span>
               </div>
               <div className="flex items-center justify-between">

@@ -315,7 +315,7 @@ export default function OnboardingPage() {
                                 <SelectContent>
                                     <SelectItem value="yes">Yes please</SelectItem>
                                     <SelectItem value="no">No thanks</SelectItem>
-                                    <SelectItem value="no_preference">Don&apos;t care</SelectItem>
+                                    <SelectItem value="no_preference">Any music</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

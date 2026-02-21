@@ -56,6 +56,7 @@ import { ProfileScreen } from '../screens/main/ProfileScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const ProfileStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 
 // Loading Screen
@@ -67,7 +68,7 @@ function LoadingScreen() {
   );
 }
 
-// Auth Navigator - Splash → Onboarding → Phone → OTP → ProfileSetup → WelcomeLoading
+// Auth Navigator - Splash → Onboarding → Phone → OTP → (ProfileSetup if new user)
 function AuthNavigator() {
   return (
     <AuthStack.Navigator
@@ -84,6 +85,28 @@ function AuthNavigator() {
       <AuthStack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <AuthStack.Screen name="WelcomeLoading" component={WelcomeLoadingScreen} />
     </AuthStack.Navigator>
+  );
+}
+
+// Profile Setup Navigator - Used when a user is authenticated but has no profile yet
+// (e.g. Google sign-in for the first time). Starts directly at ProfileSetup.
+function ProfileSetupNavigator() {
+  return (
+    <ProfileStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'fade',
+      }}
+    >
+      <ProfileStack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+      <ProfileStack.Screen name="WelcomeLoading" component={WelcomeLoadingScreen} />
+      {/* Include unused screens to satisfy TS — they won't be reachable */}
+      <ProfileStack.Screen name="Splash" component={SplashScreen} />
+      <ProfileStack.Screen name="Onboarding" component={OnboardingScreen} />
+      <ProfileStack.Screen name="PhoneVerification" component={PhoneVerificationScreen} />
+      <ProfileStack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -130,9 +153,14 @@ function MainTabNavigator() {
   );
 }
 
-// Root Navigator - Uses AuthContext for clean routing
+// Root Navigator
+// Routing logic:
+//   loading              → LoadingScreen
+//   !session             → AuthNavigator (Splash → Onboarding → Phone → OTP)
+//   session && !profile  → ProfileSetup stack (new user must complete profile)
+//   session && profile   → Main app
 export function AppNavigator() {
-  const { loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated, hasProfile } = useAuth();
 
   // Show loading screen while checking auth
   if (loading) {
@@ -154,10 +182,13 @@ export function AppNavigator() {
         }}
       >
         {!isAuthenticated ? (
-          // Not signed in -> Show Auth flow (Splash → Onboarding → Phone → OTP → etc.)
+          // Not signed in → Auth flow
           <RootStack.Screen name="Auth" component={AuthNavigator} />
+        ) : !hasProfile ? (
+          // Signed in but no profile yet → send directly to ProfileSetup
+          <RootStack.Screen name="Auth" component={ProfileSetupNavigator} />
         ) : (
-          // Signed in -> Show Main App
+          // Signed in and has profile → Main app
           <>
             <RootStack.Screen name="Main" component={MainTabNavigator} />
             <RootStack.Screen

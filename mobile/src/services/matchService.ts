@@ -52,12 +52,16 @@ export const matchService = {
 
         if (existingMatch) {
             // Update existing match with interest
-            const updateField = existingMatch.user_1 === user.id ? 'user_1_interested' : 'user_2_interested';
+            const isUser1 = existingMatch.user_1 === user.id;
+            const updateField = isUser1 ? 'user_1_interested' : 'user_2_interested';
+            // Check if the OTHER user has already expressed interest (making this mutual)
+            const otherAlreadyInterested = isUser1 ? existingMatch.user_2_interested : existingMatch.user_1_interested;
+
             const { data, error } = await supabase
                 .from('matches')
                 .update({
                     [updateField]: true,
-                    status: existingMatch.user_1_interested || existingMatch.user_2_interested ? 'mutual' : 'pending'
+                    status: otherAlreadyInterested ? 'mutual' : 'pending',
                 })
                 .eq('id', existingMatch.id)
                 .select()

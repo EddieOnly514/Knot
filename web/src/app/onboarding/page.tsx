@@ -50,23 +50,14 @@ export default function OnboardingPage() {
     const [musicPref, setMusicPref] = useState("no_preference");
     const [genderPref, setGenderPref] = useState("any");
 
-    // Pre-fill once profile loads; use user_metadata (e.g. Google name) when profile name is empty
+    // Pre-fill from existing profile data only (not Google metadata — user should type their own name)
     useEffect(() => {
         if (profile) {
-            const fromProfileFirst = (profile.first_name || "").trim();
-            const fromProfileLast = (profile.last_name || "").trim();
-            if (fromProfileFirst || fromProfileLast) {
-                setFirstName(fromProfileFirst);
-                setLastName(fromProfileLast);
-            } else if (user?.user_metadata) {
-                const fullName = user.user_metadata.full_name || user.user_metadata.name || "";
-                const parts = fullName.trim().split(/\s+/);
-                setFirstName(parts[0] || "");
-                setLastName(parts.slice(1).join(" ") || "");
-            }
+            setFirstName((profile.first_name || "").trim());
+            setLastName((profile.last_name || "").trim());
             setPhone(profile.phone || "");
         }
-    }, [profile, user?.user_metadata]);
+    }, [profile]);
 
     // Redirect if not authenticated (and not loading)
     useEffect(() => {

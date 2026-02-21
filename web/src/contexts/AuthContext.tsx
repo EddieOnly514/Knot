@@ -87,9 +87,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [supabase]);
 
-    // ── Step 1: Auth state listener (synchronous only — no DB calls) ──
+    // ── Step 1: Get initial session and subscribe to auth changes ──
     useEffect(() => {
         if (!supabase) return;
+        let cancelled = false;
+
+        supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+            if (cancelled) return;
+            setSession(initialSession);
+            setUser(initialSession?.user ?? null);
+            if (!initialSession) {
+                setProfile(null);
+                profileFetchedForRef.current = null;
+                setLoading(false);
+            }
+        });
+
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(
@@ -106,7 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            cancelled = true;
+            subscription.unsubscribe();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [supabase]);
 
@@ -125,9 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 if (fetchError && fetchError.code === "PGRST116") {
                     // No profile found — trigger may not have fired yet, create one with empty name
-                    // so user is sent to onboarding to register (name prefill happens on onboarding page)
+                    // so user is sent to onboarding to register
                     console.log("[AuthProvider] No profile found, creating...");
-                    const metadata = authUser.user_metadata || {};
 
                     const { data: newProfile, error: insertError } = await supabase
                         .from("profiles")
@@ -136,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             email: authUser.email || null,
                             first_name: "",
                             last_name: "",
-                            photo_url: metadata.avatar_url || metadata.picture || null,
+                            photo_url: null,
                         })
                         .select()
                         .single();
@@ -397,8 +412,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAuthenticated: !!session,
-        // New = has session but no profile yet (still loading) or profile has no name (needs onboarding)
-        isNewUser: !!session && (!profile || !profile.first_name?.trim()),
+        // Only "new" when profile has loaded and has no name (don't assume while profile is loading)
+        isNewUser: !!session && !!profile && !profile.first_name?.trim(),
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmailPassword,

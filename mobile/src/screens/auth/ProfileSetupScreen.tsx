@@ -9,6 +9,7 @@ import {
   Image,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,20 +17,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, ArrowRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
-import type { RootStackParamList } from '../../types/navigation';
+import type { AuthStackParamList } from '../../types/navigation';
 import { KnotLogo } from '../../components/common/KnotLogo';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export function ProfileSetupScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { devBypassAuth } = useAuth();
+  const { user, refreshProfile } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handlePickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -51,11 +54,44 @@ export function ProfileSetupScreen() {
     }
   };
 
-  const handleContinue = () => {
-    if (firstName.trim() && lastName.trim()) {
-      // TODO: Save profile to Supabase
-      // Navigate to WelcomeLoading animation
-      (navigation as any).navigate('WelcomeLoading');
+  const handleContinue = async () => {
+    if (!firstName.trim() || !lastName.trim()) return;
+    if (!user) {
+      Alert.alert('Error', 'Not logged in. Please restart the app.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          email: email.trim() || user.email || null,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          photo_url: null, // photo upload can be added later
+          is_verified: false,
+          default_party_size: 1,
+          default_luggage: 'none',
+        });
+
+      if (error) {
+        console.error('[ProfileSetup] Error saving profile:', error);
+        Alert.alert('Error', 'Failed to save your profile. Please try again.');
+        return;
+      }
+
+      // Refresh profile in context — this flips hasProfile to true
+      // AppNavigator will automatically route to Main once hasProfile is true
+      await refreshProfile();
+      // Navigate to WelcomeLoading for the animation, then state change takes over
+      navigation.navigate('WelcomeLoading');
+    } catch (err) {
+      console.error('[ProfileSetup] Exception:', err);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -63,16 +99,6 @@ export function ProfileSetupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* DEV BYPASS - Remove for production */}
-      {__DEV__ && (
-        <TouchableOpacity
-          style={styles.devButton}
-          onPress={devBypassAuth}
-        >
-          <Text style={styles.devButtonText}>DEV Skip</Text>
-        </TouchableOpacity>
-      )}
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -152,17 +178,23 @@ export function ProfileSetupScreen() {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           onPress={handleContinue}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={isValid ? [colors.primary, colors.primaryLight] : [colors.slate[300], colors.slate[300]]}
+            colors={isValid && !isSaving ? [colors.primary, colors.primaryLight] : [colors.slate[300], colors.slate[300]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.continueButton}
           >
-            <Text style={styles.continueText}>Continue</Text>
-            <ArrowRight size={20} color="#FFFFFF" />
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.continueText}>Continue</Text>
+                <ArrowRight size={20} color="#FFFFFF" />
+              </>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>

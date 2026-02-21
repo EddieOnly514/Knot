@@ -9,11 +9,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography } from '../../design';
-import { useAuth } from '../../contexts/AuthContext';
 
 export function WelcomeLoadingScreen() {
-    const { devBypassAuth } = useAuth();
-
     // Animation values
     const logoScale = useRef(new Animated.Value(0.8)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -41,20 +38,20 @@ export function WelcomeLoadingScreen() {
                 duration: 500,
                 useNativeDriver: true,
             }).start(() => {
-                // Phase 3: Fade out and complete auth
+                // Phase 3: Fade out
+                // AppNavigator will react to hasProfile becoming true and automatically
+                // route to Main — no explicit navigation needed here.
                 setTimeout(() => {
                     Animated.timing(containerOpacity, {
                         toValue: 0,
                         duration: 400,
                         useNativeDriver: true,
-                    }).start(() => {
-                        // Complete auth to trigger navigation to Main
-                        devBypassAuth();
-                    });
+                    }).start();
                 }, 800);
             });
         });
     }, []);
+
 
     return (
         <Animated.View style={[styles.container, { opacity: containerOpacity }]}>

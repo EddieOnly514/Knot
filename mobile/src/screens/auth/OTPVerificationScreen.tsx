@@ -65,22 +65,11 @@ export function OTPVerificationScreen() {
 
       if (error) {
         Alert.alert('Verification Failed', error.message);
-      } else if (data.session) {
-        // Check if this is a new user (no profile yet)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', data.user?.id)
-          .single();
-
-        if (!profile) {
-          // New user, go to profile setup
-          navigation.navigate('ProfileSetup');
-        } else {
-          // Existing user, go to welcome loading
-          navigation.navigate('WelcomeLoading');
-        }
       }
+      // On success: onAuthStateChange in AuthContext fires automatically,
+      // fetchProfile runs, and AppNavigator routes based on hasProfile:
+      //   - New user (no profile)  → ProfileSetupNavigator → ProfileSetup screen
+      //   - Existing user          → Main app
     } catch (err) {
       Alert.alert('Error', 'Verification failed. Please try again.');
     } finally {

@@ -77,10 +77,12 @@ export const chatService = {
 
     /**
      * Subscribe to new messages in a match (real-time)
+     * NOTE: Realtime payloads only include raw row data (no JOINs), so we
+     * re-fetch the full message with sender profile after each INSERT event.
      */
     subscribeToMessages(
         matchId: string,
-        onNewMessage: (message: Message) => void
+        onNewMessage: (message: MessageWithSender) => void
     ) {
         const subscription = supabase
             .channel(`messages:${matchId}`)
@@ -92,8 +94,21 @@ export const chatService = {
                     table: 'messages',
                     filter: `match_id=eq.${matchId}`,
                 },
-                (payload) => {
-                    onNewMessage(payload.new as Message);
+                async (payload) => {
+                    // Fetch the full message with sender profile since realtime
+                    // payloads don't include JOIN data
+                    const { data } = await supabase
+                        .from('messages')
+                        .select(`
+                            *,
+                            sender:profiles!messages_sender_id_fkey(first_name, last_name, photo_url)
+                        `)
+                        .eq('id', payload.new.id)
+                        .single();
+
+                    if (data) {
+                        onNewMessage(data as MessageWithSender);
+                    }
                 }
             )
             .subscribe();

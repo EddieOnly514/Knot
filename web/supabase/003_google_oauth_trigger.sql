@@ -1,20 +1,18 @@
 -- Knot Web Migration: Update handle_new_user for Google OAuth
 -- Run this in Supabase SQL Editor
 --
--- New users must go through onboarding to set their name. We create the profile
--- with empty first_name/last_name so the app redirects them to onboarding.
--- Email and photo_url are set from OAuth for display/prefill on the onboarding page.
+-- New users must go through onboarding to set their name and photo.
+-- We create the profile with empty first_name/last_name and NULL photo_url
+-- so the app redirects them to onboarding. Nothing is auto-filled from Google.
 
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_photo_url TEXT;
     v_email TEXT;
 BEGIN
-    v_photo_url := COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture', NULL);
     v_email := COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', NULL);
 
-    -- Insert with empty first_name/last_name so user is sent to onboarding to register
+    -- Insert with empty fields so user is sent to onboarding to register
     INSERT INTO public.profiles (user_id, email, phone, first_name, last_name, photo_url)
     VALUES (
         NEW.id,
@@ -22,7 +20,7 @@ BEGIN
         NEW.phone,
         '',
         '',
-        v_photo_url
+        NULL
     );
     RETURN NEW;
 END;

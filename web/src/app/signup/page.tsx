@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +24,10 @@ function SignupForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setError(new URLSearchParams(window.location.search).get("error"));
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -239,17 +241,7 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <Suspense
-          fallback={
-            <Card className="border-zinc-200 bg-white shadow-xl">
-              <CardContent className="p-8 text-center">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-              </CardContent>
-            </Card>
-          }
-        >
-          <SignupForm />
-        </Suspense>
+        <SignupForm />
       </div>
     </div>
   );

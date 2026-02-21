@@ -98,21 +98,21 @@ export async function updateSession(request: NextRequest) {
 
         const isNewUser = !profile?.first_name?.trim();
 
-        // New users on login/signup → send to onboarding
-        if (isAuthPath && isNewUser) {
+        // New users on login/signup → send to onboarding (skip if already on onboarding)
+        if (isAuthPath && isNewUser && !isOnboardingPath) {
             const url = request.nextUrl.clone();
             url.pathname = "/onboarding";
             return NextResponse.redirect(url);
         }
 
-        // New users on any protected route (e.g. /home after email sign-in) → onboarding
-        if (isProtectedPath && isNewUser) {
+        // New users on other protected routes (e.g. /home) → onboarding; never redirect /onboarding → /onboarding (avoids loop)
+        if (isProtectedPath && isNewUser && !pathname.startsWith("/onboarding")) {
             const url = request.nextUrl.clone();
             url.pathname = "/onboarding";
             return NextResponse.redirect(url);
         }
 
-        // Completed users on auth or onboarding → send to app
+        // Completed users on login/signup or onboarding → send to app
         if ((isAuthPath || isOnboardingPath) && !isNewUser) {
             const url = request.nextUrl.clone();
             url.pathname = "/home";

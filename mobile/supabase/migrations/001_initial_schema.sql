@@ -223,27 +223,16 @@ CREATE TRIGGER update_profiles_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Function to create profile on user signup
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.profiles (user_id, phone, first_name, last_name)
-    VALUES (
-        NEW.id,
-        NEW.phone,
-        COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
-        COALESCE(NEW.raw_user_meta_data->>'last_name', '')
-    );
-    RETURN NEW;
-END;
-$$ language 'plpgsql' SECURITY DEFINER;
+-- NOTE: Profile creation is handled by the app in ProfileSetupScreen.
+-- Users must explicitly fill in their name and details before a profile row is created.
+-- This ensures new users (including Google OAuth) always go through the profile setup flow.
+--
+-- If you want to auto-create profiles for legacy reasons, re-add the trigger below,
+-- but be aware it will bypass the onboarding profile setup screen.
+--
+-- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- (Run this in Supabase SQL Editor to drop the old trigger if it was already applied)
 
--- Trigger to auto-create profile on signup
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW
-    EXECUTE FUNCTION handle_new_user();
 
 -- ============================================
 -- INDEXES FOR PERFORMANCE

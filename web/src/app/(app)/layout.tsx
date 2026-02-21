@@ -9,19 +9,23 @@ import { Loader2 } from "lucide-react";
 import { SidebarNav } from "@/components/sidebar-nav";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { loading, isNewUser } = useAuth();
+  const { loading, isNewUser, user, profile } = useAuth();
   const router = useRouter();
 
-  // Redirect new users to onboarding before any app content renders
+  // Don't render app until we know auth state: wait for profile when user is logged in
+  const waitingForProfile = !!user && !profile && !loading;
+  const shouldShowSpinner = loading || waitingForProfile || isNewUser;
+
+  // Redirect new users (profile loaded with no name) to onboarding
   useEffect(() => {
     if (!loading && isNewUser) {
       router.replace("/onboarding");
     }
   }, [loading, isNewUser, router]);
 
-  // Warm likely destinations so tab switches feel instant.
+  // Warm likely destinations so tab switches feel instant
   useEffect(() => {
-    if (loading || isNewUser) return;
+    if (shouldShowSpinner) return;
     const routes = [
       "/home",
       "/post",
@@ -32,10 +36,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       "/settings",
     ];
     routes.forEach((route) => router.prefetch(route));
-  }, [loading, isNewUser, router]);
+  }, [shouldShowSpinner, router]);
 
-  // Show loading spinner while auth/profile is resolving
-  if (loading || (!loading && isNewUser)) {
+  // Spinner while loading, or while logged in but profile not loaded yet, or while new user (redirecting to onboarding)
+  if (shouldShowSpinner) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-50 text-zinc-500">
         <Loader2 className="h-6 w-6 animate-spin text-blue-600" />

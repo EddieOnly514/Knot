@@ -32,30 +32,14 @@ interface AuthContextType {
     profile: Profile | null;
     loading: boolean;
     isAuthenticated: boolean;
+    hasProfile: boolean;
     signInWithGoogle: () => Promise<{ error: Error | null }>;
     signOut: () => Promise<void>;
     updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
     refreshProfile: () => Promise<void>;
-    devBypassAuth: () => void; // DEV ONLY
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// DEV ONLY: Mock profile for testing
-const DEV_PROFILE: Profile = {
-    id: 'dev-user-001',
-    user_id: 'dev-user-001',
-    phone: '+15550000000',
-    email: 'dev@knot.app',
-    first_name: 'Dev',
-    last_name: 'User',
-    photo_url: null,
-    default_party_size: 1,
-    default_luggage: 'none',
-    is_verified: true,
-    rating: 5.0,
-    total_rides: 0,
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
@@ -109,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    await fetchOrCreateProfile(session.user);
+                    await fetchProfile(session.user.id);
                 } else {
                     setProfile(null);
                 }
@@ -129,59 +113,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .single();
 
             if (error && error.code !== 'PGRST116') {
+                // PGRST116 = no rows found (new user, expected)
                 console.error('[AuthProvider] Error fetching profile:', error);
             }
 
-            setProfile(data);
+            // data will be null if no profile row exists (new user)
+            setProfile(data ?? null);
         } catch (error) {
             console.error('[AuthProvider] Exception fetching profile:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchOrCreateProfile = async (authUser: User) => {
-        try {
-            // First try to fetch existing profile
-            const { data: existing, error: fetchError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('user_id', authUser.id)
-                .single();
-
-            if (existing) {
-                setProfile(existing);
-                return;
-            }
-
-            // Profile doesn't exist, create one
-            const email = authUser.email;
-            const metadata = authUser.user_metadata || {};
-            const firstName = metadata.full_name?.split(' ')[0] || metadata.name?.split(' ')[0] || '';
-            const lastName = metadata.full_name?.split(' ').slice(1).join(' ') || '';
-            const photoUrl = metadata.avatar_url || metadata.picture || null;
-
-            const { data: newProfile, error: insertError } = await supabase
-                .from('profiles')
-                .insert({
-                    user_id: authUser.id,
-                    email,
-                    first_name: firstName,
-                    last_name: lastName,
-                    photo_url: photoUrl,
-                    is_verified: true, // OAuth users are verified
-                })
-                .select()
-                .single();
-
-            if (insertError) {
-                console.error('[AuthProvider] Error creating profile:', insertError);
-            } else {
-                console.log('[AuthProvider] Profile created:', newProfile);
-                setProfile(newProfile);
-            }
-        } catch (error) {
-            console.error('[AuthProvider] Exception in fetchOrCreateProfile:', error);
         } finally {
             setLoading(false);
         }
@@ -192,14 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             console.log('[AuthProvider] Starting Google Sign-In...');
 
-            // Check if device supports Google Play Services (Android) or has Google Sign-In (iOS)
             await GoogleSignin.hasPlayServices();
-
-            // Sign in with Google
             const signInResult = await GoogleSignin.signIn();
             console.log('[AuthProvider] Google Sign-In success, getting tokens...');
 
-            // Get the ID token
             const idToken = signInResult.data?.idToken;
 
             if (!idToken) {
@@ -208,7 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             console.log('[AuthProvider] Got ID token, signing in to Supabase...');
 
-            // Sign in to Supabase with the Google ID token
             const { data, error } = await supabase.auth.signInWithIdToken({
                 provider: 'google',
                 token: idToken,
@@ -224,7 +158,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error: any) {
             console.error('[AuthProvider] Google Sign-In error:', error);
 
-            // Handle specific Google Sign-In errors
             if (error.code === statusCodes.SIGN_IN_CANCELLED) {
                 return { error: new Error('Sign-in was cancelled') };
             } else if (error.code === statusCodes.IN_PROGRESS) {
@@ -239,13 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signOut = async () => {
         try {
-            // Sign out from Google
             await GoogleSignin.signOut();
         } catch (error) {
             console.log('[AuthProvider] Google sign-out error (non-fatal):', error);
         }
 
-        // Sign out from Supabase
         await supabase.auth.signOut();
         setSession(null);
         setUser(null);
@@ -282,28 +213,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    // DEV ONLY: Bypass auth for testing
-    const devBypassAuth = () => {
-        if (__DEV__) {
-            console.log('[AuthProvider] DEV: Bypassing auth');
-            setProfile(DEV_PROFILE);
-            // Create a fake session to trigger isAuthenticated
-            setSession({ access_token: 'dev-token', refresh_token: 'dev-token' } as Session);
-            setLoading(false);
-        }
-    };
-
     const value = {
         session,
         user,
         profile,
         loading,
-        isAuthenticated: !!session || !!profile, // Allow dev profile to auth
+        isAuthenticated: !!session,
+        hasProfile: !!profile,
         signInWithGoogle,
         signOut,
         updateProfile,
         refreshProfile,
-        devBypassAuth,
     };
 
     return (

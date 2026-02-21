@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,10 @@ function LoginForm() {
   const [resendLoading, setResendLoading] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setError(new URLSearchParams(window.location.search).get("error"));
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -58,8 +60,8 @@ function LoginForm() {
       return;
     }
 
-    // Send to create-profile; middleware will redirect existing users to /home
-    router.push("/onboarding");
+    // Middleware will redirect new users (no first_name) to /onboarding
+    router.push("/home");
     setIsLoading(false);
   };
 
@@ -136,47 +138,47 @@ function LoginForm() {
         )}
 
         <form onSubmit={handleEmailSignIn} className="space-y-4">
-            <div className="space-y-3">
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
-                  <Mail className="w-4 h-4" />
-                </span>
-                <Input
-                  type="email"
-                  placeholder="Enter email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <Input
-                  type="password"
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
-                  disabled={isLoading}
-                />
-              </div>
+          <div className="space-y-3">
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                <Mail className="w-4 h-4" />
+              </span>
+              <Input
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
+                disabled={isLoading}
+              />
             </div>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                <Lock className="w-4 h-4" />
+              </span>
+              <Input
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
-              disabled={isLoading || !email || !password}
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              ) : null}
-              Sign in
-            </Button>
-          </form>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
+            disabled={isLoading || !email || !password}
+          >
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            ) : null}
+            Sign in
+          </Button>
+        </form>
 
         <div className="relative">
           <Separator className="bg-zinc-100" />
@@ -281,36 +283,26 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
-    return (
-        <div
-          className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-6"
-          style={{
-            paddingLeft: "max(1rem, env(safe-area-inset-left))",
-            paddingRight: "max(1rem, env(safe-area-inset-right))",
-          }}
-        >
-            <div className="w-full max-w-md space-y-6">
-                <div className="text-center space-y-1">
-                    <h1 className="text-3xl font-semibold tracking-tight text-blue-600">
-                        Knot
-                    </h1>
-                    <p className="text-sm text-zinc-500">
-                        Welcome back. Sign in to keep splitting rides.
-                    </p>
-                </div>
-
-                <Suspense
-                    fallback={
-                        <Card className="border-zinc-200 bg-white shadow-xl">
-                            <CardContent className="p-8 text-center">
-                                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                            </CardContent>
-                        </Card>
-                    }
-                >
-                    <LoginForm />
-                </Suspense>
-            </div>
+  return (
+    <div
+      className="min-h-screen bg-zinc-50 flex items-center justify-center px-4 py-6"
+      style={{
+        paddingLeft: "max(1rem, env(safe-area-inset-left))",
+        paddingRight: "max(1rem, env(safe-area-inset-right))",
+      }}
+    >
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-1">
+          <h1 className="text-3xl font-semibold tracking-tight text-blue-600">
+            Knot
+          </h1>
+          <p className="text-sm text-zinc-500">
+            Welcome back. Sign in to keep splitting rides.
+          </p>
         </div>
-    );
+
+        <LoginForm />
+      </div>
+    </div>
+  );
 }

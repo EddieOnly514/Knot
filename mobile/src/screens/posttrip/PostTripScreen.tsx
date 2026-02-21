@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,24 +8,30 @@ import {
     TextInput,
     SafeAreaView,
     ScrollView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, typography, spacing, borderRadius, shadows } from '../../design';
 import type { RootStackParamList } from '../../types/navigation';
+import { matchService, MatchWithProfile } from '../../services/matchService';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type ScreenRouteProp = RouteProp<RootStackParamList, 'PostTrip'>;
 
 type Step = 'confirm' | 'rate' | 'done';
 
-const mockMatch = {
-    name: 'Sarah K.',
-    photo: 'https://randomuser.me/api/portraits/women/44.jpg',
-};
-
 export function PostTripScreen() {
     const navigation = useNavigation<NavigationProp>();
+    const route = useRoute<ScreenRouteProp>();
+    const { profile } = useAuth();
+
+    const matchId = route.params?.matchId;
 
     const [step, setStep] = useState<Step>('confirm');
     const [rating, setRating] = useState(0);
@@ -33,26 +39,85 @@ export function PostTripScreen() {
     const [comment, setComment] = useState('');
     const [showReport, setShowReport] = useState(false);
     const [reportReason, setReportReason] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Match data for displaying who they rode with
+    const [matchData, setMatchData] = useState<MatchWithProfile | null>(null);
+    const [isLoadingMatch, setIsLoadingMatch] = useState(true);
+
+    useEffect(() => {
+        if (!matchId) { setIsLoadingMatch(false); return; }
+        matchService.getMatch(matchId).then(({ data }) => {
+            setMatchData(data);
+            setIsLoadingMatch(false);
+        });
+    }, [matchId]);
+
+    const otherUser = matchData?.other_user;
+    const otherName = otherUser ? `${otherUser.first_name}` : 'Your ride partner';
+    const otherPhoto = otherUser?.photo_url;
 
     const handleConfirmTrip = (completed: boolean) => {
-        if (completed) {
-            setStep('rate');
-        } else {
-            setShowReport(true);
+        if (completed) setStep('rate');
+        else setShowReport(true);
+    };
+
+    const handleSubmitRating = async () => {
+        if (!profile || !matchId || !matchData) {
+            // No profile/match context — just navigate away
+            setStep('done');
+            return;
         }
+
+        setIsSaving(true);
+
+        // Derive rater_id (profile.id) and rated_id (other user's profile id)
+        const raterId = profile.id;
+        const ratedId = matchData.other_user?.id;
+
+        if (!ratedId) {
+            setIsSaving(false);
+            setStep('done');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('trip_ratings')
+            .insert({
+                match_id: matchId,
+                rater_id: raterId,
+                rated_id: ratedId,
+                rating,
+                would_ride_again: wouldRideAgain ?? true,
+                comment: comment.trim() || null,
+            });
+
+        if (error) {
+            // Handle duplicate (already rated) gracefully
+            if (error.code === '23505') {
+                // Unique constraint — already rated this match
+                setStep('done');
+            } else {
+                Alert.alert('Error', 'Failed to submit rating. Please try again.');
+            }
+        } else {
+            // Also update the match status to completed
+            await supabase
+                .from('matches')
+                .update({ status: 'completed' })
+                .eq('id', matchId);
+
+            setStep('done');
+        }
+
+        setIsSaving(false);
     };
 
-    const handleSubmitRating = () => {
-        console.log({ rating, wouldRideAgain, comment });
-        setStep('done');
-    };
+    const handleBlock = () => navigation.navigate('Main');
 
-    const handleBlock = () => {
-        navigation.navigate('Main');
-    };
-
-    const handleReport = () => {
-        console.log({ reportReason });
+    const handleReport = async () => {
+        // TODO: Save report to a reports table once implemented
+        console.log({ matchId, reportReason });
         navigation.navigate('Main');
     };
 
@@ -89,10 +154,7 @@ export function PostTripScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={() => navigation.goBack()}
-                    >
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                         <Text style={styles.backIcon}>←</Text>
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Trip Complete</Text>
@@ -101,9 +163,17 @@ export function PostTripScreen() {
 
                 {/* Profile Card */}
                 <View style={styles.profileCard}>
-                    <Image source={{ uri: mockMatch.photo }} style={styles.avatar} />
+                    {isLoadingMatch ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                    ) : otherPhoto ? (
+                        <Image source={{ uri: otherPhoto }} style={styles.avatar} />
+                    ) : (
+                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                            <Text style={styles.avatarInitial}>{otherName[0]}</Text>
+                        </View>
+                    )}
                     <View style={styles.profileInfo}>
-                        <Text style={styles.profileName}>{mockMatch.name}</Text>
+                        <Text style={styles.profileName}>{otherName}</Text>
                         <Text style={styles.profileLabel}>Your ride partner</Text>
                     </View>
                 </View>
@@ -111,19 +181,13 @@ export function PostTripScreen() {
                 {step === 'confirm' && !showReport && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>
-                            Did you complete the trip with {mockMatch.name}?
+                            Did you complete the trip with {otherName}?
                         </Text>
                         <View style={styles.confirmButtons}>
-                            <TouchableOpacity
-                                style={styles.yesButton}
-                                onPress={() => handleConfirmTrip(true)}
-                            >
+                            <TouchableOpacity style={styles.yesButton} onPress={() => handleConfirmTrip(true)}>
                                 <Text style={styles.yesButtonText}>✓ Yes, we rode together</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.noButton}
-                                onPress={() => handleConfirmTrip(false)}
-                            >
+                            <TouchableOpacity style={styles.noButton} onPress={() => handleConfirmTrip(false)}>
                                 <Text style={styles.noButtonText}>✗ No, it didn't happen</Text>
                             </TouchableOpacity>
                         </View>
@@ -133,30 +197,23 @@ export function PostTripScreen() {
                 {step === 'rate' && (
                     <View style={styles.section}>
                         {/* Star Rating */}
-                        <Text style={styles.rateLabel}>How was your ride with {mockMatch.name}?</Text>
+                        <Text style={styles.rateLabel}>How was your ride with {otherName}?</Text>
                         <View style={styles.starsRow}>
                             {[1, 2, 3, 4, 5].map((star) => (
                                 <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                                    <Text style={[styles.star, star <= rating && styles.starFilled]}>
-                                        ★
-                                    </Text>
+                                    <Text style={[styles.star, star <= rating && styles.starFilled]}>★</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
                         {/* Would Ride Again */}
-                        <Text style={styles.rateLabel}>Would you ride with {mockMatch.name} again?</Text>
+                        <Text style={styles.rateLabel}>Would you ride with {otherName} again?</Text>
                         <View style={styles.rideAgainRow}>
                             <TouchableOpacity
                                 style={[styles.rideAgainButton, wouldRideAgain === true && styles.rideAgainYes]}
                                 onPress={() => setWouldRideAgain(true)}
                             >
-                                <Text
-                                    style={[
-                                        styles.rideAgainText,
-                                        wouldRideAgain === true && styles.rideAgainTextActive,
-                                    ]}
-                                >
+                                <Text style={[styles.rideAgainText, wouldRideAgain === true && styles.rideAgainTextActive]}>
                                     👍 Yes!
                                 </Text>
                             </TouchableOpacity>
@@ -164,12 +221,7 @@ export function PostTripScreen() {
                                 style={[styles.rideAgainButton, wouldRideAgain === false && styles.rideAgainNo]}
                                 onPress={() => setWouldRideAgain(false)}
                             >
-                                <Text
-                                    style={[
-                                        styles.rideAgainText,
-                                        wouldRideAgain === false && styles.rideAgainTextActive,
-                                    ]}
-                                >
+                                <Text style={[styles.rideAgainText, wouldRideAgain === false && styles.rideAgainTextActive]}>
                                     👎 No
                                 </Text>
                             </TouchableOpacity>
@@ -187,7 +239,7 @@ export function PostTripScreen() {
 
                         <TouchableOpacity
                             onPress={handleSubmitRating}
-                            disabled={rating === 0}
+                            disabled={rating === 0 || isSaving}
                             activeOpacity={0.9}
                         >
                             <LinearGradient
@@ -196,7 +248,11 @@ export function PostTripScreen() {
                                 end={{ x: 1, y: 0 }}
                                 style={styles.primaryButton}
                             >
-                                <Text style={styles.primaryButtonText}>Submit Rating</Text>
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.primaryButtonText}>Submit Rating</Text>
+                                )}
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
@@ -215,7 +271,6 @@ export function PostTripScreen() {
                                 multiline
                             />
                         </View>
-
                         <View style={styles.reportButtons}>
                             <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
                                 <Text style={styles.reportButtonText}>🚩 Report</Text>
@@ -224,11 +279,7 @@ export function PostTripScreen() {
                                 <Text style={styles.blockButtonText}>🚫 Block</Text>
                             </TouchableOpacity>
                         </View>
-
-                        <TouchableOpacity
-                            style={styles.skipLink}
-                            onPress={() => navigation.navigate('Main')}
-                        >
+                        <TouchableOpacity style={styles.skipLink} onPress={() => navigation.navigate('Main')}>
                             <Text style={styles.skipText}>Skip for now</Text>
                         </TouchableOpacity>
                     </View>
@@ -239,246 +290,98 @@ export function PostTripScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    scrollContent: {
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.xl,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    scrollContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: spacing.md,
+        flexDirection: 'row', alignItems: 'center',
+        justifyContent: 'space-between', paddingVertical: spacing.md,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: borderRadius.lg,
-        backgroundColor: colors.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...shadows.card,
+        width: 40, height: 40, borderRadius: borderRadius.lg,
+        backgroundColor: colors.surface, justifyContent: 'center',
+        alignItems: 'center', ...shadows.card,
     },
-    backIcon: {
-        fontSize: 20,
-        color: colors.text.main,
-    },
-    headerTitle: {
-        ...typography.styles.h3,
-        color: colors.text.main,
-    },
+    backIcon: { fontSize: 20, color: colors.text.main },
+    headerTitle: { ...typography.styles.h3, color: colors.text.main },
     profileCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.surface,
-        padding: spacing.lg,
-        borderRadius: borderRadius['3xl'],
-        marginBottom: spacing.lg,
-        ...shadows.card,
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: colors.surface, padding: spacing.lg,
+        borderRadius: borderRadius['3xl'], marginBottom: spacing.lg, ...shadows.card,
     },
-    avatar: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+    avatar: { width: 64, height: 64, borderRadius: 32 },
+    avatarPlaceholder: {
+        backgroundColor: colors.primaryAlpha[20],
+        justifyContent: 'center', alignItems: 'center',
     },
-    profileInfo: {
-        marginLeft: spacing.md,
-    },
-    profileName: {
-        ...typography.styles.h3,
-        color: colors.text.main,
-    },
-    profileLabel: {
-        ...typography.styles.bodySmall,
-        color: colors.text.muted,
-    },
-    section: {
-        gap: spacing.md,
-    },
-    sectionTitle: {
-        ...typography.styles.h3,
-        color: colors.text.main,
-        textAlign: 'center',
-    },
-    confirmButtons: {
-        gap: spacing.sm,
-    },
+    avatarInitial: { fontSize: 24, fontWeight: '700', color: colors.primary },
+    profileInfo: { marginLeft: spacing.md },
+    profileName: { ...typography.styles.h3, color: colors.text.main },
+    profileLabel: { ...typography.styles.bodySmall, color: colors.text.muted },
+    section: { gap: spacing.md },
+    sectionTitle: { ...typography.styles.h3, color: colors.text.main, textAlign: 'center' },
+    confirmButtons: { gap: spacing.sm },
     yesButton: {
-        backgroundColor: '#E8F5E9',
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
+        backgroundColor: '#E8F5E9', paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg, alignItems: 'center',
     },
-    yesButtonText: {
-        ...typography.styles.bodyMedium,
-        color: colors.success,
-    },
+    yesButtonText: { ...typography.styles.bodyMedium, color: colors.success },
     noButton: {
-        backgroundColor: colors.slate[100],
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
+        backgroundColor: colors.slate[100], paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg, alignItems: 'center',
     },
-    noButtonText: {
-        ...typography.styles.bodyMedium,
-        color: colors.text.muted,
-    },
-    rateLabel: {
-        ...typography.styles.body,
-        color: colors.text.muted,
-        textAlign: 'center',
-    },
-    starsRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: spacing.sm,
-    },
-    star: {
-        fontSize: 40,
-        color: colors.slate[300],
-    },
-    starFilled: {
-        color: '#FFD700',
-    },
-    rideAgainRow: {
-        flexDirection: 'row',
-        gap: spacing.md,
-    },
+    noButtonText: { ...typography.styles.bodyMedium, color: colors.text.muted },
+    rateLabel: { ...typography.styles.body, color: colors.text.muted, textAlign: 'center' },
+    starsRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
+    star: { fontSize: 40, color: colors.slate[300] },
+    starFilled: { color: '#FFD700' },
+    rideAgainRow: { flexDirection: 'row', gap: spacing.md },
     rideAgainButton: {
-        flex: 1,
-        backgroundColor: colors.slate[100],
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
+        flex: 1, backgroundColor: colors.slate[100],
+        paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center',
     },
-    rideAgainYes: {
-        backgroundColor: colors.primary,
-    },
-    rideAgainNo: {
-        backgroundColor: colors.text.main,
-    },
-    rideAgainText: {
-        ...typography.styles.bodyMedium,
-        color: colors.text.muted,
-    },
-    rideAgainTextActive: {
-        color: colors.text.white,
-    },
+    rideAgainYes: { backgroundColor: colors.primary },
+    rideAgainNo: { backgroundColor: colors.text.main },
+    rideAgainText: { ...typography.styles.bodyMedium, color: colors.text.muted },
+    rideAgainTextActive: { color: colors.text.white },
     commentInput: {
-        backgroundColor: colors.slate[50],
-        borderRadius: borderRadius.xl,
-        padding: spacing.md,
-        minHeight: 80,
-        ...typography.styles.body,
-        color: colors.text.main,
-        textAlignVertical: 'top',
+        backgroundColor: colors.slate[50], borderRadius: borderRadius.xl,
+        padding: spacing.md, minHeight: 80,
+        ...typography.styles.body, color: colors.text.main, textAlignVertical: 'top',
     },
-    primaryButton: {
-        height: 56,
-        borderRadius: borderRadius.lg,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    primaryButtonText: {
-        ...typography.styles.button,
-        color: colors.text.white,
-    },
-    reportCard: {
-        backgroundColor: colors.surface,
-        padding: spacing.md,
-        borderRadius: borderRadius['3xl'],
-        ...shadows.card,
-    },
-    reportTitle: {
-        ...typography.styles.bodyMedium,
-        color: colors.text.main,
-        marginBottom: spacing.sm,
-    },
+    primaryButton: { height: 56, borderRadius: borderRadius.lg, justifyContent: 'center', alignItems: 'center' },
+    primaryButtonText: { ...typography.styles.button, color: colors.text.white },
+    reportCard: { backgroundColor: colors.surface, padding: spacing.md, borderRadius: borderRadius['3xl'], ...shadows.card },
+    reportTitle: { ...typography.styles.bodyMedium, color: colors.text.main, marginBottom: spacing.sm },
     reportInput: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        borderWidth: 1,
-        borderColor: colors.slate[200],
-        padding: spacing.md,
-        minHeight: 100,
-        ...typography.styles.body,
-        color: colors.text.main,
-        textAlignVertical: 'top',
+        backgroundColor: colors.surface, borderRadius: borderRadius.lg,
+        borderWidth: 1, borderColor: colors.slate[200], padding: spacing.md,
+        minHeight: 100, ...typography.styles.body, color: colors.text.main, textAlignVertical: 'top',
     },
-    reportButtons: {
-        flexDirection: 'row',
-        gap: spacing.md,
-    },
+    reportButtons: { flexDirection: 'row', gap: spacing.md },
     reportButton: {
-        flex: 1,
-        backgroundColor: '#FFF3E0',
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
+        flex: 1, backgroundColor: '#FFF3E0',
+        paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center',
     },
-    reportButtonText: {
-        ...typography.styles.bodyMedium,
-        color: '#F57C00',
-    },
+    reportButtonText: { ...typography.styles.bodyMedium, color: '#F57C00' },
     blockButton: {
-        flex: 1,
-        backgroundColor: '#FFEBEE',
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
+        flex: 1, backgroundColor: '#FFEBEE',
+        paddingVertical: spacing.md, borderRadius: borderRadius.lg, alignItems: 'center',
     },
-    blockButtonText: {
-        ...typography.styles.bodyMedium,
-        color: colors.danger,
-    },
-    skipLink: {
-        alignItems: 'center',
-        paddingVertical: spacing.sm,
-    },
-    skipText: {
-        ...typography.styles.body,
-        color: colors.text.muted,
-    },
-    doneContainer: {
-        flex: 1,
-        backgroundColor: colors.background,
-        justifyContent: 'center',
-    },
-    doneContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-    },
+    blockButtonText: { ...typography.styles.bodyMedium, color: colors.danger },
+    skipLink: { alignItems: 'center', paddingVertical: spacing.sm },
+    skipText: { ...typography.styles.body, color: colors.text.muted },
+    doneContainer: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
+    doneContent: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.lg },
     doneIconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#E8F5E9',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: spacing.lg,
+        width: 80, height: 80, borderRadius: 40,
+        backgroundColor: '#E8F5E9', justifyContent: 'center',
+        alignItems: 'center', marginBottom: spacing.lg,
     },
-    doneIcon: {
-        fontSize: 40,
-        color: colors.success,
-    },
-    doneTitle: {
-        ...typography.styles.h2,
-        color: colors.text.main,
-        textAlign: 'center',
-    },
+    doneIcon: { fontSize: 40, color: colors.success },
+    doneTitle: { ...typography.styles.h2, color: colors.text.main, textAlign: 'center' },
     doneSubtitle: {
-        ...typography.styles.body,
-        color: colors.text.muted,
-        textAlign: 'center',
-        marginTop: spacing.sm,
+        ...typography.styles.body, color: colors.text.muted,
+        textAlign: 'center', marginTop: spacing.sm,
     },
-    doneButtonContainer: {
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.xl,
-    },
+    doneButtonContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
 });

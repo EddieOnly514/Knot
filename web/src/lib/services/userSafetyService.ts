@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
 export interface BlockedUser {
   id: string;
@@ -12,7 +12,7 @@ export interface BlockedUser {
  * Block another user by their profile id.
  */
 export async function blockUser(blockedProfileId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const {
     data: { user },
@@ -54,7 +54,7 @@ export async function blockUser(blockedProfileId: string) {
  * Unblock a previously blocked user by their profile id.
  */
 export async function unblockUser(blockedProfileId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const {
     data: { user },
@@ -88,7 +88,7 @@ export async function unblockUser(blockedProfileId: string) {
  * Check if the current user has blocked the given profile id.
  */
 export async function isUserBlocked(blockedProfileId: string): Promise<boolean> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const {
     data: { user },
@@ -127,7 +127,7 @@ export async function isUserBlocked(blockedProfileId: string): Promise<boolean> 
  * Get the current user's blocked users with basic profile info.
  */
 export async function getBlockedUsers(): Promise<BlockedUser[]> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const {
     data: { user },
@@ -179,7 +179,7 @@ export async function getBlockedUsers(): Promise<BlockedUser[]> {
       | null;
   };
 
-  return (data as BlockedUsersRow[]).map((row) => ({
+  return (data as unknown as BlockedUsersRow[]).map((row) => ({
     id: row.id as string,
     blocked_profile_id: row.blocked_profile_id as string,
     first_name: row.profiles?.first_name ?? "Unknown",
@@ -196,7 +196,7 @@ export async function reportUser(
   reason: string | null,
   rideRequestId?: string,
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const {
     data: { user },

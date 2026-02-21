@@ -34,7 +34,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import { getMyRequests } from "@/lib/services/matchService";
 
 export default function ProfilePage() {
@@ -45,7 +45,7 @@ export default function ProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseClientOrThrow();
 
   const [firstName, setFirstName] = useState(profile?.first_name || "");
   const [lastName, setLastName] = useState(profile?.last_name || "");

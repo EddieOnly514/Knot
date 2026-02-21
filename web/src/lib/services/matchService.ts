@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { PotentialMatch } from "@/types";
 
 /**
@@ -11,7 +11,7 @@ export async function findMatches(
         minScore?: number;
     }
 ): Promise<PotentialMatch[]> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { data, error } = await supabase.rpc("find_matches_v3", {
         p_ride_id: rideId,
@@ -47,7 +47,7 @@ export async function sendMatchRequest(
     myRideId: string,
     targetRideId: string
 ): Promise<string> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { data, error } = await supabase
         .from("ride_requests")
@@ -75,7 +75,7 @@ export const MAX_MATCHES_PER_RIDE = 3;
  * Use to disable Accept / send request when at cap.
  */
 export async function getAcceptedMatchCount(rideId: string): Promise<number> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
     const { data, error } = await supabase.rpc("count_accepted_matches_for_ride", {
         p_ride_id: rideId,
     });
@@ -92,7 +92,7 @@ export async function respondToRequest(
     requestId: string,
     response: "accepted" | "rejected"
 ) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const updates = response === "accepted"
         ? { status: "accepted", ride_status: "accepted" }
@@ -117,7 +117,7 @@ export async function respondToRequest(
  * Updates status to 'rejected' so the request no longer appears as pending.
  */
 export async function withdrawRequest(requestId: string): Promise<void> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
     const { error } = await supabase
         .from("ride_requests")
         .update({ status: "rejected" })
@@ -159,7 +159,7 @@ export interface RideRequest {
 }
 
 export async function getMyRequests(profileId?: string): Promise<RideRequest[]> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     let effectiveProfileId = profileId;
 

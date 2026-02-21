@@ -42,7 +42,7 @@ import {
   leaveGroup,
 } from "@/lib/services/chatService";
 import type { Message } from "@/lib/services/chatService";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   blockUser,
@@ -137,7 +137,7 @@ export default function ChatThreadPage() {
   useEffect(() => {
     setConversationNotFound(false);
     async function loadPartner() {
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       if (!profile) return;
 
       if (isGroup) {
@@ -274,7 +274,7 @@ export default function ChatThreadPage() {
     }
     setRideDetailLoading(true);
     (async () => {
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       const { data } = await supabase
         .from("rides")
         .select("id, origin_name, dest_name, departure_earliest, departure_latest, departure_preferred, ride_type")
@@ -306,7 +306,7 @@ export default function ChatThreadPage() {
     const senderIds = [...new Set(messages.map((m) => m.sender_id))];
     if (senderIds.length === 0) return;
     (async () => {
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       const { data } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, photo_url")
@@ -333,7 +333,7 @@ export default function ChatThreadPage() {
     }, isGroup);
 
     return () => {
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       supabase.removeChannel(channel);
     };
   }, [conversationId, isGroup]);

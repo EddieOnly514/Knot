@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
 export interface CreateRideData {
     rideType: "offering" | "seeking";
@@ -32,7 +32,7 @@ export interface CreateRideData {
  * Insert a new ride into the rides table.
  */
 export async function createRide(data: CreateRideData) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const {
         data: { user },
@@ -91,7 +91,7 @@ export async function createRide(data: CreateRideData) {
  * by profile id (which is the foreign key for rides.user_id).
  */
 export async function getMyRides(profileId?: string) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     let effectiveProfileId = profileId;
 
@@ -144,7 +144,7 @@ export interface CompletedRide {
 }
 
 export async function getCompletedRides(profileId?: string): Promise<CompletedRide[]> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     let effectiveProfileId = profileId;
 
@@ -193,7 +193,7 @@ export async function getCompletedRides(profileId?: string): Promise<CompletedRi
  * Fetch a single ride by id (for edit form prefill).
  */
 export async function getRideById(rideId: string) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
     const {
         data: { user },
     } = await supabase.auth.getUser();
@@ -221,7 +221,7 @@ export async function getRideById(rideId: string) {
  * Update an existing ride.
  */
 export async function updateRide(rideId: string, data: Partial<CreateRideData>) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
     const {
         data: { user },
     } = await supabase.auth.getUser();
@@ -271,7 +271,7 @@ export async function updateRide(rideId: string, data: Partial<CreateRideData>) 
  * Cancel a ride.
  */
 export async function cancelRide(rideId: string) {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { error } = await supabase
         .from("rides")

@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // =============================================
@@ -46,7 +46,7 @@ export interface Conversation {
 // =============================================
 
 export async function getConversations(profileId?: string): Promise<Conversation[]> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     let effectiveProfileId = profileId;
 
@@ -223,7 +223,7 @@ export async function getConversations(profileId?: string): Promise<Conversation
     for (const req of requests1to1) {
         const isMyRide = myRideIds.includes(req.ride_id);
         const otherRideId = isMyRide ? req.requester_ride_id : req.ride_id;
-        const otherRide = otherRideMap[otherRideId] as {
+        const otherRide = otherRideMap[otherRideId] as unknown as {
             user_id: string;
             origin_name: string;
             dest_name: string;
@@ -271,7 +271,7 @@ export async function getConversations(profileId?: string): Promise<Conversation
     for (const rideId of groupRideIds) {
         const group = rideIdToGroup.get(rideId);
         if (!group) continue;
-        const hostRide = allRideMap[rideId] as { origin_name: string; dest_name: string; departure_preferred: string | null } | undefined;
+        const hostRide = allRideMap[rideId] as unknown as { origin_name: string; dest_name: string; departure_preferred: string | null } | undefined;
         const acceptedCount = requests.filter(
             (r: { ride_id: string; status: string }) => r.ride_id === rideId && r.status === "accepted"
         ).length;
@@ -322,7 +322,7 @@ export async function getConversations(profileId?: string): Promise<Conversation
  * Get messages for a conversation (1:1 ride_request id) or a group (ride_group id).
  */
 export async function getMessages(conversationOrGroupId: string): Promise<Message[]> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { data, error } = await supabase
         .from("messages")
@@ -345,7 +345,7 @@ export async function sendMessage(
     metadata?: Record<string, unknown>,
     isGroup?: boolean
 ): Promise<Message> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const {
         data: { user },
@@ -377,7 +377,7 @@ export async function sendMessage(
 }
 
 export async function markAsRead(conversationOrGroupId: string): Promise<void> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const {
         data: { user },
@@ -407,7 +407,7 @@ export async function updateRideStatus(
     requestId: string,
     status: "confirmed" | "completed" | "cancelled"
 ): Promise<void> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { data, error } = await supabase
         .from("ride_requests")
@@ -443,7 +443,7 @@ export async function updateRideStatusForGroup(
     rideId: string,
     status: "confirmed" | "completed"
 ): Promise<void> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const { data: requests, error: fetchError } = await supabase
         .from("ride_requests")
@@ -478,7 +478,7 @@ export async function updateRideStatusForGroup(
  * Determines host vs requester server-side so it doesn't rely on possibly stale UI state.
  */
 export async function leaveGroup(rideId: string): Promise<void> {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     const {
         data: { user },
@@ -544,7 +544,7 @@ export function subscribeToMessages(
     onNewMessage: (message: Message) => void,
     isGroup?: boolean
 ): RealtimeChannel {
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
     const filterColumn = isGroup ? "ride_group_id" : "conversation_id";
 
     const channel = supabase

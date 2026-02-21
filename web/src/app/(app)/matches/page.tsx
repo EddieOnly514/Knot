@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { findMatches, sendMatchRequest } from "@/lib/services/matchService";
 import { getMyRides } from "@/lib/services/rideService";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { PotentialMatch } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -536,7 +536,7 @@ function MatchesContent() {
       setRideId(id);
       const results = await findMatches(id!);
 
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       const { data: existingRequests } = await supabase
         .from("ride_requests")
         .select("ride_id, requester_ride_id, status")

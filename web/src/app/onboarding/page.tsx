@@ -30,7 +30,7 @@ import {
     Phone,
     Camera,
 } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
 export default function OnboardingPage() {
     const { profile, user, updateProfile, isAuthenticated, loading } = useAuth();
@@ -39,7 +39,7 @@ export default function OnboardingPage() {
 
     const [avatarUploading, setAvatarUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const supabase = getSupabaseClient();
+    const supabase = getSupabaseClientOrThrow();
 
     // Pre-fill from Google data
     const [firstName, setFirstName] = useState("");

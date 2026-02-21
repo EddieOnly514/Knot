@@ -21,7 +21,7 @@ import {
     Users,
     Loader2,
 } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { Profile } from "@/contexts/AuthContext";
 
 export default function PublicProfilePage() {
@@ -33,7 +33,7 @@ export default function PublicProfilePage() {
 
     useEffect(() => {
         async function fetchProfile() {
-            const supabase = getSupabaseClient();
+            const supabase = getSupabaseClientOrThrow();
             const { data, error } = await supabase
                 .from("profiles")
                 .select("*")

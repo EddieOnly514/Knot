@@ -7,7 +7,7 @@ import { getMyRides, cancelRide } from "@/lib/services/rideService";
 import { getMyRequests, respondToRequest, withdrawRequest } from "@/lib/services/matchService";
 import { findMatches, sendMatchRequest } from "@/lib/services/matchService";
 import type { RideRequest } from "@/lib/services/matchService";
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -411,7 +411,7 @@ export default function HomePage() {
     try {
       // Same options as matches page: default maxResults (10), minScore (30)
       const results = await findMatches(suggestedMatchRideId);
-      const supabase = getSupabaseClient();
+      const supabase = getSupabaseClientOrThrow();
       const { data: existingRequests } = await supabase
         .from("ride_requests")
         .select("ride_id, requester_ride_id, status")

@@ -80,8 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabaseClient();
     const profileFetchedForRef = useRef<string | null>(null);
 
+    // When Supabase env is missing (e.g. static prerender), skip auth and stop loading
+    useEffect(() => {
+        if (!supabase) {
+            setLoading(false);
+        }
+    }, [supabase]);
+
     // ── Step 1: Auth state listener (synchronous only — no DB calls) ──
     useEffect(() => {
+        if (!supabase) return;
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(
@@ -100,11 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return () => subscription.unsubscribe();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [supabase]);
 
     // ── Step 2: Profile fetch (separate effect, triggers when user changes) ──
     const fetchProfileForUser = useCallback(
         async (authUser: User, retryCount = 0) => {
+            if (!supabase) return;
             try {
                 console.log("[AuthProvider] Fetching profile for:", authUser.id);
 
@@ -206,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ── Auth methods ──
 
     const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
+        if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
@@ -222,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signInWithEmail = async (
         email: string
     ): Promise<{ error: Error | null }> => {
+        if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { error } = await supabase.auth.signInWithOtp({
                 email,
@@ -236,10 +247,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const signOut = async () => {
-        try {
-            await supabase.auth.signOut();
-        } catch (e) {
-            console.error("[AuthProvider] Sign out error:", e);
+        if (supabase) {
+            try {
+                await supabase.auth.signOut();
+            } catch (e) {
+                console.error("[AuthProvider] Sign out error:", e);
+            }
         }
         setSession(null);
         setUser(null);
@@ -249,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const updateProfile = async (updates: Partial<Profile>) => {
+        if (!supabase) return { error: new Error("Auth not available") };
         if (!user) {
             return { error: new Error("No user logged in") };
         }
@@ -287,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: string,
         password: string
     ): Promise<{ error: Error | null; needsEmailConfirmation?: boolean }> => {
+        if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
@@ -307,6 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resendEmailConfirmation = async (
         email: string
     ): Promise<{ error: Error | null }> => {
+        if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { error } = await supabase.auth.resend({
                 type: "signup",
@@ -322,6 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: string,
         password: string
     ): Promise<{ error: Error | null }> => {
+        if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { error } = await supabase.auth.signInWithPassword({
                 email,

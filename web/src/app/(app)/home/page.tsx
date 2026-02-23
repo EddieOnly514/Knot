@@ -484,6 +484,11 @@ export default function HomePage() {
       await respondToRequest(requestId, response);
       if (response === "accepted") {
         toast.success("Request accepted! Starting chat...");
+        fetch("/api/notify/match-accepted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId }),
+        }).catch(() => {});
         router.push("/messages?refresh=1");
       } else {
         toast.success("Request declined");
@@ -891,7 +896,91 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Ride requests — only show incoming pending (others requested me); hide outgoing "Sent" and completed */}
+      {/* Pending requests (sent) — requests I sent waiting for response */}
+      {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-zinc-900">
+                Pending requests
+              </h2>
+              <Badge className="border-0 bg-amber-50 text-xs font-medium text-amber-700">
+                {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length} sent
+              </Badge>
+            </div>
+          </div>
+          {requests
+            .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
+            .map((req) => (
+            <Card
+              key={req.id}
+              className="cursor-pointer border border-amber-200/80 bg-white transition-shadow hover:shadow-md"
+              onClick={() => setRideRequestDetail(req)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    className="h-10 w-10 shrink-0 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/profile/${req.requester_profile_id}`);
+                    }}
+                  >
+                    <AvatarImage src={req.requester_photo || undefined} />
+                    <AvatarFallback className="bg-amber-50 text-sm font-medium text-amber-600">
+                      {req.requester_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-zinc-900">
+                        {req.requester_name}
+                      </span>
+                      {req.requester_school && (
+                        <span className="text-xs text-zinc-500">
+                          {req.requester_school}
+                        </span>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className="border-amber-200 text-xs text-amber-700"
+                      >
+                        <Clock className="mr-1 h-3 w-3" />
+                        Pending
+                      </Badge>
+                    </div>
+                    <p className="truncate text-xs text-zinc-500">
+                      {req.requester_origin} → {req.requester_dest}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-shrink-0 items-center gap-2 sm:gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-10 min-h-[44px] rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0"
+                      onClick={() => handleWithdraw(req.id)}
+                      disabled={withdrawingRequestId === req.id}
+                    >
+                      {withdrawingRequestId === req.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <>
+                          <XCircle className="mr-1 h-3 w-3" />
+                          Withdraw
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
+
+      {/* Ride requests — incoming pending (others requested me) */}
       {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">

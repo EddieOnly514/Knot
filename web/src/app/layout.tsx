@@ -18,6 +18,11 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Knot",
   },
+  icons: {
+    icon: "/knot-logo.png",
+    apple: "/knot-logo.png",
+    shortcut: "/knot-logo.png",
+  },
 };
 
 export const viewport: Viewport = {

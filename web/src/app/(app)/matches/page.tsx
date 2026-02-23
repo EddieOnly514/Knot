@@ -29,7 +29,13 @@ import {
   Music,
   Calendar,
 } from "lucide-react";
-import { findMatches, sendMatchRequest, collapseMatchesIntoItems } from "@/lib/services/matchService";
+import {
+  findMatches,
+  sendMatchRequest,
+  collapseMatchesIntoItems,
+  getMyRequests,
+  type RideRequest,
+} from "@/lib/services/matchService";
 import { getMyRides } from "@/lib/services/rideService";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { PotentialMatch, MatchItem } from "@/types";
@@ -628,6 +634,7 @@ function MatchesContent() {
   const [matches, setMatches] = useState<PotentialMatch[]>([]);
   const [matchItems, setMatchItems] = useState<MatchItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requests, setRequests] = useState<RideRequest[]>([]);
   const [rideId, setRideId] = useState<string | null>(null);
   const [rideSummary, setRideSummary] = useState<{
     origin: string;
@@ -673,6 +680,10 @@ function MatchesContent() {
       }
 
       setRideId(id);
+      if (profile) {
+        const myRequests = await getMyRequests(profile.id);
+        setRequests(myRequests);
+      }
       const results = await findMatches(id!);
 
       const supabase = getSupabaseClientOrThrow();
@@ -717,6 +728,18 @@ function MatchesContent() {
   useEffect(() => {
     loadMatches();
   }, [loadMatches]);
+
+  const invitationsForRide = useMemo(
+    () =>
+      requests.filter(
+        (r) =>
+          r.direction === "incoming" &&
+          r.status === "pending" &&
+          r.ride_status !== "completed" &&
+          (!!rideId && r.ride_id === rideId),
+      ),
+    [requests, rideId],
+  );
 
   const getScoreMatch = (item: MatchItem): PotentialMatch =>
     item.kind === "single" ? item.match : item.primaryMatch;
@@ -854,6 +877,52 @@ function MatchesContent() {
           </SortChip>
         </div>
       </div>
+
+      {invitationsForRide.length > 0 && (
+        <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-zinc-900">
+                Invitations
+              </h2>
+              <Badge className="border-0 bg-blue-600/90 text-xs font-medium text-white">
+                {invitationsForRide.length} new
+              </Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full border-blue-200 text-xs"
+              onClick={() => router.push("/home")}
+            >
+              Manage on Home
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {invitationsForRide.slice(0, 3).map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center gap-3 rounded-lg bg-white/80 px-3 py-2 text-xs text-zinc-700"
+              >
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={inv.requester_photo || undefined} />
+                  <AvatarFallback className="bg-blue-50 text-xs font-medium text-blue-600">
+                    {inv.requester_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-zinc-900">
+                    {inv.requester_name} invited you
+                  </p>
+                  <p className="truncate text-[11px] text-zinc-500">
+                    {inv.requester_origin} → {inv.requester_dest}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {sortedMatchItems.map((item) =>

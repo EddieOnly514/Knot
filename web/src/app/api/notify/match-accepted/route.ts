@@ -3,6 +3,19 @@ import { NextResponse } from "next/server";
 import { sendMatchAcceptedEmail } from "@/lib/matchEmail";
 import type { Database } from "@/types/database";
 
+type RideRequestRow = Pick<
+  Database["public"]["Tables"]["ride_requests"]["Row"],
+  "id" | "status" | "ride_id" | "requester_ride_id"
+>;
+type RideRow = Pick<
+  Database["public"]["Tables"]["rides"]["Row"],
+  "id" | "user_id" | "origin_name" | "dest_name"
+>;
+type ProfileRow = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "id" | "first_name" | "last_name" | "email" | "user_id"
+>;
+
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -26,30 +39,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: reqRow, error: reqErr } = await admin
+    const { data, error: reqErr } = await admin
       .from("ride_requests")
       .select("id, status, ride_id, requester_ride_id")
       .eq("id", requestId)
       .single();
 
+    const reqRow = data as RideRequestRow | null;
     if (reqErr || !reqRow) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
-    if (reqRow.status !== "accepted") {
+    const row: RideRequestRow = reqRow;
+    if (row.status !== "accepted") {
       return NextResponse.json({ error: "Request is not accepted" }, { status: 400 });
     }
 
-    const { data: rides, error: ridesErr } = await admin
+    const { data: ridesData, error: ridesErr } = await admin
       .from("rides")
       .select("id, user_id, origin_name, dest_name")
-      .in("id", [reqRow.ride_id, reqRow.requester_ride_id]);
+      .in("id", [row.ride_id, row.requester_ride_id]);
 
-    if (ridesErr || !rides || rides.length !== 2) {
+    const rides = (ridesData ?? []) as RideRow[];
+    if (ridesErr || rides.length !== 2) {
       return NextResponse.json({ error: "Rides not found" }, { status: 404 });
     }
 
-    const ownerRide = rides.find((r) => r.id === reqRow.ride_id);
-    const requesterRide = rides.find((r) => r.id === reqRow.requester_ride_id);
+    const ownerRide = rides.find((r) => r.id === row.ride_id);
+    const requesterRide = rides.find((r) => r.id === row.requester_ride_id);
     if (!ownerRide || !requesterRide) {
       return NextResponse.json({ error: "Rides not found" }, { status: 404 });
     }
@@ -57,19 +73,20 @@ export async function POST(request: Request) {
     const routeSummary = `${ownerRide.origin_name} → ${ownerRide.dest_name}`;
     const profileIds = [ownerRide.user_id, requesterRide.user_id];
 
-    const { data: profiles, error: profilesErr } = await admin
+    const { data: profilesData, error: profilesErr } = await admin
       .from("profiles")
       .select("id, first_name, last_name, email, user_id")
       .in("id", profileIds);
 
-    if (profilesErr || !profiles || profiles.length !== 2) {
+    const profiles = (profilesData ?? []) as ProfileRow[];
+    if (profilesErr || profiles.length !== 2) {
       return NextResponse.json({ error: "Profiles not found" }, { status: 404 });
     }
 
     const getDisplayName = (p: { first_name: string | null; last_name: string | null }) =>
       [p.first_name, p.last_name ? `${String(p.last_name)[0]}.` : ""].filter(Boolean).join(" ") || "Someone";
 
-    const resolveEmail = async (profile: (typeof profiles)[0]): Promise<string | null> => {
+    const resolveEmail = async (profile: ProfileRow): Promise<string | null> => {
       if (profile.email && typeof profile.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
         return profile.email;
       }

@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { sendSuggestedMatchesEmail } from "@/lib/matchEmail";
 import type { Database } from "@/types/database";
 
+type ProfileRow = Pick<
+  Database["public"]["Tables"]["profiles"]["Row"],
+  "id" | "first_name" | "email" | "user_id"
+>;
+type RideRow = Pick<Database["public"]["Tables"]["rides"]["Row"], "id">;
+
 /**
  * Send "you have suggested matches" email to a user.
  * Call with POST { profileId: string }.
@@ -31,12 +37,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: profile, error: profileErr } = await admin
+    const { data: profileData, error: profileErr } = await admin
       .from("profiles")
       .select("id, first_name, email, user_id")
       .eq("id", profileId)
       .single();
 
+    const profile = profileData as ProfileRow | null;
     if (profileErr || !profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No email for profile" }, { status: 400 });
     }
 
-    const { data: rides, error: ridesErr } = await admin
+    const { data: ridesData, error: ridesErr } = await admin
       .from("rides")
       .select("id")
       .eq("user_id", profileId)
@@ -58,16 +65,18 @@ export async function POST(request: Request) {
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (ridesErr || !rides?.length) {
+    const rides = (ridesData ?? []) as RideRow[];
+    if (ridesErr || !rides.length) {
       return NextResponse.json({ error: "No active ride", sent: false }, { status: 200 });
     }
 
     const rideId = rides[0].id;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase RPC typings expect undefined for args
     const { data: matches, error: rpcErr } = await admin.rpc("find_matches_v3", {
       p_ride_id: rideId,
       p_max_results: 20,
       p_min_score: 30,
-    });
+    } as any);
 
     if (rpcErr || !Array.isArray(matches)) {
       return NextResponse.json({ error: "Failed to get matches", sent: false }, { status: 200 });

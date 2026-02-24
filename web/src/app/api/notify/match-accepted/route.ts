@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { sendMatchAcceptedEmail } from "@/lib/matchEmail";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
 type RideRequestRow = Pick<
@@ -25,6 +26,31 @@ function getAdminClient() {
 
 export async function POST(request: Request) {
   try {
+    // Auth: accept either CRON_SECRET bearer token OR authenticated Supabase session
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get("authorization");
+    let isAuthed = false;
+
+    if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+      isAuthed = true;
+    } else {
+      // Fall back to Supabase session auth (for client-side calls)
+      try {
+        const supabase = await createServerClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) isAuthed = true;
+      } catch { /* no session */ }
+    }
+
+    if (!isAuthed) {
+      if (process.env.NODE_ENV === "development") {
+        // Allow in development for easier testing
+        isAuthed = true;
+      } else {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const body = await request.json();
     const requestId = typeof body?.requestId === "string" ? body.requestId.trim() : null;
     if (!requestId) {

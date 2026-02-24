@@ -79,14 +79,26 @@ function LoginForm() {
   };
 
   const fillTestAccount = () => {
-    setEmail("sarah@knot-test.dev");
-    setPassword("KnotTest2026!");
+    const testEmail = process.env.NEXT_PUBLIC_TEST_EMAIL_1;
+    const testPass = process.env.NEXT_PUBLIC_TEST_PASSWORD;
+    if (!testEmail || !testPass) {
+      toast.error("Test credentials not configured in .env.local");
+      return;
+    }
+    setEmail(testEmail);
+    setPassword(testPass);
     toast.success("Test credentials filled. Click Sign in.");
   };
 
   const fillGroupChatTestAccount = () => {
-    setEmail("david@knot-test.dev");
-    setPassword("KnotTest2026!");
+    const testEmail = process.env.NEXT_PUBLIC_TEST_EMAIL_2;
+    const testPass = process.env.NEXT_PUBLIC_TEST_PASSWORD;
+    if (!testEmail || !testPass) {
+      toast.error("Test credentials not configured in .env.local");
+      return;
+    }
+    setEmail(testEmail);
+    setPassword(testPass);
     toast.success("Group chat test account filled. Go to Messages after sign-in.");
   };
 
@@ -99,8 +111,7 @@ function LoginForm() {
         toast.error(data.error ?? `Seed failed (${res.status})`);
         return;
       }
-      setEmail("sarah@knot-test.dev");
-      setPassword("KnotTest2026!");
+      fillTestAccount();
       toast.success("Test accounts created. You can sign in now.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create test accounts");

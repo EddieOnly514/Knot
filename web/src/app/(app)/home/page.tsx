@@ -50,6 +50,7 @@ import {
   ChevronUp,
   VolumeX,
   Music,
+  MessageSquare,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -60,6 +61,7 @@ import {
   HOME_CACHE_TTL_MS,
   type HomeCache,
 } from "@/lib/homeCache";
+import { estimateSavingsDollars as estimateSavings } from "@/lib/estimateSavings";
 
 function toErrorDetails(err: unknown): string {
   if (!err) return "";
@@ -84,9 +86,7 @@ function formatMatchTimeRange(earliest: string, latest: string) {
 }
 
 function estimateSavingsDollars(match: PotentialMatch) {
-  const base = 28;
-  const factor = Math.max(0.55, Math.min(0.95, match.total_score / 100));
-  return Math.round(base * factor * 2) / 2;
+  return estimateSavings(match.origin_name, match.dest_name, match.total_score);
 }
 
 interface Ride {
@@ -244,6 +244,15 @@ function SuggestedMatchCard({
                   </Badge>
                 )}
               </div>
+              {match.notes?.trim() && (
+                <div className="flex items-start gap-2 pt-1 border-t border-zinc-100 mt-2 pt-2">
+                  <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold tracking-wide text-zinc-400">SPECIAL NOTE</p>
+                    <p className="text-sm text-zinc-700 whitespace-pre-wrap">{match.notes.trim()}</p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <p className="text-[11px] font-semibold text-blue-600">
                   Est. savings ~${estimateSavingsDollars(match).toFixed(2)}

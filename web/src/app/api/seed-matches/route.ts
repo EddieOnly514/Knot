@@ -635,64 +635,64 @@ async function createTestMatches(
         status: string;
         rideStatus: string;
     }> = [
-        // Route A: single match (Sarah ↔ Mike)
-        {
-            rideKey: "sarah_offering",
-            requesterKey: "mike_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
-        },
-        // Route B (flow test): 0 accepted, 4 pending — max group = 4 people (host + 3). Accept 1→1:1, 2→GC3, 3→GC4 (max), 4th→blocked
-        {
-            rideKey: "david_offering",
-            requesterKey: "sophia_seeking",
-            status: "pending",
-            rideStatus: "requested",
-        },
-        {
-            rideKey: "david_offering",
-            requesterKey: "alex_seeking",
-            status: "pending",
-            rideStatus: "requested",
-        },
-        {
-            rideKey: "david_offering",
-            requesterKey: "jordan_seeking_sfo",
-            status: "pending",
-            rideStatus: "requested",
-        },
-        {
-            rideKey: "david_offering",
-            requesterKey: "taylor_seeking_sfo",
-            status: "pending",
-            rideStatus: "requested",
-        },
-        // Route C: group of 4 (Chris ↔ Jordan, Taylor, Riley) + Quinn pending
-        {
-            rideKey: "chris_offering",
-            requesterKey: "jordan_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
-        },
-        {
-            rideKey: "chris_offering",
-            requesterKey: "taylor_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
-        },
-        {
-            rideKey: "chris_offering",
-            requesterKey: "riley_seeking",
-            status: "accepted",
-            rideStatus: "accepted",
-        },
-        {
-            rideKey: "chris_offering",
-            requesterKey: "quinn_seeking",
-            status: "pending",
-            rideStatus: "requested",
-        },
-    ];
+            // Route A: single match (Sarah ↔ Mike)
+            {
+                rideKey: "sarah_offering",
+                requesterKey: "mike_seeking",
+                status: "accepted",
+                rideStatus: "accepted",
+            },
+            // Route B (flow test): 0 accepted, 4 pending — max group = 4 people (host + 3). Accept 1→1:1, 2→GC3, 3→GC4 (max), 4th→blocked
+            {
+                rideKey: "david_offering",
+                requesterKey: "sophia_seeking",
+                status: "pending",
+                rideStatus: "requested",
+            },
+            {
+                rideKey: "david_offering",
+                requesterKey: "alex_seeking",
+                status: "pending",
+                rideStatus: "requested",
+            },
+            {
+                rideKey: "david_offering",
+                requesterKey: "jordan_seeking_sfo",
+                status: "pending",
+                rideStatus: "requested",
+            },
+            {
+                rideKey: "david_offering",
+                requesterKey: "taylor_seeking_sfo",
+                status: "pending",
+                rideStatus: "requested",
+            },
+            // Route C: group of 4 (Chris ↔ Jordan, Taylor, Riley) + Quinn pending
+            {
+                rideKey: "chris_offering",
+                requesterKey: "jordan_seeking",
+                status: "accepted",
+                rideStatus: "accepted",
+            },
+            {
+                rideKey: "chris_offering",
+                requesterKey: "taylor_seeking",
+                status: "accepted",
+                rideStatus: "accepted",
+            },
+            {
+                rideKey: "chris_offering",
+                requesterKey: "riley_seeking",
+                status: "accepted",
+                rideStatus: "accepted",
+            },
+            {
+                rideKey: "chris_offering",
+                requesterKey: "quinn_seeking",
+                status: "pending",
+                rideStatus: "requested",
+            },
+        ];
 
     // Insert one at a time so triggers fire in order
     for (const pair of matchPairs) {
@@ -837,6 +837,9 @@ async function createTestMessages(
 // ─── POST: create all fake matches ───
 
 export async function POST() {
+    if (process.env.NODE_ENV !== "development") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     try {
         const supabase = getAdmin() as Supabase;
 
@@ -907,7 +910,6 @@ export async function POST() {
             },
             credentials: FAKE_USERS.map((u) => ({
                 email: u.email,
-                password: u.password,
                 name: `${u.firstName} ${u.lastName}`,
             })),
         });
@@ -926,6 +928,9 @@ export async function POST() {
 // ─── DELETE: remove all fake test data ───
 
 export async function DELETE() {
+    if (process.env.NODE_ENV !== "development") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     try {
         const supabase = getAdmin() as Supabase;
         const cleaned = await cleanupTestUsers(supabase);

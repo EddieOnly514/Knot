@@ -28,6 +28,7 @@ import {
   VolumeX,
   Music,
   Calendar,
+  MessageSquare,
 } from "lucide-react";
 import {
   findMatches,
@@ -41,6 +42,7 @@ import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { PotentialMatch, MatchItem } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { estimateSavingsDollars as estimateSavings } from "@/lib/estimateSavings";
 
 function formatTime(value: string | Date) {
   const d = typeof value === "string" ? new Date(value) : value;
@@ -50,10 +52,7 @@ function formatTime(value: string | Date) {
 }
 
 function estimateSavingsDollars(match: PotentialMatch) {
-  // UI-only estimate until we have real pricing data.
-  const base = 28;
-  const factor = Math.max(0.55, Math.min(0.95, match.total_score / 100));
-  return Math.round(base * factor * 2) / 2;
+  return estimateSavings(match.origin_name, match.dest_name, match.total_score);
 }
 
 function MatchDetailDialog({
@@ -463,6 +462,15 @@ function MatchCard({
                   </Badge>
                 )}
               </div>
+              {match.notes?.trim() && (
+                <div className="flex items-start gap-2 pt-1 border-t border-zinc-100 mt-2 pt-2">
+                  <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold tracking-wide text-zinc-400">SPECIAL NOTE</p>
+                    <p className="text-sm text-zinc-700 whitespace-pre-wrap">{match.notes.trim()}</p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between pt-1">
                 <p className="text-[11px] font-semibold text-blue-600">
                   Est. savings ~${estimateSavingsDollars(match).toFixed(2)}
@@ -741,6 +749,18 @@ function MatchesContent() {
     [requests, rideId],
   );
 
+  // All incoming ride requests (any of my rides) — show in matches section so they're visible beyond home
+  const allIncomingRequests = useMemo(
+    () =>
+      requests.filter(
+        (r) =>
+          r.direction === "incoming" &&
+          r.status === "pending" &&
+          r.ride_status !== "completed",
+      ),
+    [requests],
+  );
+
   const getScoreMatch = (item: MatchItem): PotentialMatch =>
     item.kind === "single" ? item.match : item.primaryMatch;
 
@@ -817,7 +837,7 @@ function MatchesContent() {
     );
   }
 
-  if (matchItems.length === 0) {
+  if (matchItems.length === 0 && allIncomingRequests.length === 0) {
     return (
       <div className="py-16 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
@@ -878,15 +898,16 @@ function MatchesContent() {
         </div>
       </div>
 
-      {invitationsForRide.length > 0 && (
+      {/* Ride requests (incoming) — show all so they appear in Matches as well as Home */}
+      {allIncomingRequests.length > 0 && (
         <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-zinc-900">
-                Invitations
+                Ride requests
               </h2>
               <Badge className="border-0 bg-blue-600/90 text-xs font-medium text-white">
-                {invitationsForRide.length} new
+                {allIncomingRequests.length} pending
               </Badge>
             </div>
             <Button
@@ -899,7 +920,7 @@ function MatchesContent() {
             </Button>
           </div>
           <div className="space-y-2">
-            {invitationsForRide.slice(0, 3).map((inv) => (
+            {allIncomingRequests.map((inv) => (
               <div
                 key={inv.id}
                 className="flex items-center gap-3 rounded-lg bg-white/80 px-3 py-2 text-xs text-zinc-700"
@@ -917,6 +938,9 @@ function MatchesContent() {
                   <p className="truncate text-[11px] text-zinc-500">
                     {inv.requester_origin} → {inv.requester_dest}
                   </p>
+                  <p className="truncate text-[11px] text-zinc-400">
+                    For your {inv.my_ride_origin} → {inv.my_ride_dest} ride
+                  </p>
                 </div>
               </div>
             ))}
@@ -924,33 +948,42 @@ function MatchesContent() {
         </section>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {sortedMatchItems.map((item) =>
-          item.kind === "single" ? (
-            <MatchCard
-              key={item.match.ride_id}
-              match={item.match}
-              myRideId={rideId!}
-              onRequested={loadMatches}
-              onShowInfo={() => {
-                setDetailItem(item);
-                setDetailOpen(true);
-              }}
-            />
-          ) : (
-            <GroupMatchCard
-              key={item.groupHostRideId}
-              item={item}
-              myRideId={rideId!}
-              onRequested={loadMatches}
-              onShowInfo={() => {
-                setDetailItem(item);
-                setDetailOpen(true);
-              }}
-            />
-          ),
-        )}
-      </div>
+      {matchItems.length === 0 ? (
+        <div className="py-12 text-center">
+          <p className="text-sm text-zinc-500">No suggested matches for this ride yet — check back soon.</p>
+          <Button variant="outline" size="sm" onClick={loadMatches} className="mt-3">
+            Refresh
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {sortedMatchItems.map((item) =>
+            item.kind === "single" ? (
+              <MatchCard
+                key={item.match.ride_id}
+                match={item.match}
+                myRideId={rideId!}
+                onRequested={loadMatches}
+                onShowInfo={() => {
+                  setDetailItem(item);
+                  setDetailOpen(true);
+                }}
+              />
+            ) : (
+              <GroupMatchCard
+                key={item.groupHostRideId}
+                item={item}
+                myRideId={rideId!}
+                onRequested={loadMatches}
+                onShowInfo={() => {
+                  setDetailItem(item);
+                  setDetailOpen(true);
+                }}
+              />
+            ),
+          )}
+        </div>
+      )}
 
       <MatchDetailDialog
         item={detailItem}

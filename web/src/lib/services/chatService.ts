@@ -66,7 +66,7 @@ export async function getConversations(profileId?: string): Promise<Conversation
         effectiveProfileId = profile.id;
     }
 
-    // Get my rides
+    // Get my rides (include cancelled/deleted so we don't lose matched conversations)
     const { data: myRides } = await supabase
         .from("rides")
         .select("id, origin_name, dest_name, departure_preferred, user_id")
@@ -122,14 +122,6 @@ export async function getConversations(profileId?: string): Promise<Conversation
             myRideIds.includes(r.ride_id) ? r.requester_ride_id : r.ride_id
         ),
     ];
-    const { data: otherRides } = await supabase
-        .from("rides")
-        .select("id, user_id, origin_name, dest_name, departure_preferred")
-        .in("id", [...new Set(otherRideIds)]);
-
-    const otherRideMap = Object.fromEntries(
-        (otherRides || []).map((r: { id: string }) => [r.id, r])
-    );
 
     // Rides for group convos (host ride + all requesters)
     const groupRideIdsExpanded = new Set<string>();
@@ -140,23 +132,32 @@ export async function getConversations(profileId?: string): Promise<Conversation
             groupRideIdsExpanded.add(r.requester_ride_id);
         }
     });
-    const { data: groupRides } = await supabase
-        .from("rides")
-        .select("id, user_id, origin_name, dest_name, departure_preferred")
-        .in("id", [...groupRideIdsExpanded]);
 
+    // Parallelize independent ride+group fetches
+    const [{ data: otherRides }, { data: groupRides }] = await Promise.all([
+        supabase
+            .from("rides")
+            .select("id, user_id, origin_name, dest_name, departure_preferred")
+            .in("id", [...new Set(otherRideIds)]),
+        supabase
+            .from("rides")
+            .select("id, user_id, origin_name, dest_name, departure_preferred")
+            .in("id", [...groupRideIdsExpanded]),
+    ]);
+
+    const otherRideMap = Object.fromEntries(
+        (otherRides || []).map((r: { id: string }) => [r.id, r])
+    );
     const allRideMap = { ...otherRideMap, ...Object.fromEntries((groupRides || []).map((r: { id: string }) => [r.id, r])) };
 
-    const partnerProfileIds = [...new Set(
-        (otherRides || []).map((r: { user_id: string }) => r.user_id)
-    )];
-    const groupProfileIds = [...new Set(
-        (groupRides || []).map((r: { user_id: string }) => r.user_id)
-    )];
+    const allProfileIds = [...new Set([
+        ...(otherRides || []).map((r: { user_id: string }) => r.user_id),
+        ...(groupRides || []).map((r: { user_id: string }) => r.user_id),
+    ])];
     const { data: profiles } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, photo_url, school")
-        .in("id", [...new Set([...partnerProfileIds, ...groupProfileIds])]);
+        .in("id", allProfileIds);
 
     const profileMap = Object.fromEntries(
         (profiles || []).map((p: { id: string }) => [p.id, p])
@@ -231,12 +232,12 @@ export async function getConversations(profileId?: string): Promise<Conversation
         } | undefined;
         const partner = otherRide
             ? (profileMap[otherRide.user_id] as {
-                  id: string;
-                  first_name: string;
-                  last_name: string;
-                  photo_url: string | null;
-                  school: string | null;
-              } | undefined)
+                id: string;
+                first_name: string;
+                last_name: string;
+                photo_url: string | null;
+                school: string | null;
+            } | undefined)
             : null;
         const lastMsg = lastMessageByConv.get(req.id);
         const unreadCount = unreadCountByConv.get(req.id) || 0;
@@ -343,28 +344,33 @@ export async function sendMessage(
     content: string,
     type: "text" | "quick_action" | "location" = "text",
     metadata?: Record<string, unknown>,
-    isGroup?: boolean
+    isGroup?: boolean,
+    senderProfileId?: string
 ): Promise<Message> {
     const supabase = getSupabaseClientOrThrow();
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    let senderId = senderProfileId;
+    if (!senderId) {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-    if (!profile) throw new Error("Profile not found");
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("user_id", user.id)
+            .single();
+        if (!profile) throw new Error("Profile not found");
+        senderId = profile.id;
+    }
 
     const { data, error } = await supabase
         .from("messages")
         .insert({
             conversation_id: isGroup ? null : conversationOrGroupId,
             ride_group_id: isGroup ? conversationOrGroupId : null,
-            sender_id: profile.id,
+            sender_id: senderId,
             content,
             message_type: type,
             metadata: metadata || null,
@@ -376,26 +382,30 @@ export async function sendMessage(
     return data as Message;
 }
 
-export async function markAsRead(conversationOrGroupId: string): Promise<void> {
+export async function markAsRead(conversationOrGroupId: string, readerProfileId?: string): Promise<void> {
     const supabase = getSupabaseClientOrThrow();
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    let readerId = readerProfileId;
+    if (!readerId) {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-    if (!profile) return;
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("user_id", user.id)
+            .single();
+        if (!profile) return;
+        readerId = profile.id;
+    }
 
     await supabase
         .from("messages")
         .update({ read_at: new Date().toISOString() })
         .or(`conversation_id.eq.${conversationOrGroupId},ride_group_id.eq.${conversationOrGroupId}`)
-        .neq("sender_id", profile.id)
+        .neq("sender_id", readerId)
         .is("read_at", null);
 }
 

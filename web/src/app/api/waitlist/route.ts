@@ -1,9 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { sendWaitlistThankYou } from "@/lib/waitlistEmail";
+import { createRateLimiter } from "@/lib/rateLimit";
 
 const SCHOOLS = ["UCI", "UCLA", "USC", "UCSD", "Cal Poly", "other"] as const;
 const AIRPORTS = ["LAX", "SNA", "SAN", "LGB", "ONT", "Other"] as const;
+
+const rateLimiter = createRateLimiter({ windowMs: 60_000, maxRequests: 5, key: "waitlist" });
 
 function getSupabaseAnon() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -13,6 +16,8 @@ function getSupabaseAnon() {
 }
 
 export async function POST(request: Request) {
+  const limited = rateLimiter(request);
+  if (limited) return limited;
   try {
     const body = await request.json();
     const { school, email, airport, school_other: schoolOther } = body;

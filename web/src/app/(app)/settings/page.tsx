@@ -113,7 +113,7 @@ export default function SettingsPage() {
           description: profile?.phone_verified
             ? "Phone number verified"
             : "Add or verify your phone for extra trust",
-          action: profile?.phone_verified ? undefined : () => {},
+          action: profile?.phone_verified ? undefined : () => { },
           disabled: profile?.phone_verified,
         },
       ],
@@ -124,23 +124,26 @@ export default function SettingsPage() {
         {
           icon: Bell,
           label: "Ride activity",
-          description: "New ride requests, ride accepted, ride canceled",
+          description: "New ride requests, ride accepted, ride canceled (coming soon)",
           toggle: true,
           defaultOn: true,
+          disabled: true,
         },
         {
           icon: Bell,
           label: "Reminders",
-          description: "Upcoming ride and departure time reminders",
+          description: "Upcoming ride and departure time reminders (coming soon)",
           toggle: true,
           defaultOn: true,
+          disabled: true,
         },
         {
           icon: Bell,
           label: "Marketing",
-          description: "Product updates and promotions",
+          description: "Product updates and promotions (coming soon)",
           toggle: true,
           defaultOn: false,
+          disabled: true,
         },
       ],
     },
@@ -201,7 +204,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       </div>
-                      {hasMounted && <Switch defaultChecked={item.defaultOn} />}
+                      {hasMounted && <Switch defaultChecked={item.defaultOn} disabled={item.disabled} />}
                     </div>
                   ) : (
                     <div
@@ -213,11 +216,11 @@ export default function SettingsPage() {
                         item.disabled || !item.action
                           ? undefined
                           : (e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                item.action?.();
-                              }
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              item.action?.();
                             }
+                          }
                       }
                     >
                       <div className="flex items-center gap-3">

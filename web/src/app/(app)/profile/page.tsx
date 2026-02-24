@@ -160,6 +160,10 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    if (!firstName.trim()) {
+      toast.error("First name is required");
+      return;
+    }
     setSaving(true);
     try {
       const result = await updateProfile({
@@ -385,11 +389,10 @@ export default function ProfilePage() {
           <div className="flex flex-wrap gap-2.5">
             <Badge
               variant="outline"
-              className={`py-1.5 px-3 text-xs ${
-                profile?.id_verified
+              className={`py-1.5 px-3 text-xs ${profile?.id_verified
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-zinc-200 bg-zinc-50 text-zinc-500"
-              }`}
+                }`}
             >
               {profile?.id_verified ? (
                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -400,11 +403,10 @@ export default function ProfilePage() {
             </Badge>
             <Badge
               variant="outline"
-              className={`py-1.5 px-3 text-xs ${
-                user?.email?.endsWith(".edu")
+              className={`py-1.5 px-3 text-xs ${user?.email?.endsWith(".edu")
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-zinc-200 bg-zinc-50 text-zinc-500"
-              }`}
+                }`}
             >
               {user?.email?.endsWith(".edu") ? (
                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -415,11 +417,10 @@ export default function ProfilePage() {
             </Badge>
             <Badge
               variant="outline"
-              className={`py-1.5 px-3 text-xs ${
-                profile?.phone_verified
+              className={`py-1.5 px-3 text-xs ${profile?.phone_verified
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-zinc-200 bg-zinc-50 text-zinc-500"
-              }`}
+                }`}
             >
               {profile?.phone_verified ? (
                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -430,11 +431,10 @@ export default function ProfilePage() {
             </Badge>
             <Badge
               variant="outline"
-              className={`py-1.5 px-3 text-xs ${
-                profile?.email_verified || user?.email
+              className={`py-1.5 px-3 text-xs ${profile?.email_verified || user?.email
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-zinc-200 bg-zinc-50 text-zinc-500"
-              }`}
+                }`}
             >
               {profile?.email_verified || user?.email ? (
                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" />

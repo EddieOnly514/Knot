@@ -22,6 +22,7 @@ export interface PotentialMatch {
     gender_pref: string;
     quiet_ride: boolean;
     music_ok: boolean;
+    notes: string | null;
     // Profile
     first_name: string;
     last_name: string;

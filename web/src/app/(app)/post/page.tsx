@@ -365,6 +365,12 @@ export default function PostRidePage() {
       );
     }
 
+    // Reject departure windows that have already passed
+    if (departureLatest < new Date()) {
+      toast.error("Departure time must be in the future");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -468,329 +474,329 @@ export default function PostRidePage() {
           <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
         </div>
       ) : (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Route */}
-        <Card className="border-zinc-200">
-          <CardHeader className="pb-0">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-              <MapPin className="h-4 w-4 text-blue-600" />
-              Route
-            </CardTitle>
-            <p className="mt-0.5 text-[11px] font-medium text-zinc-500">
-              Use a general area like UCLA or LAX. You can share the exact meetup spot later in chat.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-1.5">
-            <div>
-              <Label className="text-xs text-zinc-600">Pickup location</Label>
-              <div className="mt-1.5">
-                <AddressInput
-                  inputId="origin-address"
-                  value={origin}
-                  onChange={(val, addr) => {
-                    setOrigin(val);
-                    setOriginAddress(addr ?? null);
-                  }}
-                  placeholder="Where are you leaving from?"
-                />
-                {originAddress && (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    <span>
-                      {originAddress.city || originAddress.formatted}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs text-zinc-600">Destination</Label>
-              <div className="mt-1.5">
-                <AddressInput
-                  inputId="destination-address"
-                  value={destination}
-                  onChange={(val, addr) => {
-                    setDestination(val);
-                    setDestAddress(addr ?? null);
-                  }}
-                  placeholder="Where are you heading?"
-                />
-                {destAddress && (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    <span>{destAddress.city || destAddress.formatted}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Time */}
-        <Card className="border-zinc-200">
-          <CardHeader className="pb-1">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-              <Clock className="h-4 w-4 text-blue-600" />
-              When
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-2">
-            <div>
-              <Label className="text-xs text-zinc-600">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="mt-1.5 flex h-11 w-full items-center justify-start bg-white text-left text-sm"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-zinc-400" />
-                    {date
-                      ? format(date, "EEE, MMM d, yyyy")
-                      : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    disabled={(d) => d < new Date()}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Route */}
+          <Card className="border-zinc-200">
+            <CardHeader className="pb-0">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <MapPin className="h-4 w-4 text-blue-600" />
+                Route
+              </CardTitle>
+              <p className="mt-0.5 text-[11px] font-medium text-zinc-500">
+                Use a general area like UCLA or LAX. You can share the exact meetup spot later in chat.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-1.5">
+              <div>
+                <Label className="text-xs text-zinc-600">Pickup location</Label>
+                <div className="mt-1.5">
+                  <AddressInput
+                    inputId="origin-address"
+                    value={origin}
+                    onChange={(val, addr) => {
+                      setOrigin(val);
+                      setOriginAddress(addr ?? null);
+                    }}
+                    placeholder="Where are you leaving from?"
                   />
-                </PopoverContent>
-              </Popover>
-            </div>
+                  {originAddress && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>
+                        {originAddress.city || originAddress.formatted}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-600">Destination</Label>
+                <div className="mt-1.5">
+                  <AddressInput
+                    inputId="destination-address"
+                    value={destination}
+                    onChange={(val, addr) => {
+                      setDestination(val);
+                      setDestAddress(addr ?? null);
+                    }}
+                    placeholder="Where are you heading?"
+                  />
+                  {destAddress && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-600">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>{destAddress.city || destAddress.formatted}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Separator />
+          {/* Time */}
+          <Card className="border-zinc-200">
+            <CardHeader className="pb-1">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <Clock className="h-4 w-4 text-blue-600" />
+                When
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-2">
+              <div>
+                <Label className="text-xs text-zinc-600">Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="mt-1.5 flex h-11 w-full items-center justify-start bg-white text-left text-sm"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-zinc-400" />
+                      {date
+                        ? format(date, "EEE, MMM d, yyyy")
+                        : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      disabled={(d) => d < new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div>
-              <Label className="text-xs text-zinc-600">Departure time</Label>
-              <div className="mt-1.5 flex items-center gap-2">
-                <Select value={depHour} onValueChange={setDepHour}>
-                  <SelectTrigger className="h-11 w-20">
-                    <SelectValue placeholder="Hr" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                      <SelectItem key={h} value={h.toString()}>
-                        {h}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-lg font-medium text-zinc-400">:</span>
-                <Select value={depMinute} onValueChange={setDepMinute}>
-                  <SelectTrigger className="h-11 w-20">
-                    <SelectValue placeholder="Min" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["00", "15", "30", "45"].map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={depPeriod} onValueChange={setDepPeriod}>
-                  <SelectTrigger className="h-11 w-20">
+              <Separator />
+
+              <div>
+                <Label className="text-xs text-zinc-600">Departure time</Label>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Select value={depHour} onValueChange={setDepHour}>
+                    <SelectTrigger className="h-11 w-20">
+                      <SelectValue placeholder="Hr" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                        <SelectItem key={h} value={h.toString()}>
+                          {h}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-lg font-medium text-zinc-400">:</span>
+                  <Select value={depMinute} onValueChange={setDepMinute}>
+                    <SelectTrigger className="h-11 w-20">
+                      <SelectValue placeholder="Min" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["00", "15", "30", "45"].map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={depPeriod} onValueChange={setDepPeriod}>
+                    <SelectTrigger className="h-11 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs text-zinc-600">
+                  Flexibility
+                </Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    { value: "15", label: "15 min" },
+                    { value: "30", label: "30 min" },
+                    { value: "60", label: "1 hr" },
+                    { value: "120", label: "2 hr" },
+                    { value: "all_day", label: "All day" },
+                  ].map(({ value, label }) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={tolerance === value ? "default" : "outline"}
+                      className={[
+                        "h-9 text-xs",
+                        tolerance === value
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-zinc-700",
+                      ].join(" ")}
+                      onClick={() => setTolerance(value)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Travel details */}
+          <Card className="border-zinc-200">
+            <CardHeader className="pb-1">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <Users className="h-4 w-4 text-blue-600" />
+                Travel details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-2">
+              <div>
+                <Label className="text-xs text-zinc-600">Seats needed</Label>
+                <Select value={seatsNeeded} onValueChange={setSeatsNeeded}>
+                  <SelectTrigger className="mt-1.5 h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AM">AM</SelectItem>
-                    <SelectItem value="PM">PM</SelectItem>
+                    {[1, 2, 3, 4].map((n) => (
+                      <SelectItem key={n} value={n.toString()}>
+                        {n} {n === 1 ? "person" : "people"}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div>
-              <Label className="text-xs text-zinc-600">
-                Flexibility
-              </Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {[
-                  { value: "15", label: "15 min" },
-                  { value: "30", label: "30 min" },
-                  { value: "60", label: "1 hr" },
-                  { value: "120", label: "2 hr" },
-                  { value: "all_day", label: "All day" },
-                ].map(({ value, label }) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    variant={tolerance === value ? "default" : "outline"}
-                    className={[
-                      "h-9 text-xs",
-                      tolerance === value
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-zinc-700",
-                    ].join(" ")}
-                    onClick={() => setTolerance(value)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <Separator />
 
-        {/* Travel details */}
-        <Card className="border-zinc-200">
-          <CardHeader className="pb-1">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-              <Users className="h-4 w-4 text-blue-600" />
-              Travel details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-2">
-            <div>
-              <Label className="text-xs text-zinc-600">Seats needed</Label>
-              <Select value={seatsNeeded} onValueChange={setSeatsNeeded}>
-                <SelectTrigger className="mt-1.5 h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4].map((n) => (
-                    <SelectItem key={n} value={n.toString()}>
-                      {n} {n === 1 ? "person" : "people"}
-                    </SelectItem>
+              <div>
+                <Label className="text-xs text-zinc-600">
+                  Luggage / space needed
+                </Label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {SPACE_OPTIONS.map((opt) => (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant={spaceCapacity === opt.value ? "default" : "outline"}
+                      className={[
+                        "h-auto justify-start py-3 text-left text-xs",
+                        spaceCapacity === opt.value
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-zinc-700",
+                      ].join(" ")}
+                      onClick={() => setSpaceCapacity(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Separator />
-
-            <div>
-              <Label className="text-xs text-zinc-600">
-                Luggage / space needed
-              </Label>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {SPACE_OPTIONS.map((opt) => (
-                  <Button
-                    key={opt.value}
-                    type="button"
-                    variant={spaceCapacity === opt.value ? "default" : "outline"}
-                    className={[
-                      "h-auto justify-start py-3 text-left text-xs",
-                      spaceCapacity === opt.value
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-zinc-700",
-                    ].join(" ")}
-                    onClick={() => setSpaceCapacity(opt.value)}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Preferences */}
-        <Card className="border-zinc-200">
-          <CardHeader className="pb-1">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
-              Ride preferences
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-3">
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                type="button"
-                variant={quietRide ? "default" : "outline"}
-                className={[
-                  "h-14 flex-col gap-1 text-xs",
-                  quietRide ? "bg-blue-600 text-white" : "bg-white text-zinc-700",
-                ].join(" ")}
-                onClick={() => setQuietRide(!quietRide)}
-              >
-                {quietRide ? (
-                  <VolumeX className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
-                )}
-                Quiet ride
-              </Button>
-              <Button
-                type="button"
-                variant={musicOk ? "default" : "outline"}
-                className={[
-                  "h-14 flex-col gap-1 text-xs",
-                  musicOk ? "bg-blue-600 text-white" : "bg-white text-zinc-700",
-                ].join(" ")}
-                onClick={() => setMusicOk(!musicOk)}
-              >
-                <Music className="h-4 w-4" />
-                Music OK
-              </Button>
-              <Button
-                type="button"
-                variant={genderPref !== "any" ? "default" : "outline"}
-                className={[
-                  "h-14 flex-col gap-1 text-xs",
-                  genderPref !== "any"
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-zinc-700",
-                ].join(" ")}
-                onClick={() => {
-                  const cycle = {
-                    any: "male" as const,
-                    male: "female" as const,
-                    female: "any" as const,
-                  };
-                  setGenderPref(cycle[genderPref]);
-                }}
-              >
-                <Users className="h-4 w-4" />
-                {genderPref === "any"
-                  ? "Any gender"
-                  : genderPref === "male"
-                    ? "Male only"
-                    : "Female only"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Preferences */}
+          <Card className="border-zinc-200">
+            <CardHeader className="pb-1">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                Ride preferences
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant={quietRide ? "default" : "outline"}
+                  className={[
+                    "h-14 flex-col gap-1 text-xs",
+                    quietRide ? "bg-blue-600 text-white" : "bg-white text-zinc-700",
+                  ].join(" ")}
+                  onClick={() => setQuietRide(!quietRide)}
+                >
+                  {quietRide ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                  Quiet ride
+                </Button>
+                <Button
+                  type="button"
+                  variant={musicOk ? "default" : "outline"}
+                  className={[
+                    "h-14 flex-col gap-1 text-xs",
+                    musicOk ? "bg-blue-600 text-white" : "bg-white text-zinc-700",
+                  ].join(" ")}
+                  onClick={() => setMusicOk(!musicOk)}
+                >
+                  <Music className="h-4 w-4" />
+                  Music OK
+                </Button>
+                <Button
+                  type="button"
+                  variant={genderPref !== "any" ? "default" : "outline"}
+                  className={[
+                    "h-14 flex-col gap-1 text-xs",
+                    genderPref !== "any"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-zinc-700",
+                  ].join(" ")}
+                  onClick={() => {
+                    const cycle = {
+                      any: "male" as const,
+                      male: "female" as const,
+                      female: "any" as const,
+                    };
+                    setGenderPref(cycle[genderPref]);
+                  }}
+                >
+                  <Users className="h-4 w-4" />
+                  {genderPref === "any"
+                    ? "Any gender"
+                    : genderPref === "male"
+                      ? "Male only"
+                      : "Female only"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Notes */}
-        <Card className="border-zinc-200">
-          <CardContent className="space-y-3 p-4">
-            <Label className="text-sm font-medium text-zinc-900">
-              Special notes
-            </Label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Anything helpful for your ride buddy (e.g. large suitcase, meet at Terminal 3, etc.)"
-              className="h-24 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
-              maxLength={300}
-            />
-            <p className="text-right text-xs text-zinc-400">
-              {notes.length}/300
-            </p>
-          </CardContent>
-        </Card>
+          {/* Notes */}
+          <Card className="border-zinc-200">
+            <CardContent className="space-y-3 p-4">
+              <Label className="text-sm font-medium text-zinc-900">
+                Special notes
+              </Label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Anything helpful for your ride buddy (e.g. large suitcase, meet at Terminal 3, etc.)"
+                className="h-24 w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+                maxLength={300}
+              />
+              <p className="text-right text-xs text-zinc-400">
+                {notes.length}/300
+              </p>
+            </CardContent>
+          </Card>
 
-        <Button
-          type="submit"
-          size="lg"
-          className="mt-2 h-12 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {editRideId ? "Updating..." : "Posting..."}
-            </>
-          ) : editRideId ? (
-            "Update ride"
-          ) : (
-            "Post ride request"
-          )}
-        </Button>
-      </form>
+          <Button
+            type="submit"
+            size="lg"
+            className="mt-2 h-12 w-full rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {editRideId ? "Updating..." : "Posting..."}
+              </>
+            ) : editRideId ? (
+              "Update ride"
+            ) : (
+              "Post ride request"
+            )}
+          </Button>
+        </form>
       )}
     </div>
   );

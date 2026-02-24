@@ -39,7 +39,6 @@ export default function OnboardingPage() {
 
     const [avatarUploading, setAvatarUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const supabase = getSupabaseClientOrThrow();
 
     // Pre-fill from Google data
     const [firstName, setFirstName] = useState("");
@@ -103,6 +102,7 @@ export default function OnboardingPage() {
 
         setAvatarUploading(true);
         try {
+            const supabase = getSupabaseClientOrThrow();
             const ownerId = profile?.id || user.id;
             const fileExt = file.name.split(".").pop() || "jpg";
             const filePath = `avatars/${ownerId}-${Date.now()}.${fileExt}`;

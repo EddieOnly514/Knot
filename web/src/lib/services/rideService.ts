@@ -268,15 +268,32 @@ export async function updateRide(rideId: string, data: Partial<CreateRideData>) 
 }
 
 /**
- * Cancel a ride.
+ * Cancel a ride. Only the ride owner can cancel.
  */
 export async function cancelRide(rideId: string) {
     const supabase = getSupabaseClientOrThrow();
 
-    const { error } = await supabase
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+    if (!profile) throw new Error("Profile not found");
+
+    const { data, error } = await supabase
         .from("rides")
         .update({ status: "cancelled" })
-        .eq("id", rideId);
+        .eq("id", rideId)
+        .eq("user_id", profile.id)
+        .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0) {
+        throw new Error("Ride not found or you don't have permission to cancel it.");
+    }
 }

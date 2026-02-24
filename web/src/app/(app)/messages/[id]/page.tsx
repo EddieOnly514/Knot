@@ -303,14 +303,16 @@ export default function ChatThreadPage() {
   // Sender profiles for group chat (so we can show name + avatar per message)
   useEffect(() => {
     if (!isGroup || messages.length === 0) return;
-    const senderIds = [...new Set(messages.map((m) => m.sender_id))];
-    if (senderIds.length === 0) return;
+    const allSenderIds = [...new Set(messages.map((m) => m.sender_id))];
+    // Only fetch profiles we don't already have
+    const unknownSenderIds = allSenderIds.filter(id => !senderProfiles[id]);
+    if (unknownSenderIds.length === 0) return;
     (async () => {
       const supabase = getSupabaseClientOrThrow();
       const { data } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, photo_url")
-        .in("id", senderIds);
+        .in("id", unknownSenderIds);
       const map: Record<string, { name: string; photo: string | null }> = {};
       (data || []).forEach((p: { id: string; first_name: string; last_name: string; photo_url: string | null }) => {
         map[p.id] = {
@@ -318,9 +320,10 @@ export default function ChatThreadPage() {
           photo: p.photo_url,
         };
       });
-      setSenderProfiles(map);
+      setSenderProfiles((prev) => ({ ...prev, ...map }));
     })();
-  }, [isGroup, conversationId, messages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGroup, conversationId, messages.length]);
 
   // Realtime
   useEffect(() => {
@@ -636,66 +639,66 @@ export default function ChatThreadPage() {
               />
               <div className="absolute right-0 top-9 z-50 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
                 {!isGroup && partner?.profile_id && (
-                <>
-                <button
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
-                  onClick={async () => {
-                    setShowSafety(false);
-                    if (!partner) return;
-                    const confirmReport = window.confirm(
-                      "Report this user to Knot? We'll review this conversation.",
-                    );
-                    if (!confirmReport) return;
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                      onClick={async () => {
+                        setShowSafety(false);
+                        if (!partner) return;
+                        const confirmReport = window.confirm(
+                          "Report this user to Knot? We'll review this conversation.",
+                        );
+                        if (!confirmReport) return;
 
-                    const reason = window.prompt(
-                      "Tell us what happened (optional, but helpful for our review):",
-                    );
-                    if (reason === null) return;
-                    try {
-                      await reportUser(partner.profile_id, reason, conversationId);
-                      alert("Thanks for your report. We'll review this conversation.");
-                    } catch (err) {
-                      console.error("Failed to report user:", err);
-                      alert("Something went wrong sending your report. Please try again.");
-                    }
-                  }}
-                >
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Report user
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
-                  onClick={async () => {
-                    setShowSafety(false);
-                    if (!partner) return;
-                    try {
-                      if (!isBlocked) {
-                        const confirmBlock = window.confirm(
-                          "Block this user? You won't see them in future matches.",
+                        const reason = window.prompt(
+                          "Tell us what happened (optional, but helpful for our review):",
                         );
-                        if (!confirmBlock) return;
-                        await blockUser(partner.profile_id);
-                        setIsBlocked(true);
-                        alert("User blocked. You won't see them in future matches.");
-                      } else {
-                        const confirmUnblock = window.confirm(
-                          "Unblock this user so they can appear in future matches?",
-                        );
-                        if (!confirmUnblock) return;
-                        await unblockUser(partner.profile_id);
-                        setIsBlocked(false);
-                        alert("User unblocked.");
-                      }
-                    } catch (err) {
-                      console.error("Failed to update block status:", err);
-                      alert("Something went wrong. Please try again.");
-                    }
-                  }}
-                >
-                  <Ban className={`h-4 w-4 ${isBlocked ? "text-zinc-500" : "text-rose-500"}`} />
-                  {isBlocked ? "Unblock user" : "Block user"}
-                </button>
-                </>
+                        if (reason === null) return;
+                        try {
+                          await reportUser(partner.profile_id, reason, conversationId);
+                          alert("Thanks for your report. We'll review this conversation.");
+                        } catch (err) {
+                          console.error("Failed to report user:", err);
+                          alert("Something went wrong sending your report. Please try again.");
+                        }
+                      }}
+                    >
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      Report user
+                    </button>
+                    <button
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs text-zinc-700 hover:bg-zinc-50"
+                      onClick={async () => {
+                        setShowSafety(false);
+                        if (!partner) return;
+                        try {
+                          if (!isBlocked) {
+                            const confirmBlock = window.confirm(
+                              "Block this user? You won't see them in future matches.",
+                            );
+                            if (!confirmBlock) return;
+                            await blockUser(partner.profile_id);
+                            setIsBlocked(true);
+                            alert("User blocked. You won't see them in future matches.");
+                          } else {
+                            const confirmUnblock = window.confirm(
+                              "Unblock this user so they can appear in future matches?",
+                            );
+                            if (!confirmUnblock) return;
+                            await unblockUser(partner.profile_id);
+                            setIsBlocked(false);
+                            alert("User unblocked.");
+                          }
+                        } catch (err) {
+                          console.error("Failed to update block status:", err);
+                          alert("Something went wrong. Please try again.");
+                        }
+                      }}
+                    >
+                      <Ban className={`h-4 w-4 ${isBlocked ? "text-zinc-500" : "text-rose-500"}`} />
+                      {isBlocked ? "Unblock user" : "Block user"}
+                    </button>
+                  </>
                 )}
                 <div className="my-1 border-t border-zinc-100" />
                 <button
@@ -860,87 +863,84 @@ export default function ChatThreadPage() {
 
       {/* Status bar. Hide until rideStatus loaded from server to avoid flashing "Confirm meetup". */}
       {rideStatus !== null && (
-      <div className="mb-2">
-        {rideStatus !== "cancelled" ? (
-          <div className="flex items-center px-1">
-            {STATUS_STEPS.map((step, i) => {
-              const isActive = i <= currentStepIndex;
-              const isCurrent = i === currentStepIndex;
-              return (
-                <div key={step} className="flex flex-1 items-center">
-                  <div className="flex flex-1 flex-col items-center">
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium ${
-                        isCurrent
-                          ? "bg-blue-600 text-white"
-                          : isActive
-                            ? "bg-emerald-500 text-white"
-                            : "bg-zinc-200 text-zinc-400"
-                      }`}
-                    >
-                      {isActive && i < currentStepIndex ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        i + 1
-                      )}
+        <div className="mb-2">
+          {rideStatus !== "cancelled" ? (
+            <div className="flex items-center px-1">
+              {STATUS_STEPS.map((step, i) => {
+                const isActive = i <= currentStepIndex;
+                const isCurrent = i === currentStepIndex;
+                return (
+                  <div key={step} className="flex flex-1 items-center">
+                    <div className="flex flex-1 flex-col items-center">
+                      <div
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium ${isCurrent
+                            ? "bg-blue-600 text-white"
+                            : isActive
+                              ? "bg-emerald-500 text-white"
+                              : "bg-zinc-200 text-zinc-400"
+                          }`}
+                      >
+                        {isActive && i < currentStepIndex ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          i + 1
+                        )}
+                      </div>
+                      <span
+                        className={`mt-1 text-[10px] ${isCurrent
+                            ? "font-semibold text-blue-600"
+                            : isActive
+                              ? "text-emerald-600"
+                              : "text-zinc-400"
+                          }`}
+                      >
+                        {STATUS_LABELS[step]}
+                      </span>
                     </div>
-                    <span
-                      className={`mt-1 text-[10px] ${
-                        isCurrent
-                          ? "font-semibold text-blue-600"
-                          : isActive
-                            ? "text-emerald-600"
-                            : "text-zinc-400"
-                      }`}
-                    >
-                      {STATUS_LABELS[step]}
-                    </span>
+                    {i < STATUS_STEPS.length - 1 && (
+                      <div
+                        className={`-mt-4 h-0.5 flex-1 ${i < currentStepIndex ? "bg-emerald-400" : "bg-zinc-200"
+                          }`}
+                      />
+                    )}
                   </div>
-                  {i < STATUS_STEPS.length - 1 && (
-                    <div
-                      className={`-mt-4 h-0.5 flex-1 ${
-                        i < currentStepIndex ? "bg-emerald-400" : "bg-zinc-200"
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <Badge className="bg-rose-50 text-xs text-rose-700">
-            Ride cancelled
-          </Badge>
-        )}
-        {rideStatus === "accepted" && (
-          <Button
-            className="mt-2 h-9 w-full rounded-lg bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
-            onClick={() => handleStatusAction("confirmed")}
-            disabled={updatingStatus}
-          >
-            {updatingStatus ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Handshake className="mr-2 h-4 w-4" />
-            )}
-            Confirm meetup
-          </Button>
-        )}
-        {rideStatus === "confirmed" && (
-          <Button
-            className="mt-2 h-9 w-full rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
-            onClick={() => handleStatusAction("completed")}
-            disabled={updatingStatus}
-          >
-            {updatingStatus ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Flag className="mr-2 h-4 w-4" />
-            )}
-            Complete ride
-          </Button>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Badge className="bg-rose-50 text-xs text-rose-700">
+              Ride cancelled
+            </Badge>
+          )}
+          {rideStatus === "accepted" && (
+            <Button
+              className="mt-2 h-9 w-full rounded-lg bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
+              onClick={() => handleStatusAction("confirmed")}
+              disabled={updatingStatus}
+            >
+              {updatingStatus ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Handshake className="mr-2 h-4 w-4" />
+              )}
+              Confirm meetup
+            </Button>
+          )}
+          {rideStatus === "confirmed" && (
+            <Button
+              className="mt-2 h-9 w-full rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
+              onClick={() => handleStatusAction("completed")}
+              disabled={updatingStatus}
+            >
+              {updatingStatus ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Flag className="mr-2 h-4 w-4" />
+              )}
+              Complete ride
+            </Button>
+          )}
+        </div>
       )}
 
       {/* Messages — only this area scrolls; white background to match chat design */}
@@ -974,9 +974,8 @@ export default function ChatThreadPage() {
                   return (
                     <div
                       key={msg.id}
-                      className={`mb-3 flex ${
-                        isMine ? "justify-end" : "justify-start"
-                      }`}
+                      className={`mb-3 flex ${isMine ? "justify-end" : "justify-start"
+                        }`}
                     >
                       <div className={`max-w-[80%] flex ${isMine ? "flex-col items-end" : "flex-col items-start"}`}>
                         {isGroup && !isMine && sender && (
@@ -991,11 +990,10 @@ export default function ChatThreadPage() {
                           </div>
                         )}
                         <div
-                          className={`rounded-2xl px-4 py-2.5 text-xs ${
-                            isMine
+                          className={`rounded-2xl px-4 py-2.5 text-xs ${isMine
                               ? "rounded-br-md bg-blue-600 text-white"
                               : "rounded-bl-md bg-blue-50 text-blue-900"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
@@ -1003,14 +1001,12 @@ export default function ChatThreadPage() {
                             </span>
                           </div>
                           <div
-                            className={`mt-1 flex items-center gap-1 ${
-                              isMine ? "justify-end" : ""
-                            }`}
+                            className={`mt-1 flex items-center gap-1 ${isMine ? "justify-end" : ""
+                              }`}
                           >
                             <span
-                              className={`text-[10px] ${
-                                isMine ? "text-blue-200" : "text-blue-700"
-                              }`}
+                              className={`text-[10px] ${isMine ? "text-blue-200" : "text-blue-700"
+                                }`}
                             >
                               {formatMsgTime(msg.created_at)}
                             </span>
@@ -1041,9 +1037,8 @@ export default function ChatThreadPage() {
                   return (
                     <div
                       key={msg.id}
-                      className={`mb-3 flex ${
-                        isMine ? "justify-end" : "justify-start"
-                      }`}
+                      className={`mb-3 flex ${isMine ? "justify-end" : "justify-start"
+                        }`}
                     >
                       <div className={`max-w-[80%] flex flex-col ${isMine ? "items-end" : "items-start"}`}>
                         {isGroup && !isMine && sender && (
@@ -1058,58 +1053,54 @@ export default function ChatThreadPage() {
                           </div>
                         )}
                         <div
-                          className={`overflow-hidden rounded-2xl ${
-                            isMine
+                          className={`overflow-hidden rounded-2xl ${isMine
                               ? "rounded-br-md bg-blue-600 text-white"
                               : "rounded-bl-md border border-zinc-200 bg-white"
-                          }`}
+                            }`}
                         >
-                        {staticMapUrl && (
-                          <a
-                            href={meta?.map_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <img
-                              src={staticMapUrl}
-                              alt="Location"
-                              className="h-[120px] w-full object-cover"
-                            />
-                          </a>
-                        )}
-                        <div className="px-4 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5" />
-                            <span className="text-sm font-medium">
-                              Shared location
-                            </span>
-                          </div>
-                          {meta?.map_url && (
+                          {staticMapUrl && (
                             <a
-                              href={meta.map_url}
+                              href={meta?.map_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`mt-1 block text-xs underline ${
-                                isMine ? "text-blue-200" : "text-blue-600"
-                              }`}
                             >
-                              Open in Google Maps
+                              <img
+                                src={staticMapUrl}
+                                alt="Location"
+                                className="h-[120px] w-full object-cover"
+                              />
                             </a>
                           )}
-                          <div
-                            className={`mt-1 flex items-center gap-1 ${
-                              isMine ? "justify-end" : ""
-                            }`}
-                          >
-                            <span
-                              className={`text-[10px] ${
-                                isMine ? "text-blue-200" : "text-zinc-400"
-                              }`}
+                          <div className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span className="text-sm font-medium">
+                                Shared location
+                              </span>
+                            </div>
+                            {meta?.map_url && (
+                              <a
+                                href={meta.map_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`mt-1 block text-xs underline ${isMine ? "text-blue-200" : "text-blue-600"
+                                  }`}
+                              >
+                                Open in Google Maps
+                              </a>
+                            )}
+                            <div
+                              className={`mt-1 flex items-center gap-1 ${isMine ? "justify-end" : ""
+                                }`}
                             >
-                              {formatMsgTime(msg.created_at)}
-                            </span>
+                              <span
+                                className={`text-[10px] ${isMine ? "text-blue-200" : "text-zinc-400"
+                                  }`}
+                              >
+                                {formatMsgTime(msg.created_at)}
+                              </span>
+                            </div>
                           </div>
-                        </div>
                         </div>
                       </div>
                     </div>
@@ -1129,9 +1120,8 @@ export default function ChatThreadPage() {
                 return (
                   <div
                     key={msg.id}
-                    className={`mb-3 flex ${
-                      isMine ? "justify-end" : "justify-start"
-                    }`}
+                    className={`mb-3 flex ${isMine ? "justify-end" : "justify-start"
+                      }`}
                   >
                     <div className={`max-w-[80%] flex flex-col ${isMine ? "items-end" : "items-start"}`}>
                       {isGroup && !isMine && sender && (
@@ -1146,22 +1136,19 @@ export default function ChatThreadPage() {
                         </div>
                       )}
                       <div
-                        className={`rounded-2xl px-4 py-2.5 text-sm ${
-                          isMine
+                        className={`rounded-2xl px-4 py-2.5 text-sm ${isMine
                             ? "rounded-br-md bg-blue-600 text-white"
                             : "rounded-bl-md border border-zinc-200 bg-white text-zinc-900"
-                        }`}
+                          }`}
                       >
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                         <div
-                          className={`mt-1 flex items-center gap-1 ${
-                            isMine ? "justify-end" : ""
-                          }`}
+                          className={`mt-1 flex items-center gap-1 ${isMine ? "justify-end" : ""
+                            }`}
                         >
                           <span
-                            className={`text-[10px] ${
-                              isMine ? "text-blue-200" : "text-zinc-400"
-                            }`}
+                            className={`text-[10px] ${isMine ? "text-blue-200" : "text-zinc-400"
+                              }`}
                           >
                             {formatMsgTime(msg.created_at)}
                           </span>
@@ -1218,9 +1205,8 @@ export default function ChatThreadPage() {
           <Button
             variant="ghost"
             size="icon"
-            className={`h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0 ${
-              showQuickActions ? "bg-blue-50 text-blue-600" : "text-zinc-400"
-            }`}
+            className={`h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0 ${showQuickActions ? "bg-blue-50 text-blue-600" : "text-zinc-400"
+              }`}
             onClick={() => setShowQuickActions(!showQuickActions)}
           >
             <Zap className="h-5 w-5" />

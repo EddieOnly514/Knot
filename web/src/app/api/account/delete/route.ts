@@ -39,6 +39,20 @@ export async function POST() {
       serviceRoleKey
     );
 
+    // Clean up uploaded avatars from storage
+    try {
+      const { data: files } = await adminClient.storage
+        .from("profile-photos")
+        .list("avatars", { search: user.id });
+      if (files && files.length > 0) {
+        const paths = files.map((f) => `avatars/${f.name}`);
+        await adminClient.storage.from("profile-photos").remove(paths);
+      }
+    } catch (storageErr) {
+      // Non-fatal: continue with account deletion even if storage cleanup fails
+      console.warn("[DeleteAccount] Storage cleanup failed:", storageErr);
+    }
+
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(
       user.id
     );

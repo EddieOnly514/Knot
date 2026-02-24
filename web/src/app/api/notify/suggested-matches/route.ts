@@ -23,6 +23,17 @@ function getAdminClient() {
 
 export async function POST(request: Request) {
   try {
+    // Authenticate: require CRON_SECRET bearer token
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = request.headers.get("authorization");
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    } else if (process.env.NODE_ENV !== "development") {
+      return NextResponse.json({ error: "Not configured" }, { status: 403 });
+    }
+
     const body = await request.json();
     const profileId = typeof body?.profileId === "string" ? body.profileId.trim() : null;
     if (!profileId) {

@@ -196,6 +196,7 @@ export async function getAcceptedMatchCount(rideId: string): Promise<number> {
 
 /**
  * Accept or reject a match request.
+ * Verifies the current user owns the target ride before allowing the response.
  * When accepted, also set ride_status to 'accepted' so the chat shows step 2 (Confirm meetup) instead of Requested.
  * Throws with message containing "ride_match_cap_exceeded" if either ride already has 3 matches (4 people max).
  */
@@ -204,6 +205,23 @@ export async function respondToRequest(
     response: "accepted" | "rejected"
 ) {
     const supabase = getSupabaseClientOrThrow();
+
+    // Verify the current user owns the ride this request targets
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+    const { data: profile } = await supabase
+        .from("profiles").select("id").eq("user_id", user.id).single();
+    if (!profile) throw new Error("Profile not found");
+
+    const { data: myRides } = await supabase
+        .from("rides").select("id").eq("user_id", profile.id);
+    const myRideIds = (myRides ?? []).map((r: { id: string }) => r.id);
+
+    const { data: req } = await supabase
+        .from("ride_requests").select("ride_id").eq("id", requestId).single();
+    if (!req || !myRideIds.includes(req.ride_id)) {
+        throw new Error("Request not found or you don't have permission to respond.");
+    }
 
     const updates = response === "accepted"
         ? { status: "accepted", ride_status: "accepted" }
@@ -225,10 +243,29 @@ export async function respondToRequest(
 
 /**
  * Withdraw (remove) a pending request that the current user sent.
+ * Verifies the current user is the requester before allowing withdrawal.
  * Updates status to 'rejected' so the request no longer appears as pending.
  */
 export async function withdrawRequest(requestId: string): Promise<void> {
     const supabase = getSupabaseClientOrThrow();
+
+    // Verify the current user owns the requester ride
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+    const { data: profile } = await supabase
+        .from("profiles").select("id").eq("user_id", user.id).single();
+    if (!profile) throw new Error("Profile not found");
+
+    const { data: myRides } = await supabase
+        .from("rides").select("id").eq("user_id", profile.id);
+    const myRideIds = (myRides ?? []).map((r: { id: string }) => r.id);
+
+    const { data: req } = await supabase
+        .from("ride_requests").select("requester_ride_id").eq("id", requestId).single();
+    if (!req || !myRideIds.includes(req.requester_ride_id)) {
+        throw new Error("Request not found or you don't have permission to withdraw it.");
+    }
+
     const { error } = await supabase
         .from("ride_requests")
         .update({ status: "rejected" })

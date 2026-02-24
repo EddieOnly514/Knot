@@ -261,8 +261,9 @@ export default function PostRidePage() {
   const [depHour, setDepHour] = useState("");
   const [depMinute, setDepMinute] = useState("00");
   const [depPeriod, setDepPeriod] = useState("AM");
-  // Flexibility: 15, 30, 60 (1 hr), 120 (2 hr), or "all_day"
+  // Flexibility: 15, 30, 60 (1 hr), 120 (2 hr), "custom", or "all_day"
   const [tolerance, setTolerance] = useState<string>("15");
+  const [customFlexibilityHours, setCustomFlexibilityHours] = useState<string>("1");
 
   const [seatsNeeded, setSeatsNeeded] = useState("1");
   const [spaceCapacity, setSpaceCapacity] = useState("1");
@@ -356,7 +357,10 @@ export default function PostRidePage() {
       end.setHours(23, 59, 59, 999);
       departureLatest = end;
     } else {
-      const toleranceMin = parseInt(tolerance, 10) || 15;
+      const toleranceMin =
+        tolerance === "custom"
+          ? (parseInt(customFlexibilityHours, 10) || 1) * 60
+          : parseInt(tolerance, 10) || 15;
       departureEarliest = new Date(
         departureTime.getTime() - toleranceMin * 60 * 1000,
       );
@@ -433,6 +437,11 @@ export default function PostRidePage() {
           notes: notes.trim() || undefined,
         });
         toast.success("Ride posted");
+        fetch("/api/notify/suggested-matches-after-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rideId: ride.id }),
+        }).catch(() => {});
         router.push(`/matches?ride=${ride.id}`);
       }
     } catch (err) {
@@ -612,12 +621,13 @@ export default function PostRidePage() {
                 <Label className="text-xs text-zinc-600">
                   Flexibility
                 </Label>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   {[
                     { value: "15", label: "15 min" },
                     { value: "30", label: "30 min" },
                     { value: "60", label: "1 hr" },
                     { value: "120", label: "2 hr" },
+                    { value: "custom", label: "Custom (hr)" },
                     { value: "all_day", label: "All day" },
                   ].map(({ value, label }) => (
                     <Button
@@ -635,6 +645,17 @@ export default function PostRidePage() {
                       {label}
                     </Button>
                   ))}
+                  {tolerance === "custom" && (
+                    <Input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={customFlexibilityHours}
+                      onChange={(e) => setCustomFlexibilityHours(e.target.value.replace(/\D/g, "").slice(0, 2) || "1")}
+                      className="h-9 w-16 bg-white text-center text-xs tabular-nums"
+                      placeholder="hr"
+                    />
+                  )}
                 </div>
               </div>
             </CardContent>

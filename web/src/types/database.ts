@@ -33,6 +33,7 @@ export interface Database {
           id_verified: boolean;
           completed_rides: number;
           gender_preference: string;
+          suggested_matches_email_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -57,6 +58,7 @@ export interface Database {
           id_verified?: boolean;
           completed_rides?: number;
           gender_preference?: string;
+          suggested_matches_email_sent_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };

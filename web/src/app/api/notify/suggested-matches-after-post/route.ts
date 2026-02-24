@@ -58,12 +58,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ride not found" }, { status: 404 });
     }
 
-    const { data: profileByUser } = await admin
+    const { data: profileByUserData } = await admin
       .from("profiles")
       .select("id")
       .eq("user_id", user.id)
       .single();
 
+    const profileByUser = profileByUserData as { id: string } | null;
     if (!profileByUser || profileByUser.id !== ride.user_id) {
       return NextResponse.json({ error: "Ride not found" }, { status: 404 });
     }
@@ -138,10 +139,10 @@ export async function POST(request: Request) {
     const result = await sendSuggestedMatchesEmail(email, suggestedCount, appUrl);
 
     if (result.ok) {
-      await admin
-        .from("profiles")
-        .update({ suggested_matches_email_sent_at: now.toISOString() })
-        .eq("id", profileId);
+      const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
+        suggested_matches_email_sent_at: now.toISOString(),
+      };
+      await admin.from("profiles").update(updatePayload as never).eq("id", profileId);
     } else if (process.env.NODE_ENV === "development") {
       console.warn("[notify/suggested-matches-after-post] send failed:", result.error);
     }

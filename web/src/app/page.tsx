@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import {
   ArrowRight,
   MessageSquare,
@@ -24,7 +32,11 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
+  Calendar as CalendarIcon,
+  Search,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { AddressInput } from "@/components/address-input";
 
 const WAITLIST_SCHOOLS = ["UCI", "UCLA", "USC", "UCSD", "Cal Poly", "other"] as const;
 const WAITLIST_AIRPORTS = ["LAX", "SNA", "SAN", "LGB", "ONT", "Other"] as const;
@@ -36,6 +48,8 @@ interface WaitlistStats {
 }
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [activeAccordion, setActiveAccordion] = useState<number | null>(0);
   const [waitlistSchool, setWaitlistSchool] = useState<WaitlistSchool | "">("");
   const [waitlistSchoolOther, setWaitlistSchoolOther] = useState("");
@@ -43,6 +57,13 @@ export default function LandingPage() {
   const [waitlistAirport, setWaitlistAirport] = useState<WaitlistAirport | "">("");
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
   const [waitlistStats, setWaitlistStats] = useState<WaitlistStats | null>(null);
+
+  // Search bar state
+  const [searchFrom, setSearchFrom] = useState("");
+  const [searchTo, setSearchTo] = useState("");
+  const [searchDate, setSearchDate] = useState<Date | undefined>(undefined);
+  const [searchSeats, setSearchSeats] = useState("1");
+
   const heroRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const howItWorksRef = useRef<HTMLDivElement>(null);
@@ -297,7 +318,7 @@ export default function LandingPage() {
       {/* Hero Section (Page 1) */}
       <section
         ref={heroRef}
-        className="pt-36 pb-24 px-6 lg:min-h-[78vh] opacity-0 transition-opacity duration-1000 relative overflow-hidden z-10"
+        className="pt-28 pb-16 px-6 lg:min-h-[78vh] opacity-0 transition-opacity duration-1000 relative overflow-hidden z-10"
       >
         {/* Subtle dotted background */}
         <div
@@ -316,66 +337,23 @@ export default function LandingPage() {
         />
 
         <div className="max-w-7xl mx-auto relative">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Column - Text */}
-            <div className="space-y-10 pl-6 lg:pl-8">
-              <div className="space-y-6">
+            <div className="space-y-8 pl-6 lg:pl-8">
+              <div className="space-y-5">
                 <h2 className="text-5xl md:text-6xl font-bold text-[#0F172A] leading-tight">
                   <span className="block">Same trip.</span>
                   <span className="block text-[#0052FF] ml-16 md:ml-24">Smaller bill.</span>
                 </h2>
                 <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
-                  Why pay <span className="line-through">$100</span> when it’s{" "}
+                  Why pay <span className="line-through">$100</span> when it's{" "}
                   <span className="font-semibold text-[#0052FF]">$25 each</span>
                   ? Connect with verified travelers heading your way and split
                   the fare instantly.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a
-                  href="#waitlist-form"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  <Button
-                    size="lg"
-                    className="h-12 px-7 text-base bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-full transition-transform hover:scale-[1.03]"
-                  >
-                    Join early access
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </a>
-                <Link href="/signup">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 px-7 text-base border border-gray-200 text-gray-900 hover:bg-gray-50 rounded-full"
-                  >
-                    Sign up
-                  </Button>
-                </Link>
-                <a
-                  href="#how-it-works"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    document
-                      .getElementById("how-it-works")
-                      ?.scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 px-7 text-base border border-gray-200 text-gray-900 hover:bg-gray-50 rounded-full"
-                  >
-                    How it works
-                  </Button>
-                </a>
-              </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-1">
                 <div className="flex -space-x-2">
                   {["ea", "km", "sr"].map((name) => (
                     <div
@@ -480,6 +458,116 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="mt-10 lg:mt-14">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_8px_40px_rgba(15,23,42,0.10)] border border-gray-100 p-4 md:p-5">
+              <p className="text-sm font-semibold text-[#0F172A] mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#0052FF]" />
+                Post a ride — tell us where you&apos;re heading
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto_auto] gap-3 items-end">
+                {/* From */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-500">From</label>
+                  <AddressInput
+                    value={searchFrom}
+                    onChange={(val) => setSearchFrom(val)}
+                    placeholder="Leaving from"
+                    inputId="landing-from"
+                    className="h-11 bg-gray-50 border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* To */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-500">To</label>
+                  <AddressInput
+                    value={searchTo}
+                    onChange={(val) => setSearchTo(val)}
+                    placeholder="Going to"
+                    inputId="landing-to"
+                    className="h-11 bg-gray-50 border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+
+                {/* Date */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-500">Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full min-w-[150px] justify-start bg-gray-50 border-gray-200 rounded-lg text-sm text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
+                        {searchDate
+                          ? format(searchDate, "MMM d, yyyy")
+                          : <span className="text-gray-400">Select date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={searchDate}
+                        onSelect={setSearchDate}
+                        disabled={(d) => d < new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Passengers */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-500">Passengers</label>
+                  <Select value={searchSeats} onValueChange={setSearchSeats}>
+                    <SelectTrigger className="h-11 w-full min-w-[110px] bg-gray-50 border-gray-200 rounded-lg text-sm">
+                      <Users className="mr-2 h-4 w-4 text-gray-400" />
+                      <SelectValue placeholder="1" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4].map((n) => (
+                        <SelectItem key={n} value={n.toString()}>
+                          {n} {n === 1 ? "passenger" : "passengers"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search / Post Button */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-transparent select-none hidden lg:block">Go</label>
+                  <Button
+                    onClick={() => {
+                      if (!searchFrom.trim() || !searchTo.trim()) {
+                        toast.error("Please enter where you're leaving from and going to.");
+                        return;
+                      }
+                      const params = new URLSearchParams();
+                      params.set("from", searchFrom.trim());
+                      params.set("to", searchTo.trim());
+                      if (searchDate) {
+                        params.set("date", format(searchDate, "yyyy-MM-dd"));
+                      }
+                      if (searchSeats !== "1") {
+                        params.set("seats", searchSeats);
+                      }
+                      const postUrl = `/post-ride?${params.toString()}`;
+                      router.push(postUrl);
+                    }}
+                    className="h-11 w-full px-6 bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg font-semibold text-sm shadow-[0_8px_20px_rgba(0,82,255,0.25)] transition-all hover:scale-[1.02]"
+                  >
+                    <Search className="w-4 h-4 mr-2" />
+                    Post a ride
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-gray-400">
+                Use a general area like UCLA or LAX. You can share the exact meetup spot later.
+              </p>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ function LoginForm() {
     devSignIn,
   } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +34,10 @@ function LoginForm() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    const { error } = await signInWithGoogle();
+    const redirectTo = nextUrl
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
+      : undefined;
+    const { error } = await signInWithGoogle(redirectTo);
     if (error) {
       toast.error("Failed to sign in with Google");
       setIsLoading(false);
@@ -61,7 +66,7 @@ function LoginForm() {
     }
 
     // Middleware will redirect new users (no first_name) to /onboarding
-    router.push("/home");
+    router.push(nextUrl ?? "/home");
     setIsLoading(false);
   };
 
@@ -280,7 +285,7 @@ function LoginForm() {
               type="button"
               onClick={() => {
                 devSignIn();
-                router.push("/home");
+                router.push(nextUrl ?? "/home");
               }}
               className="w-full py-2 px-4 rounded-lg border border-amber-300 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
             >
@@ -312,7 +317,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <LoginForm />
+        <Suspense>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );

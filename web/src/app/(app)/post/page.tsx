@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { createRide, getRideById, updateRide } from "@/lib/services/rideService";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +36,7 @@ import {
   Music,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { AddressInput, geocodeText, type StructuredAddress } from "@/components/address-input";
 
 const SPACE_OPTIONS = [
   { value: "0", label: "No extra space needed" },
@@ -43,203 +44,6 @@ const SPACE_OPTIONS = [
   { value: "2", label: "One suitcase" },
   { value: "3", label: "Multiple or bulky items" },
 ];
-
-interface StructuredAddress {
-  formatted: string;
-  city?: string;
-  lat?: number;
-  lng?: number;
-}
-
-function FallbackAddressInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (val: string, addr?: StructuredAddress) => void;
-  placeholder: string;
-}) {
-  return (
-    <Input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="h-11 bg-white"
-    />
-  );
-}
-
-function GooglePlacesInput({
-  value,
-  onChange,
-  placeholder,
-  inputId,
-}: {
-  value: string;
-  onChange: (val: string, addr?: StructuredAddress) => void;
-  placeholder: string;
-  inputId?: string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const [isLoaded, setIsLoaded] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !!window.google?.maps?.places;
-  });
-  const [scriptRequested, setScriptRequested] = useState(false);
-  const [focused, setFocused] = useState(false);
-
-  // Load Google Maps Places script, but only after the user interacts
-  useEffect(() => {
-    if (!scriptRequested) return;
-    if (typeof window === "undefined") return;
-    if (window.google?.maps?.places) {
-      setIsLoaded(true);
-      return;
-    }
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) return;
-
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[src*="maps.googleapis.com"]',
-    );
-    if (existing) {
-      if (existing.dataset.loaded === "true") {
-        queueMicrotask(() => setIsLoaded(true));
-      } else {
-        existing.addEventListener("load", () => setIsLoaded(true), {
-          once: true,
-        });
-      }
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.dataset.loaded = "false";
-    script.onload = () => {
-      script.dataset.loaded = "true";
-      setIsLoaded(true);
-    };
-    document.head.appendChild(script);
-  }, [scriptRequested]);
-
-  // Initialize autocomplete when this input is focused and script is ready
-  // (lazy per-field so destination gets its own dropdown when focused)
-  useEffect(() => {
-    if (
-      !isLoaded ||
-      !focused ||
-      !inputRef.current ||
-      autocompleteRef.current ||
-      !window.google?.maps?.places
-    ) {
-      return;
-    }
-
-    const autocomplete = new window.google.maps.places.Autocomplete(
-      inputRef.current,
-      {
-        types: ["geocode", "establishment"],
-        fields: [
-          "formatted_address",
-          "geometry",
-          "address_components",
-          "name",
-          "types",
-        ],
-      },
-    );
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (!place.formatted_address) return;
-
-      const city = place.address_components?.find((c) =>
-        c.types.includes("locality"),
-      )?.long_name;
-
-      const isEstablishment = place.types?.some((t) =>
-        [
-          "airport",
-          "university",
-          "transit_station",
-          "establishment",
-          "point_of_interest",
-        ].includes(t),
-      );
-      const displayName =
-        isEstablishment && place.name ? place.name : place.formatted_address;
-
-      onChangeRef.current(displayName, {
-        formatted: place.formatted_address,
-        city,
-        lat: place.geometry?.location?.lat(),
-        lng: place.geometry?.location?.lng(),
-      });
-    });
-
-    autocompleteRef.current = autocomplete;
-  }, [isLoaded, focused]);
-
-  return (
-    <Input
-      ref={inputRef}
-      id={inputId}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onFocus={() => {
-        setFocused(true);
-        if (!scriptRequested) {
-          setScriptRequested(true);
-        }
-      }}
-      placeholder={placeholder}
-      className="h-11 bg-white"
-    />
-  );
-}
-
-function AddressInput(props: {
-  value: string;
-  onChange: (val: string, addr?: StructuredAddress) => void;
-  placeholder: string;
-  inputId?: string;
-}) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (apiKey && apiKey !== "your-google-maps-api-key-here") {
-    return <GooglePlacesInput {...props} />;
-  }
-  return <FallbackAddressInput {...props} />;
-}
-
-async function geocodeText(text: string): Promise<StructuredAddress | null> {
-  if (!text.trim() || !window.google?.maps) return null;
-  try {
-    const geocoder = new google.maps.Geocoder();
-    const { results } = await geocoder.geocode({ address: text });
-    if (results.length > 0) {
-      const place = results[0];
-      const city = place.address_components?.find((c) =>
-        c.types.includes("locality"),
-      )?.long_name;
-      return {
-        formatted: place.formatted_address,
-        city,
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng(),
-      };
-    }
-  } catch {
-    // Geocoding failed; coords will be null
-  }
-  return null;
-}
 
 export default function PostRidePage() {
   const router = useRouter();
@@ -250,13 +54,22 @@ export default function PostRidePage() {
   const [loadingEdit, setLoadingEdit] = useState(!!editRideId);
 
   const rideType = "seeking";
-  const [origin, setOrigin] = useState("");
+  const [origin, setOrigin] = useState(searchParams.get("from") ?? "");
   const [originAddress, setOriginAddress] =
     useState<StructuredAddress | null>(null);
-  const [destination, setDestination] = useState("");
+  const [destination, setDestination] = useState(searchParams.get("to") ?? "");
   const [destAddress, setDestAddress] =
     useState<StructuredAddress | null>(null);
-  const [date, setDate] = useState<Date | undefined>(undefined);
+
+  // Pre-fill date from search params (ISO string e.g. "2026-03-15")
+  const paramDate = searchParams.get("date");
+  const [date, setDate] = useState<Date | undefined>(() => {
+    if (paramDate) {
+      const d = new Date(paramDate + "T12:00:00");
+      return isNaN(d.getTime()) ? undefined : d;
+    }
+    return undefined;
+  });
 
   const [depHour, setDepHour] = useState("");
   const [depMinute, setDepMinute] = useState("00");
@@ -265,7 +78,10 @@ export default function PostRidePage() {
   const [tolerance, setTolerance] = useState<string>("15");
   const [customFlexibilityHours, setCustomFlexibilityHours] = useState<string>("1");
 
-  const [seatsNeeded, setSeatsNeeded] = useState("1");
+  const paramSeats = searchParams.get("seats");
+  const [seatsNeeded, setSeatsNeeded] = useState(
+    paramSeats && ["1", "2", "3", "4"].includes(paramSeats) ? paramSeats : "1"
+  );
   const [spaceCapacity, setSpaceCapacity] = useState("1");
 
   const [quietRide, setQuietRide] = useState(false);
@@ -441,7 +257,7 @@ export default function PostRidePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rideId: ride.id }),
-        }).catch(() => {});
+        }).catch(() => { });
         router.push(`/matches?ride=${ride.id}`);
       }
     } catch (err) {

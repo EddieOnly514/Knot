@@ -18,7 +18,9 @@ export async function GET(request: Request) {
                 .single();
 
             const hasName = (profileRow as { first_name: string | null } | null)?.first_name?.trim();
-            const target = hasName ? next : "/onboarding";
+            // Preserve the `next` param through onboarding so user lands on the right page after
+            const onboardingUrl = next !== "/home" ? `/onboarding?next=${encodeURIComponent(next)}` : "/onboarding";
+            const target = hasName ? next : onboardingUrl;
             return NextResponse.redirect(`${origin}${target}`);
         }
     }

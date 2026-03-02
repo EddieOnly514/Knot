@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ function SignupForm() {
     devSignIn,
   } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +33,11 @@ function SignupForm() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    const { error } = await signInWithGoogle();
+    // Pass the next URL through Google OAuth so user lands on the right page
+    const redirectTo = nextUrl
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
+      : undefined;
+    const { error } = await signInWithGoogle(redirectTo);
     if (error) {
       toast.error("Failed to sign in with Google");
       setIsLoading(false);
@@ -44,7 +50,9 @@ function SignupForm() {
 
     setIsLoading(true);
     setNeedsEmailConfirmation(false);
-    const { error: signUpError, needsEmailConfirmation: needsConfirm } = await signUpWithEmailPassword(email, password);
+    // Pass the next URL through the email confirmation redirect
+    const emailRedirectNext = nextUrl ? `/onboarding?next=${encodeURIComponent(nextUrl)}` : "/onboarding";
+    const { error: signUpError, needsEmailConfirmation: needsConfirm } = await signUpWithEmailPassword(email, password, emailRedirectNext);
     if (signUpError) {
       toast.error(signUpError.message ?? "Failed to sign up");
       setIsLoading(false);
@@ -56,11 +64,9 @@ function SignupForm() {
       return;
     }
 
-    // At this point, Supabase should have created the user and started
-    // the email verification flow in the background. We immediately move
-    // the user into onboarding so the flow stays smooth.
     toast.success("Account created. Let’s set up your profile.");
-    router.push("/onboarding");
+    const onboardingUrl = nextUrl ? `/onboarding?next=${encodeURIComponent(nextUrl)}` : "/onboarding";
+    router.push(onboardingUrl);
     setIsLoading(false);
   };
 
@@ -126,48 +132,48 @@ function SignupForm() {
           </div>
         )}
 
-          <form onSubmit={handleEmailSignUp} className="space-y-4">
-            <div className="space-y-3">
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
-                  <Mail className="w-4 h-4" />
-                </span>
-                <Input
-                  type="email"
-                  placeholder="Enter email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
-                  <Lock className="w-4 h-4" />
-                </span>
-                <Input
-                  type="password"
-                  placeholder="Enter password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
-                  disabled={isLoading}
-                />
-              </div>
+        <form onSubmit={handleEmailSignUp} className="space-y-4">
+          <div className="space-y-3">
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                <Mail className="w-4 h-4" />
+              </span>
+              <Input
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
+                disabled={isLoading}
+              />
             </div>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-zinc-400">
+                <Lock className="w-4 h-4" />
+              </span>
+              <Input
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-12 w-full rounded-full bg-white border-zinc-200 pl-10 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 md:text-sm"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
-              disabled={isLoading || !email || !password}
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              ) : null}
-              Sign up
-            </Button>
-          </form>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
+            disabled={isLoading || !email || !password}
+          >
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            ) : null}
+            Sign up
+          </Button>
+        </form>
 
         <div className="relative">
           <Separator className="bg-zinc-100" />
@@ -210,7 +216,8 @@ function SignupForm() {
           <button
             onClick={() => {
               devSignIn();
-              router.push("/home");
+              const target = nextUrl ?? "/home";
+              router.push(target);
             }}
             className="w-full mt-1 py-2 px-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
           >
@@ -241,7 +248,9 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <SignupForm />
+        <Suspense>
+          <SignupForm />
+        </Suspense>
       </div>
     </div>
   );

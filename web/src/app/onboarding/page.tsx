@@ -4,10 +4,11 @@ import {
     useState,
     useEffect,
     useRef,
+    Suspense,
     type ChangeEvent,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,9 +33,11 @@ import {
 } from "lucide-react";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
-export default function OnboardingPage() {
+function OnboardingContent() {
     const { profile, user, updateProfile, isAuthenticated, loading } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const nextUrl = searchParams.get("next");
     const [saving, setSaving] = useState(false);
 
     const [avatarUploading, setAvatarUploading] = useState(false);
@@ -70,9 +73,9 @@ export default function OnboardingPage() {
     // Redirect if already onboarded (but not while saving) — gate on first name
     useEffect(() => {
         if (!loading && !saving && profile?.first_name?.trim()) {
-            router.push("/home");
+            router.push(nextUrl ?? "/home");
         }
-    }, [loading, saving, profile, router]);
+    }, [loading, saving, profile, router, nextUrl]);
 
     const handleAvatarClick = () => {
         fileInputRef.current?.click();
@@ -168,7 +171,7 @@ export default function OnboardingPage() {
                 toast.error("Failed to save: " + (result.error.message || "Unknown error"));
             } else {
                 toast.success("Welcome to Knot! 🎉");
-                router.push("/home");
+                router.push(nextUrl ?? "/home");
             }
         } catch (err) {
             console.error("[Onboarding] Exception:", err);
@@ -379,5 +382,13 @@ export default function OnboardingPage() {
                 </p>
             </main>
         </div>
+    );
+}
+
+export default function OnboardingPage() {
+    return (
+        <Suspense>
+            <OnboardingContent />
+        </Suspense>
     );
 }

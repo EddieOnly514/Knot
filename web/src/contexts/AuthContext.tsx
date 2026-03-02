@@ -50,11 +50,12 @@ interface AuthContextType {
     loading: boolean;
     isAuthenticated: boolean;
     isNewUser: boolean;
-    signInWithGoogle: () => Promise<{ error: Error | null }>;
+    signInWithGoogle: (redirectTo?: string) => Promise<{ error: Error | null }>;
     signInWithEmail: (email: string) => Promise<{ error: Error | null }>;
     signUpWithEmailPassword: (
         email: string,
-        password: string
+        password: string,
+        emailRedirectTo?: string
     ) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
     resendEmailConfirmation: (email: string) => Promise<{ error: Error | null }>;
     signInWithEmailPassword: (
@@ -228,13 +229,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // ── Auth methods ──
 
-    const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
+    const signInWithGoogle = async (redirectTo?: string): Promise<{ error: Error | null }> => {
         if (!supabase) return { error: new Error("Auth not available") };
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: redirectTo ?? `${window.location.origin}/auth/callback`,
                 },
             });
             return { error: error || null };
@@ -313,7 +314,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signUpWithEmailPassword = async (
         email: string,
-        password: string
+        password: string,
+        emailRedirectTo?: string
     ): Promise<{ error: Error | null; needsEmailConfirmation?: boolean }> => {
         if (!supabase) return { error: new Error("Auth not available") };
         try {
@@ -321,11 +323,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 email,
                 password,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+                    emailRedirectTo: emailRedirectTo
+                        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(emailRedirectTo)}`
+                        : `${window.location.origin}/auth/callback?next=/onboarding`,
                 },
             });
             if (error) return { error };
-            // When "Confirm email" is enabled in Supabase, no session is created until the user clicks the link
             const needsEmailConfirmation = !!data?.user && !data?.session;
             return { error: null, needsEmailConfirmation };
         } catch (error) {

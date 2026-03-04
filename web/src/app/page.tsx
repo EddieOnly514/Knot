@@ -463,12 +463,12 @@ export default function LandingPage() {
 
           {/* Search Bar */}
           <div className="mt-10 lg:mt-14">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_8px_40px_rgba(15,23,42,0.10)] border border-gray-100 p-4 md:p-5">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_8px_40px_rgba(15,23,42,0.10)] border border-gray-100 p-5 md:p-7 lg:p-8">
               <p className="text-sm font-semibold text-[#0F172A] mb-3 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#0052FF]" />
-                Post a ride — tell us where you&apos;re heading
+                Post a ride now!
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto_auto] gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto_auto] gap-4 items-end">
                 {/* From */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">From</label>
@@ -477,7 +477,7 @@ export default function LandingPage() {
                     onChange={(val) => setSearchFrom(val)}
                     placeholder="Leaving from"
                     inputId="landing-from"
-                    className="h-11 bg-gray-50 border-gray-200 rounded-lg text-sm"
+                    className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm"
                   />
                 </div>
 
@@ -489,7 +489,7 @@ export default function LandingPage() {
                     onChange={(val) => setSearchTo(val)}
                     placeholder="Going to"
                     inputId="landing-to"
-                    className="h-11 bg-gray-50 border-gray-200 rounded-lg text-sm"
+                    className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm"
                   />
                 </div>
 
@@ -500,7 +500,7 @@ export default function LandingPage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="h-11 w-full min-w-[150px] justify-start bg-gray-50 border-gray-200 rounded-lg text-sm text-left font-normal"
+                        className="h-12 w-full min-w-[150px] justify-start bg-gray-50 border-gray-200 rounded-lg text-sm text-left font-normal"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
                         {searchDate
@@ -523,7 +523,7 @@ export default function LandingPage() {
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">Passengers</label>
                   <Select value={searchSeats} onValueChange={setSearchSeats}>
-                    <SelectTrigger className="h-11 w-full min-w-[110px] bg-gray-50 border-gray-200 rounded-lg text-sm">
+                    <SelectTrigger className="h-12 w-full min-w-[110px] bg-gray-50 border-gray-200 rounded-lg text-sm">
                       <Users className="mr-2 h-4 w-4 text-gray-400" />
                       <SelectValue placeholder="1" />
                     </SelectTrigger>
@@ -558,7 +558,7 @@ export default function LandingPage() {
                       const postUrl = `/post-ride?${params.toString()}`;
                       router.push(postUrl);
                     }}
-                    className="h-11 w-full px-6 bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg font-semibold text-sm shadow-[0_8px_20px_rgba(0,82,255,0.25)] transition-all hover:scale-[1.02]"
+                    className="h-12 w-full px-6 bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg font-semibold text-sm shadow-[0_8px_20px_rgba(0,82,255,0.25)] transition-all hover:scale-[1.02]"
                   >
                     <Search className="w-4 h-4 mr-2" />
                     Post a ride

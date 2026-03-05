@@ -50,7 +50,7 @@ function EmailVerificationBanner() {
         <div className="flex-1">
           <p className="font-medium">Verify your email to build trust</p>
           <p className="text-[11px] text-amber-800/90">
-            We sent a link to <span className="font-semibold">{user.email}</span>. Verifying
+            We sent a link to <span className="font-semibold">{user?.email}</span>. Verifying
             helps your matches feel safer messaging and riding with you.
           </p>
         </div>

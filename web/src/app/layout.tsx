@@ -59,7 +59,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.variable} font-sans antialiased bg-background`}>
+      <body suppressHydrationWarning className={`${inter.variable} font-sans antialiased bg-background`}>
         <Providers>{children}</Providers>
       </body>
     </html>

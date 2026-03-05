@@ -35,6 +35,8 @@ import {
   sendMatchRequest,
   collapseMatchesIntoItems,
   getMyRequests,
+  respondToRequest,
+  withdrawRequest,
   type RideRequest,
 } from "@/lib/services/matchService";
 import { getMyRides } from "@/lib/services/rideService";
@@ -652,6 +654,8 @@ function MatchesContent() {
   const [sortKey, setSortKey] = useState<SortKey>("best");
   const [detailItem, setDetailItem] = useState<MatchItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
   const loadMatches = useCallback(async () => {
     if (authLoading) return;
@@ -723,8 +727,8 @@ function MatchesContent() {
         err instanceof Error
           ? err.message
           : (err as { message?: string })?.message ??
-            (err as { error_description?: string })?.error_description ??
-            JSON.stringify(err);
+          (err as { error_description?: string })?.error_description ??
+          JSON.stringify(err);
       const code = (err as { code?: string })?.code;
       console.error("Failed to load matches:", code ? `[${code}] ${message}` : message, err);
       setError("load_failed");
@@ -760,6 +764,75 @@ function MatchesContent() {
       ),
     [requests],
   );
+
+  // Outgoing requests that are still pending
+  const allOutgoingRequests = useMemo(
+    () =>
+      requests.filter(
+        (r) =>
+          r.direction === "outgoing" &&
+          r.status === "pending" &&
+          r.ride_status !== "completed",
+      ),
+    [requests],
+  );
+
+  const handleRespond = async (
+    requestId: string,
+    response: "accepted" | "rejected",
+  ) => {
+    setRespondingId(requestId);
+    try {
+      await respondToRequest(requestId, response);
+      if (response === "accepted") {
+        toast.success("Request accepted! Starting chat...");
+        // Fire email notification (best-effort)
+        fetch("/api/notify/match-accepted", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId }),
+        }).catch(() => { });
+        router.push("/messages?refresh=1");
+      } else {
+        toast.success("Request declined");
+      }
+      // Refresh requests and matches
+      if (profile) {
+        const myRequests = await getMyRequests(profile.id);
+        setRequests(myRequests);
+      }
+      loadMatches();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to respond";
+      console.error("Respond error:", message, err);
+      const friendlyMessage =
+        typeof message === "string" && message.includes("ride_match_cap_exceeded")
+          ? "Reached max ride limit. Group can have at most 4 people."
+          : message || "Failed to respond to request";
+      toast.error(friendlyMessage);
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
+  const handleWithdraw = async (requestId: string) => {
+    setWithdrawingId(requestId);
+    try {
+      await withdrawRequest(requestId);
+      toast.success("Request withdrawn");
+      if (profile) {
+        const myRequests = await getMyRequests(profile.id);
+        setRequests(myRequests);
+      }
+      loadMatches();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to withdraw";
+      console.error("Withdraw error:", message, err);
+      toast.error(message || "Failed to withdraw request");
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
 
   const getScoreMatch = (item: MatchItem): PotentialMatch =>
     item.kind === "single" ? item.match : item.primaryMatch;
@@ -837,7 +910,7 @@ function MatchesContent() {
     );
   }
 
-  if (matchItems.length === 0 && allIncomingRequests.length === 0) {
+  if (matchItems.length === 0 && allIncomingRequests.length === 0 && allOutgoingRequests.length === 0) {
     return (
       <div className="py-16 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
@@ -898,50 +971,116 @@ function MatchesContent() {
         </div>
       </div>
 
-      {/* Ride requests (incoming) — show all so they appear in Matches as well as Home */}
+      {/* ── Incoming Ride Requests — with inline Accept / Reject ── */}
       {allIncomingRequests.length > 0 && (
         <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-zinc-900">
-                Ride requests
-              </h2>
-              <Badge className="border-0 bg-blue-600/90 text-xs font-medium text-white">
-                {allIncomingRequests.length} pending
-              </Badge>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full border-blue-200 text-xs"
-              onClick={() => router.push("/home")}
-            >
-              Manage on Home
-            </Button>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-zinc-900">
+              Incoming Requests
+            </h2>
+            <Badge className="border-0 bg-blue-600/90 text-xs font-medium text-white">
+              {allIncomingRequests.length} pending
+            </Badge>
           </div>
           <div className="space-y-2">
             {allIncomingRequests.map((inv) => (
               <div
                 key={inv.id}
-                className="flex items-center gap-3 rounded-lg bg-white/80 px-3 py-2 text-xs text-zinc-700"
+                className="rounded-lg bg-white/80 px-3 py-3 text-xs text-zinc-700 shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarImage src={inv.requester_photo || undefined} />
+                    <AvatarFallback className="bg-blue-50 text-xs font-medium text-blue-600">
+                      {inv.requester_name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-zinc-900">
+                      {inv.requester_name} wants to ride with you
+                    </p>
+                    <p className="truncate text-[11px] text-zinc-500">
+                      {inv.requester_origin} → {inv.requester_dest}
+                    </p>
+                    <p className="truncate text-[11px] text-zinc-400">
+                      For your {inv.my_ride_origin} → {inv.my_ride_dest} ride
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-full text-xs border-zinc-300 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                    onClick={() => handleRespond(inv.id, "rejected")}
+                    disabled={respondingId === inv.id}
+                  >
+                    {respondingId === inv.id ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : null}
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 rounded-full bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
+                    onClick={() => handleRespond(inv.id, "accepted")}
+                    disabled={respondingId === inv.id}
+                  >
+                    {respondingId === inv.id ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : null}
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Outgoing Requests — with Withdraw ── */}
+      {allOutgoingRequests.length > 0 && (
+        <section className="rounded-lg border border-amber-100 bg-amber-50/60 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-zinc-900">
+              Your Pending Requests
+            </h2>
+            <Badge className="border-0 bg-amber-600/90 text-xs font-medium text-white">
+              {allOutgoingRequests.length} sent
+            </Badge>
+          </div>
+          <div className="space-y-2">
+            {allOutgoingRequests.map((req) => (
+              <div
+                key={req.id}
+                className="flex items-center gap-3 rounded-lg bg-white/80 px-3 py-2.5 text-xs text-zinc-700 shadow-sm"
               >
                 <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src={inv.requester_photo || undefined} />
-                  <AvatarFallback className="bg-blue-50 text-xs font-medium text-blue-600">
-                    {inv.requester_name[0]}
+                  <AvatarImage src={req.requester_photo || undefined} />
+                  <AvatarFallback className="bg-amber-50 text-xs font-medium text-amber-600">
+                    {req.requester_name[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-zinc-900">
-                    {inv.requester_name} invited you
+                    Requested {req.requester_name}
                   </p>
                   <p className="truncate text-[11px] text-zinc-500">
-                    {inv.requester_origin} → {inv.requester_dest}
-                  </p>
-                  <p className="truncate text-[11px] text-zinc-400">
-                    For your {inv.my_ride_origin} → {inv.my_ride_dest} ride
+                    {req.requester_origin} → {req.requester_dest}
                   </p>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-full text-[11px] border-zinc-300 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  onClick={() => handleWithdraw(req.id)}
+                  disabled={withdrawingId === req.id}
+                >
+                  {withdrawingId === req.id ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : null}
+                  Withdraw
+                </Button>
               </div>
             ))}
           </div>

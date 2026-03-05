@@ -48,10 +48,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-900">
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50/40 via-zinc-50 to-zinc-100/60 text-zinc-900">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 md:my-4 md:rounded-2xl md:border md:border-zinc-200/60 md:bg-white md:shadow-[0_2px_12px_0_rgba(0,0,0,0.04)] md:overflow-hidden">
         <SidebarNav />
-        <main className="app-main flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-14 md:px-10 md:pt-10">
+        <main className="app-main flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-white px-4 pt-14 md:px-10 md:pt-8">
           {children}
         </main>
       </div>

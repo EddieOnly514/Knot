@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,8 +16,10 @@ import { getConversations } from "@/lib/services/chatService";
 import type { Conversation } from "@/lib/services/chatService";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
-const CONVERSATION_CACHE_TTL_MS = 60_000;
+const CONVERSATION_CACHE_TTL_MS = 30_000; // 30s — show stale then refresh in background
 const conversationsCache = new Map<
   string,
   { fetchedAt: number; data: Conversation[] }
@@ -46,6 +48,7 @@ export default function MessagesPage() {
     : undefined;
   // When arriving from "accept request" we pass ?refresh=1 to force fresh list (1:1 → group)
   const forceRefresh = searchParams.get("refresh") === "1";
+  const hasCachedData = !!cachedConversations?.data?.length;
   const cacheIsValid =
     !forceRefresh &&
     !!profile &&
@@ -53,44 +56,143 @@ export default function MessagesPage() {
     Date.now() - cachedConversations.fetchedAt < CONVERSATION_CACHE_TTL_MS;
 
   const [conversations, setConversations] = useState<Conversation[]>(
-    cacheIsValid ? cachedConversations!.data : [],
+    hasCachedData ? cachedConversations!.data : [],
   );
-  const [loading, setLoading] = useState(!cacheIsValid || forceRefresh);
+  // Show spinner only if no cached data at all
+  const [loading, setLoading] = useState(!hasCachedData);
   const [query, setQuery] = useState("");
+  // Track which conversation IDs just received a new message for pulse animation
+  const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set());
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  useEffect(() => {
-    if (!profile || !cacheIsValid || !cachedConversations) return;
-    setConversations(cachedConversations.data);
-    setLoading(false);
-  }, [profile, cacheIsValid, cachedConversations]);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        if (forceRefresh && profile?.id) {
-          conversationsCache.delete(profile.id);
-        }
-        const data = await getConversations(profile?.id);
-        setConversations(data);
-        if (profile?.id) {
-          conversationsCache.set(profile.id, {
-            fetchedAt: Date.now(),
-            data,
-          });
-        }
-        if (forceRefresh) {
-          router.replace("/messages", { scroll: false });
-        }
-      } catch (err) {
-        console.error("Failed to load conversations:", err);
-      } finally {
-        setLoading(false);
+  // Load conversations — shows cached data instantly, refreshes in background
+  const loadConversations = useCallback(async (showSpinner = false) => {
+    if (!profile) return;
+    if (showSpinner) setLoading(true);
+    try {
+      if (forceRefresh) {
+        conversationsCache.delete(profile.id);
       }
-    }
-    if (profile) {
-      load();
+      const data = await getConversations(profile.id);
+      setConversations(data);
+      conversationsCache.set(profile.id, {
+        fetchedAt: Date.now(),
+        data,
+      });
+      if (forceRefresh) {
+        router.replace("/messages", { scroll: false });
+      }
+    } catch (err) {
+      console.error("Failed to load conversations:", err);
+    } finally {
+      setLoading(false);
     }
   }, [profile, forceRefresh, router]);
+
+  // Initial load
+  useEffect(() => {
+    if (!profile) return;
+    // Always refresh in background; only show spinner if no cached data
+    loadConversations(!hasCachedData || forceRefresh);
+  }, [profile, forceRefresh, hasCachedData, loadConversations]);
+
+  // ── Realtime: subscribe to ALL new messages and update conversations in-place ──
+  useEffect(() => {
+    if (!profile) return;
+
+    const supabase = getSupabaseClientOrThrow();
+
+    const channel = supabase
+      .channel("messages-list-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const newMsg = payload.new as {
+            id: string;
+            conversation_id: string | null;
+            ride_group_id: string | null;
+            content: string;
+            message_type: string;
+            sender_id: string;
+            created_at: string;
+          };
+
+          const convKey = newMsg.conversation_id ?? newMsg.ride_group_id;
+          if (!convKey) return;
+
+          // Format the display content
+          let displayContent = newMsg.content;
+          if (newMsg.message_type === "quick_action") {
+            displayContent = `⚡ ${newMsg.content}`;
+          } else if (newMsg.message_type === "location") {
+            displayContent = "📍 Shared a location";
+          }
+
+          const isFromMe = newMsg.sender_id === profile.id;
+
+          setConversations((prev) => {
+            const idx = prev.findIndex((c) => c.id === convKey);
+            if (idx === -1) {
+              // New conversation we don't know about yet — do a full refresh
+              loadConversations(false);
+              return prev;
+            }
+
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              last_message: displayContent,
+              last_message_at: newMsg.created_at,
+              unread_count: isFromMe
+                ? updated[idx].unread_count
+                : updated[idx].unread_count + 1,
+            };
+
+            // Re-sort: most recent message first
+            updated.sort((a, b) => {
+              const t1 = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+              const t2 = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+              return t2 - t1;
+            });
+
+            // Update cache
+            if (profile.id) {
+              conversationsCache.set(profile.id, {
+                fetchedAt: Date.now(),
+                data: updated,
+              });
+            }
+
+            return updated;
+          });
+
+          // Pulse animation for the updated conversation
+          if (!isFromMe) {
+            setRecentlyUpdated((prev) => new Set(prev).add(convKey));
+            setTimeout(() => {
+              setRecentlyUpdated((prev) => {
+                const next = new Set(prev);
+                next.delete(convKey);
+                return next;
+              });
+            }, 2000);
+          }
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [profile, loadConversations]);
 
   const activeConversations = conversations.filter(
     (conv) =>
@@ -114,6 +216,10 @@ export default function MessagesPage() {
   }, [activeConversations, query]);
 
   const goToChat = (conv: Conversation) => {
+    // Mark as read locally so we don't flash the old unread count when coming back
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
+    );
     router.push(`/messages/${conv.id}${conv.is_group ? "?group=1" : ""}`);
   };
 
@@ -170,7 +276,12 @@ export default function MessagesPage() {
               <button
                 key={conv.id}
                 type="button"
-                className="w-full min-h-[72px] rounded-xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition-shadow hover:shadow-md active:bg-zinc-50 touch-manipulation"
+                className={[
+                  "w-full min-h-[72px] rounded-xl border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:shadow-md active:bg-zinc-50 touch-manipulation",
+                  recentlyUpdated.has(conv.id)
+                    ? "border-blue-300 ring-2 ring-blue-100"
+                    : "border-zinc-200",
+                ].join(" ")}
                 onClick={() => goToChat(conv)}
               >
                 <div className="flex items-center gap-3">
@@ -209,7 +320,7 @@ export default function MessagesPage() {
                     </div>
                     <p
                       className={[
-                        "mt-1 truncate text-sm",
+                        "mt-1 truncate text-sm transition-colors duration-300",
                         conv.unread_count > 0
                           ? "font-medium text-zinc-900"
                           : "text-zinc-500",

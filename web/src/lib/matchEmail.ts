@@ -2,7 +2,11 @@ import { Resend } from "resend";
 
 /**
  * Match-related transactional emails via Resend.
- * Requires RESEND_API_KEY. Uses same from-address pattern as waitlist.
+ * Requires RESEND_API_KEY. Uses MATCH_FROM_EMAIL or WAITLIST_FROM_EMAIL for sender.
+ *
+ * IMPORTANT: The default "onboarding@resend.dev" is Resend's sandbox domain
+ * which ONLY delivers to the Resend account owner's email address.
+ * Set MATCH_FROM_EMAIL (e.g. "Knot <notifications@knot.app>") for production use.
  */
 function getResendClient(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -10,7 +14,24 @@ function getResendClient(): Resend | null {
   return new Resend(key);
 }
 
-const DEFAULT_FROM = "Knot <onboarding@resend.dev>";
+const RESEND_SANDBOX_FROM = "Knot <onboarding@resend.dev>";
+
+function getFromAddress(): string {
+  // Prefer MATCH_FROM_EMAIL, then WAITLIST_FROM_EMAIL, then sandbox fallback
+  const from = process.env.MATCH_FROM_EMAIL
+    ?? process.env.WAITLIST_FROM_EMAIL
+    ?? RESEND_SANDBOX_FROM;
+
+  if (from === RESEND_SANDBOX_FROM) {
+    console.warn(
+      "[matchEmail] ⚠ Using Resend sandbox sender (onboarding@resend.dev). " +
+      "Emails will ONLY be delivered to the Resend account owner. " +
+      "Set MATCH_FROM_EMAIL env var to a verified domain sender for production."
+    );
+  }
+
+  return from;
+}
 
 export async function sendMatchAcceptedEmail(
   to: string,
@@ -19,10 +40,11 @@ export async function sendMatchAcceptedEmail(
 ): Promise<{ ok: boolean; error?: string }> {
   const resend = getResendClient();
   if (!resend) {
+    console.error("[matchEmail] RESEND_API_KEY not set — cannot send match accepted email");
     return { ok: false, error: "RESEND_API_KEY not set" };
   }
 
-  const from = process.env.WAITLIST_FROM_EMAIL ?? DEFAULT_FROM;
+  const from = getFromAddress();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://knot.app";
   const subject = `You're matched with ${otherName} on Knot`;
   const html = `
@@ -56,10 +78,14 @@ export async function sendMatchAcceptedEmail(
 
   try {
     const { error } = await resend.emails.send({ from, to: [to], subject, html });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      console.error(`[matchEmail] Failed to send match-accepted email to ${to}:`, error.message);
+      return { ok: false, error: error.message };
+    }
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to send email";
+    console.error(`[matchEmail] Exception sending match-accepted email to ${to}:`, message);
     return { ok: false, error: message };
   }
 }
@@ -71,10 +97,11 @@ export async function sendSuggestedMatchesEmail(
 ): Promise<{ ok: boolean; error?: string }> {
   const resend = getResendClient();
   if (!resend) {
+    console.error("[matchEmail] RESEND_API_KEY not set — cannot send suggested matches email");
     return { ok: false, error: "RESEND_API_KEY not set" };
   }
 
-  const from = process.env.WAITLIST_FROM_EMAIL ?? DEFAULT_FROM;
+  const from = getFromAddress();
   const url = appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://knot.app";
   const subject = count === 1 ? "You have 1 suggested match on Knot" : `You have ${count} suggested matches on Knot`;
   const html = `
@@ -102,10 +129,15 @@ export async function sendSuggestedMatchesEmail(
 
   try {
     const { error } = await resend.emails.send({ from, to: [to], subject, html });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      console.error(`[matchEmail] Failed to send suggested-matches email to ${to}:`, error.message);
+      return { ok: false, error: error.message };
+    }
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to send email";
+    console.error(`[matchEmail] Exception sending suggested-matches email to ${to}:`, message);
     return { ok: false, error: message };
   }
 }
+

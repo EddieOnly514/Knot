@@ -497,7 +497,7 @@ export default function HomePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestId }),
-        }).catch(() => {});
+        }).catch(() => { });
         router.push("/messages?refresh=1");
       } else {
         toast.success("Request declined");
@@ -611,17 +611,26 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
-            {timeGreeting}{profile?.first_name ? `, ${profile.first_name}` : ""}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Ready to find your next travel companion?
-          </p>
+      {/* ── Header with avatar greeting  ── */}
+      <section className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-11 w-11 shrink-0">
+            <AvatarImage src={profile?.photo_url || undefined} />
+            <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+              {profile?.first_name?.[0] || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
+              {timeGreeting}{profile?.first_name ? `, ${profile.first_name}` : ""}
+            </h1>
+            <p className="text-sm text-zinc-500">
+              Ready for your next shared journey?
+            </p>
+          </div>
         </div>
         <Button
-          className="h-12 min-h-[44px] w-full rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 touch-manipulation md:h-11 md:w-auto"
+          className="h-11 min-h-[44px] shrink-0 rounded-full bg-[#0052FF] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#0045DD] touch-manipulation"
           onClick={() => router.push("/post")}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -631,41 +640,41 @@ export default function HomePage() {
 
       {/* Stats */}
       <section className="grid gap-3 md:grid-cols-3">
-        <Card className="border-zinc-200 bg-white">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="border-zinc-200/80 bg-white">
+          <CardContent className="flex items-center justify-between p-5">
             <div>
-              <p className="text-xs font-medium text-zinc-500">Total Saved (estimated)</p>
-              <p className="mt-1 text-xl font-semibold text-zinc-900">
+              <p className="text-xs font-medium text-zinc-500">Total Saved</p>
+              <p className="mt-1 text-xl font-bold text-zinc-900">
                 ${totalSaved.toFixed(2)}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
               <TrendingUp className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-zinc-200 bg-white">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="border-zinc-200/80 bg-white">
+          <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-xs font-medium text-zinc-500">Rides Shared</p>
-              <p className="mt-1 text-xl font-semibold text-zinc-900">
+              <p className="mt-1 text-xl font-bold text-zinc-900">
                 {ridesShared} {ridesShared === 1 ? "Trip" : "Trips"}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
               <Car className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-zinc-200 bg-white">
-          <CardContent className="flex items-center justify-between p-4">
+        <Card className="border-zinc-200/80 bg-white">
+          <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-xs font-medium text-zinc-500">CO2 Reduced</p>
-              <p className="mt-1 text-xl font-semibold text-zinc-900">
+              <p className="mt-1 text-xl font-bold text-zinc-900">
                 {co2ReducedPpm.toFixed(0)} ppm
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
               <Leaf className="h-5 w-5" />
             </div>
           </CardContent>
@@ -694,16 +703,24 @@ export default function HomePage() {
         )}
 
         {!loadingRides && !loadingRequests && activeRideCount === 0 && (
-          <Card className="border-zinc-200 bg-white">
-            <CardContent className="p-6">
-              <p className="text-sm font-medium text-zinc-900">
-                No requested rides
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Post a ride to start matching with travelers.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/30 p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100">
+              <Navigation className="h-6 w-6 text-zinc-400" />
+            </div>
+            <p className="text-sm font-semibold text-zinc-900">
+              No active requests
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              You haven't requested any rides yet. Find a commuter headed your way!
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
+              onClick={() => router.push("/matches")}
+            >
+              Browse Rides
+            </Button>
+          </div>
         )}
 
         {!loadingRides && !loadingRequests && activeRides.length > 0 && (
@@ -870,101 +887,230 @@ export default function HomePage() {
         )}
 
         {!loadingMatches && suggestedMatches.length === 0 && (
-          <Card className="border-zinc-200 bg-white">
-            <CardContent className="p-6">
-              <p className="text-sm font-medium text-zinc-900">
-                No suggested matches yet
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Post a ride or check back soon — we’ll surface top matches here.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/30 p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100">
+              <Users className="h-6 w-6 text-zinc-400" />
+            </div>
+            <p className="text-sm font-semibold text-zinc-900">
+              Looking for matches…
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Update your preferences or post a new route to see community members near you.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
+              onClick={() => router.push("/post")}
+            >
+              Edit Preferences
+            </Button>
+          </div>
         )}
 
         {!loadingMatches && suggestedMatches.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {suggestedMatches.map((item) => {
-              const match = item.kind === "single" ? item.match : item.primaryMatch;
-              const targetRideId = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
-              const matchPct = Math.max(0, Math.min(100, Math.round(match.total_score)));
-              const key = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
-              return (
-                <SuggestedMatchCard
-                  key={key}
-                  match={match}
-                  matchPct={matchPct}
-                  groupSize={item.kind === "group" ? item.groupSize : undefined}
-                  requesting={requestingMatchRideId === targetRideId}
-                  onConnect={() => handleConnect(targetRideId)}
-                  onViewProfile={() => router.push(`/profile/${match.user_id}`)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {suggestedMatches.map((item) => {
+        const match = item.kind === "single" ? item.match : item.primaryMatch;
+        const targetRideId = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
+        const matchPct = Math.max(0, Math.min(100, Math.round(match.total_score)));
+        const key = item.kind === "single" ? item.match.ride_id : item.groupHostRideId;
+        return (
+          <SuggestedMatchCard
+            key={key}
+            match={match}
+            matchPct={matchPct}
+            groupSize={item.kind === "group" ? item.groupSize : undefined}
+            requesting={requestingMatchRideId === targetRideId}
+            onConnect={() => handleConnect(targetRideId)}
+            onViewProfile={() => router.push(`/profile/${match.user_id}`)}
+          />
+        );
+      })}
+    </div>
+  )
+}
+      </section >
 
-      {/* Pending requests (sent) — requests I sent waiting for response */}
-      {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-zinc-900">
-                Pending requests
-              </h2>
-              <Badge className="border-0 bg-amber-50 text-xs font-medium text-amber-700">
-                {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length} sent
-              </Badge>
-            </div>
-          </div>
-          {requests
-            .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
-            .map((req) => (
-            <Card
-              key={req.id}
-              className="cursor-pointer border border-amber-200/80 bg-white transition-shadow hover:shadow-md"
-              onClick={() => setRideRequestDetail(req)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    className="h-10 w-10 shrink-0 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/profile/${req.requester_profile_id}`);
-                    }}
-                  >
-                    <AvatarImage src={req.requester_photo || undefined} />
-                    <AvatarFallback className="bg-amber-50 text-sm font-medium text-amber-600">
-                      {req.requester_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
+  {/* Pending requests (sent) — requests I sent waiting for response */ }
+{
+  requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-zinc-900">
+            Pending requests
+          </h2>
+          <Badge className="border-0 bg-amber-50 text-xs font-medium text-amber-700">
+            {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length} sent
+          </Badge>
+        </div>
+      </div>
+      {requests
+        .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
+        .map((req) => (
+          <Card
+            key={req.id}
+            className="cursor-pointer border border-amber-200/80 bg-white transition-shadow hover:shadow-md"
+            onClick={() => setRideRequestDetail(req)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  className="h-10 w-10 shrink-0 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/profile/${req.requester_profile_id}`);
+                  }}
+                >
+                  <AvatarImage src={req.requester_photo || undefined} />
+                  <AvatarFallback className="bg-amber-50 text-sm font-medium text-amber-600">
+                    {req.requester_name[0]}
+                  </AvatarFallback>
+                </Avatar>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-zinc-900">
-                        {req.requester_name}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-zinc-900">
+                      {req.requester_name}
+                    </span>
+                    {req.requester_school && (
+                      <span className="text-xs text-zinc-500">
+                        {req.requester_school}
                       </span>
-                      {req.requester_school && (
-                        <span className="text-xs text-zinc-500">
-                          {req.requester_school}
-                        </span>
-                      )}
+                    )}
+                    <Badge
+                      variant="outline"
+                      className="border-amber-200 text-xs text-amber-700"
+                    >
+                      <Clock className="mr-1 h-3 w-3" />
+                      Pending
+                    </Badge>
+                  </div>
+                  <p className="truncate text-xs text-zinc-500">
+                    {req.requester_origin} → {req.requester_dest}
+                  </p>
+                </div>
+
+                <div className="flex flex-shrink-0 items-center gap-2 sm:gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-10 min-h-[44px] rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0"
+                    onClick={() => handleWithdraw(req.id)}
+                    disabled={withdrawingRequestId === req.id}
+                  >
+                    {withdrawingRequestId === req.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <>
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Withdraw
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+    </section>
+  )
+}
+
+{/* Ride requests — incoming pending (others requested me) */ }
+{
+  requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-zinc-900">
+            Ride requests
+          </h2>
+          <Badge className="border-0 bg-blue-50 text-xs font-medium text-blue-700">
+            {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length} pending
+          </Badge>
+        </div>
+      </div>
+      {requests
+        .filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed")
+        .map((req) => (
+          <Card
+            key={req.id}
+            className="cursor-pointer border border-blue-200 bg-white transition-shadow hover:shadow-md"
+            onClick={() => setRideRequestDetail(req)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Avatar
+                  className="h-10 w-10 shrink-0 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/profile/${req.requester_profile_id}`);
+                  }}
+                >
+                  <AvatarImage src={req.requester_photo || undefined} />
+                  <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
+                    {req.requester_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-zinc-900">
+                      {req.requester_name}
+                    </span>
+                    {req.requester_school && (
+                      <span className="text-xs text-zinc-500">
+                        {req.requester_school}
+                      </span>
+                    )}
+                    {req.direction === "outgoing" && (
                       <Badge
                         variant="outline"
-                        className="border-amber-200 text-xs text-amber-700"
+                        className="border-zinc-200 text-xs"
                       >
-                        <Clock className="mr-1 h-3 w-3" />
-                        Pending
+                        <Send className="mr-1 h-3 w-3" />
+                        Sent
                       </Badge>
-                    </div>
-                    <p className="truncate text-xs text-zinc-500">
-                      {req.requester_origin} → {req.requester_dest}
-                    </p>
+                    )}
                   </div>
+                  <p className="truncate text-xs text-zinc-500">
+                    {req.requester_origin} → {req.requester_dest}
+                  </p>
+                </div>
 
+                {/* Actions */}
+                {req.direction === "incoming" && (
                   <div className="flex flex-shrink-0 items-center gap-2 sm:gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      className="h-10 min-h-[44px] flex-1 rounded-lg px-3 bg-blue-600 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
+                      onClick={() => handleRespond(req.id, "accepted")}
+                      disabled={respondingId === req.id}
+                    >
+                      {respondingId === req.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="mr-1 h-3 w-3" />
+                          Accept
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-10 min-h-[44px] flex-1 rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
+                      onClick={() => handleRespond(req.id, "rejected")}
+                      disabled={respondingId === req.id}
+                    >
+                      <XCircle className="mr-1 h-3 w-3" />
+                      Decline
+                    </Button>
+                  </div>
+                )}
+                {req.direction === "outgoing" && (
+                  <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       variant="outline"
@@ -977,297 +1123,181 @@ export default function HomePage() {
                       ) : (
                         <>
                           <XCircle className="mr-1 h-3 w-3" />
-                          Withdraw
+                          Remove
                         </>
                       )}
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-      )}
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+    </section>
+  )
+}
 
-      {/* Ride requests — incoming pending (others requested me) */}
-      {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-zinc-900">
-                Ride requests
-              </h2>
-              <Badge className="border-0 bg-blue-50 text-xs font-medium text-blue-700">
-                {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length} pending
-              </Badge>
+{/* Ride request detail dialog — view ride preference, time, etc. */ }
+<Dialog open={!!rideRequestDetail} onOpenChange={(open) => !open && setRideRequestDetail(null)}>
+  <DialogContent showCloseButton={true} className="max-w-md">
+    {rideRequestDetail && (
+      <>
+        <DialogHeader>
+          <DialogTitle>
+            {rideRequestDetail.direction === "outgoing"
+              ? "Request sent"
+              : "Ride request"}
+          </DialogTitle>
+          <DialogDescription>
+            {rideRequestDetail.direction === "outgoing"
+              ? "Details of the ride you requested to match with"
+              : "Details of the incoming request"}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={rideRequestDetail.requester_photo || undefined} />
+              <AvatarFallback className="bg-blue-50 text-base font-medium text-blue-600">
+                {rideRequestDetail.requester_name[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-zinc-900">
+                {rideRequestDetail.requester_name}
+              </p>
+              {rideRequestDetail.requester_school && (
+                <p className="text-xs text-zinc-500">{rideRequestDetail.requester_school}</p>
+              )}
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
+                <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                {rideRequestDetail.requester_rating.toFixed(1)} rating
+              </div>
             </div>
           </div>
-          {requests
-            .filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed")
-            .map((req) => (
-            <Card
-              key={req.id}
-              className="cursor-pointer border border-blue-200 bg-white transition-shadow hover:shadow-md"
-              onClick={() => setRideRequestDetail(req)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    className="h-10 w-10 shrink-0 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/profile/${req.requester_profile_id}`);
-                    }}
-                  >
-                    <AvatarImage src={req.requester_photo || undefined} />
-                    <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
-                      {req.requester_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-zinc-900">
-                        {req.requester_name}
-                      </span>
-                      {req.requester_school && (
-                        <span className="text-xs text-zinc-500">
-                          {req.requester_school}
-                        </span>
-                      )}
-                      {req.direction === "outgoing" && (
-                        <Badge
-                          variant="outline"
-                          className="border-zinc-200 text-xs"
-                        >
-                          <Send className="mr-1 h-3 w-3" />
-                          Sent
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="truncate text-xs text-zinc-500">
-                      {req.requester_origin} → {req.requester_dest}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  {req.direction === "incoming" && (
-                    <div className="flex flex-shrink-0 items-center gap-2 sm:gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        className="h-10 min-h-[44px] flex-1 rounded-lg px-3 bg-blue-600 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
-                        onClick={() => handleRespond(req.id, "accepted")}
-                        disabled={respondingId === req.id}
-                      >
-                        {respondingId === req.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <>
-                            <Check className="mr-1 h-3 w-3" />
-                            Accept
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-10 min-h-[44px] flex-1 rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
-                        onClick={() => handleRespond(req.id, "rejected")}
-                        disabled={respondingId === req.id}
-                      >
-                        <XCircle className="mr-1 h-3 w-3" />
-                        Decline
-                      </Button>
-                    </div>
-                  )}
-                  {req.direction === "outgoing" && (
-                    <div className="flex flex-shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-10 min-h-[44px] rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0"
-                        onClick={() => handleWithdraw(req.id)}
-                        disabled={withdrawingRequestId === req.id}
-                      >
-                        {withdrawingRequestId === req.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <>
-                            <XCircle className="mr-1 h-3 w-3" />
-                            Remove
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-      )}
-
-      {/* Ride request detail dialog — view ride preference, time, etc. */}
-      <Dialog open={!!rideRequestDetail} onOpenChange={(open) => !open && setRideRequestDetail(null)}>
-        <DialogContent showCloseButton={true} className="max-w-md">
-          {rideRequestDetail && (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {rideRequestDetail.direction === "outgoing"
-                    ? "Request sent"
-                    : "Ride request"}
-                </DialogTitle>
-                <DialogDescription>
-                  {rideRequestDetail.direction === "outgoing"
-                    ? "Details of the ride you requested to match with"
-                    : "Details of the incoming request"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={rideRequestDetail.requester_photo || undefined} />
-                    <AvatarFallback className="bg-blue-50 text-base font-medium text-blue-600">
-                      {rideRequestDetail.requester_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-zinc-900">
-                      {rideRequestDetail.requester_name}
-                    </p>
-                    {rideRequestDetail.requester_school && (
-                      <p className="text-xs text-zinc-500">{rideRequestDetail.requester_school}</p>
-                    )}
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {rideRequestDetail.requester_rating.toFixed(1)} rating
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Navigation className="h-4 w-4 shrink-0 text-blue-500" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Route</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {rideRequestDetail.requester_origin} → {rideRequestDetail.requester_dest}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4 shrink-0 text-zinc-400" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Time</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {rideRequestDetail.requester_departure
-                          ? formatMatchTime(rideRequestDetail.requester_departure)
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 shrink-0 text-zinc-400" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Party size</p>
-                      <p className="text-sm font-medium text-zinc-900">
-                        {rideRequestDetail.requester_seats}{" "}
-                        {rideRequestDetail.requester_seats === 1 ? "person" : "people"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Navigation className="h-4 w-4 shrink-0 text-blue-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Route</p>
+                <p className="text-sm font-medium text-zinc-900">
+                  {rideRequestDetail.requester_origin} → {rideRequestDetail.requester_dest}
+                </p>
               </div>
-              <DialogFooter className="flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => {
-                    setRideRequestDetail(null);
-                    router.push(`/profile/${rideRequestDetail.requester_profile_id}`);
-                  }}
-                >
-                  View full profile
-                </Button>
-                {rideRequestDetail.direction === "incoming" && (
+            </div>
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 shrink-0 text-zinc-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Time</p>
+                <p className="text-sm font-medium text-zinc-900">
+                  {rideRequestDetail.requester_departure
+                    ? formatMatchTime(rideRequestDetail.requester_departure)
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 shrink-0 text-zinc-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Party size</p>
+                <p className="text-sm font-medium text-zinc-900">
+                  {rideRequestDetail.requester_seats}{" "}
+                  {rideRequestDetail.requester_seats === 1 ? "person" : "people"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => {
+              setRideRequestDetail(null);
+              router.push(`/profile/${rideRequestDetail.requester_profile_id}`);
+            }}
+          >
+            View full profile
+          </Button>
+          {rideRequestDetail.direction === "incoming" && (
+            <>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto border-zinc-200 text-zinc-600"
+                onClick={() => {
+                  handleRespond(rideRequestDetail.id, "rejected");
+                  setRideRequestDetail(null);
+                }}
+                disabled={respondingId === rideRequestDetail.id}
+              >
+                <XCircle className="mr-1 h-3 w-3" />
+                Decline
+              </Button>
+              <Button
+                className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
+                onClick={() => {
+                  handleRespond(rideRequestDetail.id, "accepted");
+                  setRideRequestDetail(null);
+                }}
+                disabled={respondingId === rideRequestDetail.id}
+              >
+                {respondingId === rideRequestDetail.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
                   <>
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-auto border-zinc-200 text-zinc-600"
-                      onClick={() => {
-                        handleRespond(rideRequestDetail.id, "rejected");
-                        setRideRequestDetail(null);
-                      }}
-                      disabled={respondingId === rideRequestDetail.id}
-                    >
-                      <XCircle className="mr-1 h-3 w-3" />
-                      Decline
-                    </Button>
-                    <Button
-                      className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
-                      onClick={() => {
-                        handleRespond(rideRequestDetail.id, "accepted");
-                        setRideRequestDetail(null);
-                      }}
-                      disabled={respondingId === rideRequestDetail.id}
-                    >
-                      {respondingId === rideRequestDetail.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          <Check className="mr-1 h-3 w-3" />
-                          Accept
-                        </>
-                      )}
-                    </Button>
+                    <Check className="mr-1 h-3 w-3" />
+                    Accept
                   </>
                 )}
-                {rideRequestDetail.direction === "outgoing" && (
-                  <Button
-                    variant="outline"
-                    className="w-full sm:w-auto border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-                    onClick={() => {
-                      handleWithdraw(rideRequestDetail.id);
-                      setRideRequestDetail(null);
-                    }}
-                    disabled={withdrawingRequestId === rideRequestDetail.id}
-                  >
-                    {withdrawingRequestId === rideRequestDetail.id ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <XCircle className="mr-1 h-3 w-3" />
-                    )}
-                    Remove request
-                  </Button>
-                )}
-              </DialogFooter>
+              </Button>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+          {rideRequestDetail.direction === "outgoing" && (
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+              onClick={() => {
+                handleWithdraw(rideRequestDetail.id);
+                setRideRequestDetail(null);
+              }}
+              disabled={withdrawingRequestId === rideRequestDetail.id}
+            >
+              {withdrawingRequestId === rideRequestDetail.id ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <XCircle className="mr-1 h-3 w-3" />
+              )}
+              Remove request
+            </Button>
+          )}
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
 
-      {/* How Knot works */}
-      <section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-700">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          How Knot works
-        </h3>
-        <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
-          <li>
-            <span className="font-medium text-zinc-800">1. Post a ride</span>{" "}
-            — share where you&apos;re going and your time window.
-          </li>
-          <li>
-            <span className="font-medium text-zinc-800">2. Get matches</span>{" "}
-            — we score people by route, timing, trust, and preferences.
-          </li>
-          <li>
-            <span className="font-medium text-zinc-800">3. Send a request</span>{" "}
-            — if they accept, you&apos;ll get a chat to coordinate details.
-          </li>
-        </ol>
-      </section>
-    </div>
+{/* How Knot works */ }
+<section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-700">
+  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+    How Knot works
+  </h3>
+  <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
+    <li>
+      <span className="font-medium text-zinc-800">1. Post a ride</span>{" "}
+      — share where you&apos;re going and your time window.
+    </li>
+    <li>
+      <span className="font-medium text-zinc-800">2. Get matches</span>{" "}
+      — we score people by route, timing, trust, and preferences.
+    </li>
+    <li>
+      <span className="font-medium text-zinc-800">3. Send a request</span>{" "}
+      — if they accept, you&apos;ll get a chat to coordinate details.
+    </li>
+  </ol>
+</section>
+    </div >
   );
 }
 

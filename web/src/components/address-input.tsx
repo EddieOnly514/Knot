@@ -47,7 +47,10 @@ function GooglePlacesInput({
     const inputRef = useRef<HTMLInputElement>(null);
     const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
     const onChangeRef = useRef(onChange);
-    onChangeRef.current = onChange;
+
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
 
     const [isLoaded, setIsLoaded] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -61,7 +64,7 @@ function GooglePlacesInput({
         if (!scriptRequested) return;
         if (typeof window === "undefined") return;
         if (window.google?.maps?.places) {
-            setIsLoaded(true);
+            queueMicrotask(() => setIsLoaded(true));
             return;
         }
         const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;

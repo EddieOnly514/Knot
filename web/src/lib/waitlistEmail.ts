@@ -2,8 +2,7 @@ import { Resend } from "resend";
 
 /**
  * Send thank-you email after waitlist signup.
- * Requires RESEND_API_KEY in env. Optional WAITLIST_FROM_EMAIL (e.g. "Knot <hello@yourdomain.com>").
- * Resend free tier: use onboarding@resend.dev for testing, or verify your domain for production.
+ * Requires RESEND_API_KEY in env. Default sender: Knot <knot@knotride.com>. Override with WAITLIST_FROM_EMAIL.
  */
 function getResendClient(): Resend | null {
   const key = process.env.RESEND_API_KEY;
@@ -11,7 +10,7 @@ function getResendClient(): Resend | null {
   return new Resend(key);
 }
 
-const DEFAULT_FROM = "Knot <onboarding@resend.dev>";
+const DEFAULT_FROM = "Knot <knot@knotride.com>";
 
 export async function sendWaitlistThankYou(to: string): Promise<{ ok: boolean; error?: string }> {
   const resend = getResendClient();

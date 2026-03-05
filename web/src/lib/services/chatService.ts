@@ -379,7 +379,23 @@ export async function sendMessage(
         .single();
 
     if (error) throw error;
-    return data as Message;
+    const message = data as Message;
+
+    // Fire-and-forget: notify server to send email for new message.
+    // This should never block sending the message in the UI.
+    if (typeof window !== "undefined") {
+        fetch("/api/notify/new-message", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId: message.id }),
+        }).catch((err) => {
+            if (process.env.NODE_ENV === "development") {
+                console.warn("[chatService] Failed to notify new-message:", err);
+            }
+        });
+    }
+
+    return message;
 }
 
 export async function markAsRead(conversationOrGroupId: string, readerProfileId?: string): Promise<void> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Loader2, Mail, Chrome, Lock, MailCheck } from "lucide-react";
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 function SignupForm() {
   const {
@@ -21,15 +25,12 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams.get("next");
+  const error = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    setError(new URLSearchParams(window.location.search).get("error"));
-  }, []);
+  const [needsEmailConfirmation] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -47,31 +48,35 @@ function SignupForm() {
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    if (!isValidEmail(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
 
     setIsLoading(true);
-    setNeedsEmailConfirmation(false);
     // Pass the next URL through the email confirmation redirect
     const emailRedirectNext = nextUrl ? `/onboarding?next=${encodeURIComponent(nextUrl)}` : "/onboarding";
-    const { error: signUpError, needsEmailConfirmation: needsConfirm } = await signUpWithEmailPassword(email, password, emailRedirectNext);
+    const { error: signUpError } = await signUpWithEmailPassword(email, password, emailRedirectNext);
     if (signUpError) {
       toast.error(signUpError.message ?? "Failed to sign up");
       setIsLoading(false);
       return;
     }
-    if (needsConfirm) {
-      setNeedsEmailConfirmation(true);
-      setIsLoading(false);
-      return;
-    }
 
-    toast.success("Account created. Let’s set up your profile.");
+    // Fire-and-forget: send welcome email (uses session from same-origin cookie)
+    fetch("/api/notify/welcome", { method: "POST" }).catch(() => {});
+
+    toast.success("Account created. Let’s set up your profile. We also emailed you a link to verify your address so your matches can trust you more.");
     const onboardingUrl = nextUrl ? `/onboarding?next=${encodeURIComponent(nextUrl)}` : "/onboarding";
     router.push(onboardingUrl);
     setIsLoading(false);
   };
 
   const handleResendVerification = async () => {
-    if (!email) return;
+    if (!email || !isValidEmail(email)) {
+      toast.error("Enter a valid email to resend the verification link.");
+      return;
+    }
     setResendLoading(true);
     const { error } = await resendEmailConfirmation(email);
     if (error) {
@@ -81,42 +86,6 @@ function SignupForm() {
     }
     setResendLoading(false);
   };
-
-  if (needsEmailConfirmation) {
-    return (
-      <Card className="border-zinc-200 bg-white/90 shadow-xl backdrop-blur rounded-3xl">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-zinc-900 text-xl flex items-center justify-center gap-2">
-            <MailCheck className="w-5 h-5 text-emerald-500" />
-            Check your email
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-2 text-center">
-          <p className="text-sm text-zinc-600">
-            We sent a verification link to <strong className="text-zinc-900">{email}</strong>. Click the link to verify your account and finish signing up.
-          </p>
-          <p className="text-xs text-zinc-500">
-            Didn&apos;t get the email? Check spam or resend below.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            onClick={handleResendVerification}
-            disabled={resendLoading}
-          >
-            {resendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Resend verification email"}
-          </Button>
-          <Link href="/login" className="block">
-            <Button variant="outline" className="w-full rounded-full">
-              Back to log in
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="border-zinc-200 bg-white/90 shadow-xl backdrop-blur rounded-3xl">
@@ -166,7 +135,7 @@ function SignupForm() {
             type="submit"
             size="lg"
             className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white text-sm font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
-            disabled={isLoading || !email || !password}
+          disabled={isLoading || !email || !password || !isValidEmail(email)}
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -255,4 +224,3 @@ export default function SignupPage() {
     </div>
   );
 }
-

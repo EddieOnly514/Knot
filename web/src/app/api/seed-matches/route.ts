@@ -28,7 +28,7 @@ function loadEnvLocalIfNeeded() {
                 const idx = trimmed.indexOf("=");
                 if (idx <= 0) continue;
                 const key = trimmed.slice(0, idx).trim();
-                let value = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "").replace(/\r$/, "");
+                const value = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "").replace(/\r$/, "");
                 process.env[key] = value;
             }
             return;

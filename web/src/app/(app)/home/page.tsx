@@ -711,7 +711,7 @@ export default function HomePage() {
               No active requests
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              You haven't requested any rides yet. Find a commuter headed your way!
+              You haven&apos;t requested any rides yet. Find a commuter headed your way!
             </p>
             <Button
               variant="outline"
@@ -1300,4 +1300,3 @@ export default function HomePage() {
     </div >
   );
 }
-

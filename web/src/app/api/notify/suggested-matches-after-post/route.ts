@@ -105,12 +105,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No email for profile" }, { status: 400 });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase RPC typings
     const { data: matches, error: rpcErr } = await admin.rpc("find_matches_v3", {
       p_ride_id: rideId,
       p_max_results: 20,
       p_min_score: 30,
-    } as any);
+    });
 
     if (rpcErr || !Array.isArray(matches)) {
       return NextResponse.json({ error: "Failed to get matches", sent: false }, { status: 200 });
@@ -135,7 +134,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sent: false, suggestedCount: 0 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://knot.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://knotride.com";
     const result = await sendSuggestedMatchesEmail(email, suggestedCount, appUrl);
 
     if (result.ok) {

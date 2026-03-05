@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { sendSuggestedMatchesEmail } from "@/lib/matchEmail";
 import type { Database } from "@/types/database";
 
+const COOLDOWN_HOURS = 24;
+
 type ProfileRow = Pick<
   Database["public"]["Tables"]["profiles"]["Row"],
-  "id" | "first_name" | "email" | "user_id"
+  "id" | "email" | "user_id" | "suggested_matches_email_sent_at"
 >;
 type RideRow = Pick<Database["public"]["Tables"]["rides"]["Row"], "id">;
 
@@ -50,13 +52,26 @@ export async function POST(request: Request) {
 
     const { data: profileData, error: profileErr } = await admin
       .from("profiles")
-      .select("id, first_name, email, user_id")
+      .select("id, email, user_id, suggested_matches_email_sent_at")
       .eq("id", profileId)
       .single();
 
     const profile = profileData as ProfileRow | null;
     if (profileErr || !profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
+    const now = new Date();
+    const sentAt = profile.suggested_matches_email_sent_at
+      ? new Date(profile.suggested_matches_email_sent_at)
+      : null;
+    if (sentAt && now.getTime() - sentAt.getTime() < COOLDOWN_HOURS * 60 * 60 * 1000) {
+      return NextResponse.json({
+        success: true,
+        sent: false,
+        reason: "cooldown",
+        suggestedCount: 0,
+      });
     }
 
     let email: string | null = profile.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email) ? profile.email : null;
@@ -82,12 +97,10 @@ export async function POST(request: Request) {
     }
 
     const rideId = rides[0].id;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase RPC typings expect undefined for args
-    const { data: matches, error: rpcErr } = await admin.rpc("find_matches_v3", {
-      p_ride_id: rideId,
-      p_max_results: 20,
-      p_min_score: 30,
-    } as any);
+    const { data: matches, error: rpcErr } = await admin.rpc(
+      "find_matches_v3",
+      { p_ride_id: rideId, p_max_results: 20, p_min_score: 30 } as unknown as undefined
+    );
 
     if (rpcErr || !Array.isArray(matches)) {
       return NextResponse.json({ error: "Failed to get matches", sent: false }, { status: 200 });
@@ -110,9 +123,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, sent: false, suggestedCount: 0 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://knot.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://knotride.com";
     const result = await sendSuggestedMatchesEmail(email, suggestedCount, appUrl);
-    if (!result.ok && process.env.NODE_ENV === "development") {
+    if (result.ok) {
+      const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
+        suggested_matches_email_sent_at: now.toISOString(),
+      };
+      await admin.from("profiles").update(updatePayload as never).eq("id", profileId);
+    } else if (process.env.NODE_ENV === "development") {
       console.warn("[notify/suggested-matches] send failed:", result.error);
     }
     return NextResponse.json({ success: true, sent: result.ok, suggestedCount });

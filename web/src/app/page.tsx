@@ -346,7 +346,7 @@ export default function LandingPage() {
                   <span className="block text-[#0052FF] ml-16 md:ml-24">Smaller bill.</span>
                 </h2>
                 <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
-                  Why pay <span className="line-through">$100</span> when it's{" "}
+                  Why pay <span className="line-through">$100</span> when it&apos;s{" "}
                   <span className="font-semibold text-[#0052FF]">$25 each</span>
                   ? Connect with verified travelers heading your way and split
                   the fare instantly.
@@ -683,7 +683,7 @@ export default function LandingPage() {
                 </Button>
               </form>
               <p className="mt-4 text-xs text-gray-500 text-center">
-                We'll only message you about launch + important ride updates. No spam.
+                We&apos;ll only message you about launch + important ride updates. No spam.
               </p>
             </CardContent>
           </Card>

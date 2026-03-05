@@ -50,10 +50,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   }, [profile]);
 
   useEffect(() => {
-    fetchUnread();
+    const initialFetchTimeout = setTimeout(() => {
+      void fetchUnread();
+    }, 0);
     // Poll every 30s for badge updates
-    const interval = setInterval(fetchUnread, 30_000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      void fetchUnread();
+    }, 30_000);
+    return () => {
+      clearTimeout(initialFetchTimeout);
+      clearInterval(interval);
+    };
   }, [fetchUnread]);
 
   return (
@@ -219,4 +226,3 @@ export function SidebarNav() {
     </>
   );
 }
-

@@ -76,6 +76,7 @@ export const colors = {
     300: '#CBD5E1',
     400: '#94A3B8',
     500: '#64748B',
+    800: '#1E293B',
     900: '#0F172A',
   },
 } as const;

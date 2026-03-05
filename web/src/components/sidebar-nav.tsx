@@ -63,17 +63,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <button
           type="button"
           onClick={() => navigate("/home")}
-          className="flex items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors hover:bg-zinc-50"
+          className="rounded-2xl px-3 py-2 text-left transition-colors hover:bg-zinc-50"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0052FF]">
-            <span className="text-sm font-bold text-white">K</span>
-          </div>
-          <div className="flex flex-col leading-tight">
-            <div className="text-xl font-bold tracking-tight text-zinc-900">
-              Knot
-            </div>
-            <div className="text-[11px] text-zinc-500">Ride-sharing community</div>
-          </div>
+          <span className="text-2xl font-bold tracking-tight text-[#0052FF]">Knot</span>
         </button>
       </div>
 
@@ -186,11 +178,8 @@ export function SidebarNav() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-2 ml-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0052FF]">
-            <span className="text-[10px] font-bold text-white">K</span>
-          </div>
-          <span className="text-lg font-bold tracking-tight text-zinc-900">Knot</span>
+        <div className="ml-2">
+          <span className="text-xl font-bold tracking-tight text-[#0052FF]">Knot</span>
         </div>
       </div>
 
@@ -209,14 +198,8 @@ export function SidebarNav() {
             aria-label="Navigation menu"
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0052FF]">
-                  <span className="text-xs font-bold text-white">K</span>
-                </div>
-                <div className="flex flex-col leading-tight">
-                  <span className="text-lg font-bold tracking-tight text-zinc-900">Knot</span>
-                  <span className="text-[10px] text-zinc-500">Ride-sharing community</span>
-                </div>
+              <div>
+                <span className="text-xl font-bold tracking-tight text-[#0052FF]">Knot</span>
               </div>
               <button
                 type="button"

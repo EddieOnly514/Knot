@@ -183,6 +183,50 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["ride_groups"]["Insert"]>;
       };
+
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string | null;
+          ride_group_id: string | null;
+          sender_id: string;
+          content: string;
+          message_type: "text" | "quick_action" | "location" | "system";
+          metadata: Json | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id?: string | null;
+          ride_group_id?: string | null;
+          sender_id: string;
+          content: string;
+          message_type?: "text" | "quick_action" | "location" | "system";
+          metadata?: Json | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>;
+      };
+
+      message_email_cooldowns: {
+        Row: {
+          id: string;
+          conversation_id: string | null;
+          ride_group_id: string | null;
+          recipient_profile_id: string;
+          last_notified_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id?: string | null;
+          ride_group_id?: string | null;
+          recipient_profile_id: string;
+          last_notified_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["message_email_cooldowns"]["Insert"]>;
+      };
     };
 
     Functions: {

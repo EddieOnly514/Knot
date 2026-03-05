@@ -105,11 +105,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No email for profile" }, { status: 400 });
     }
 
-    const { data: matches, error: rpcErr } = await admin.rpc("find_matches_v3", {
-      p_ride_id: rideId,
-      p_max_results: 20,
-      p_min_score: 30,
-    });
+    const { data: matches, error: rpcErr } = await admin.rpc(
+      "find_matches_v3",
+      { p_ride_id: rideId, p_max_results: 20, p_min_score: 30 } as unknown as undefined
+    );
 
     if (rpcErr || !Array.isArray(matches)) {
       return NextResponse.json({ error: "Failed to get matches", sent: false }, { status: 200 });

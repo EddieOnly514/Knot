@@ -5,9 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -30,33 +27,42 @@ import {
   MapPin,
   TrendingUp,
   CheckCircle2,
-  Sparkles,
-  Loader2,
   Calendar as CalendarIcon,
   Search,
+  ShieldCheck,
+  Phone,
+  GraduationCap,
+  Star,
+  Instagram,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AddressInput } from "@/components/address-input";
+import { cn } from "@/lib/utils";
 
-const WAITLIST_SCHOOLS = ["UCI", "UCLA", "USC", "UCSD", "Cal Poly", "other"] as const;
-const WAITLIST_AIRPORTS = ["LAX", "SNA", "SAN", "LGB", "ONT", "Other"] as const;
-type WaitlistSchool = (typeof WAITLIST_SCHOOLS)[number];
-type WaitlistAirport = (typeof WAITLIST_AIRPORTS)[number];
-interface WaitlistStats {
-  total: number;
-  bySchool: Record<string, number>;
-}
+const HOW_KNOT_WORKS_STEPS = [
+  {
+    id: 0,
+    title: "Post a ride",
+    description: "Enter your destination and departure time.",
+    icon: MapPin,
+  },
+  {
+    id: 1,
+    title: "Match riders",
+    description: "Find riders going the same way.",
+    icon: Users,
+  },
+  {
+    id: 2,
+    title: "Split the cost",
+    description: "Ride together and pay a fraction of the price.",
+    icon: CheckCircle2,
+  },
+] as const;
 
 export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
-  const [activeAccordion, setActiveAccordion] = useState<number | null>(0);
-  const [waitlistSchool, setWaitlistSchool] = useState<WaitlistSchool | "">("");
-  const [waitlistSchoolOther, setWaitlistSchoolOther] = useState("");
-  const [waitlistEmail, setWaitlistEmail] = useState("");
-  const [waitlistAirport, setWaitlistAirport] = useState<WaitlistAirport | "">("");
-  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
-  const [waitlistStats, setWaitlistStats] = useState<WaitlistStats | null>(null);
 
   // Search bar state
   const [searchFrom, setSearchFrom] = useState("");
@@ -64,64 +70,20 @@ export default function LandingPage() {
   const [searchDate, setSearchDate] = useState<Date | undefined>(undefined);
   const [searchSeats, setSearchSeats] = useState("1");
 
+  // How It Works state
+  const [howItWorksProgress, setHowItWorksProgress] = useState(0);
+  const [activeHowItWorksStep, setActiveHowItWorksStep] = useState(0);
+  const [howItWorksLineMetrics, setHowItWorksLineMetrics] = useState({ top: 20, height: 0 });
+
   const heroRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
-  const howItWorksRef = useRef<HTMLDivElement>(null);
   const mapBgRef = useRef<HTMLDivElement>(null);
   const dotsBgRef = useRef<HTMLDivElement>(null);
+  const howItWorksSectionRef = useRef<HTMLDivElement>(null);
+  const howItWorksStepRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const howItWorksIconRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  useEffect(() => {
-    fetch("/api/waitlist/stats")
-      .then((res) => res.json())
-      .then((data: WaitlistStats) => setWaitlistStats(data))
-      .catch(() => setWaitlistStats({ total: 146, bySchool: {} }));
-  }, []);
-
-  const waitlistTotal = waitlistStats?.total ?? 146;
-
-  const handleWaitlistSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!waitlistSchool || !waitlistEmail.trim() || !waitlistAirport) {
-      toast.error("Please fill in all fields.");
-      return;
-    }
-    if (waitlistSchool === "other" && !waitlistSchoolOther.trim()) {
-      toast.error("Please type your school name.");
-      return;
-    }
-    setWaitlistSubmitting(true);
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          school: waitlistSchool,
-          email: waitlistEmail.trim(),
-          airport: waitlistAirport,
-          ...(waitlistSchool === "other" && { school_other: waitlistSchoolOther.trim() }),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(data.error ?? "Something went wrong. Please try again.");
-        setWaitlistSubmitting(false);
-        return;
-      }
-      toast.success("You're on the list! We'll be in touch for early access.");
-      setWaitlistEmail("");
-      setWaitlistSchool("");
-      setWaitlistSchoolOther("");
-      setWaitlistAirport("");
-      const statsRes = await fetch("/api/waitlist/stats");
-      const newStats = await statsRes.json();
-      setWaitlistStats(newStats);
-    } catch {
-      toast.error("Something went wrong. Please try again.");
-    } finally {
-      setWaitlistSubmitting(false);
-    }
-  };
-
+  // Scroll animations + parallax
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
     const reduceMotion =
@@ -135,26 +97,21 @@ export default function LandingPage() {
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add(className);
-            }
+            if (entry.isIntersecting) entry.target.classList.add(className);
           });
         },
         { threshold: 0.1 }
       );
-
       if (ref.current) {
         observer.observe(ref.current);
         observers.push(observer);
       }
     };
 
-    // Observe sections
     createObserver(heroRef, "animate-fade-in-up");
     createObserver(featuresRef, "animate-fade-in-up");
-    createObserver(howItWorksRef, "animate-fade-in-up");
 
-    // Enhanced scroll animations for individual elements
+    // data-scroll-animate elements
     const animateElements = () => {
       const elements = document.querySelectorAll("[data-scroll-animate]");
       const observer = new IntersectionObserver(
@@ -162,21 +119,36 @@ export default function LandingPage() {
           entries.forEach((entry, index) => {
             if (entry.isIntersecting) {
               const delay = reduceMotion ? 0 : index * 100;
-              setTimeout(() => {
-                entry.target.classList.add("animate-in");
-              }, delay);
+              setTimeout(() => entry.target.classList.add("animate-in"), delay);
               observer.unobserve(entry.target);
             }
           });
         },
         { threshold: 0.15, rootMargin: "0px 0px -50px 0px" }
       );
-
       elements.forEach((el) => observer.observe(el));
       observers.push(observer);
     };
 
-    // Staggered animations for stats
+    // data-animate elements (how-it-works steps)
+    const animateDataAnimate = () => {
+      const elements = document.querySelectorAll("[data-animate]");
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.18, rootMargin: "0px 0px -8% 0px" }
+      );
+      elements.forEach((el) => observer.observe(el));
+      observers.push(observer);
+    };
+
+    // Stats stagger
     const animateStats = () => {
       const stats = document.querySelectorAll("[data-stat-animate]");
       const observer = new IntersectionObserver(
@@ -184,80 +156,102 @@ export default function LandingPage() {
           entries.forEach((entry, index) => {
             if (entry.isIntersecting) {
               const delay = reduceMotion ? 0 : index * 150;
-              setTimeout(() => {
-                entry.target.classList.add("animate-scale-in");
-              }, delay);
+              setTimeout(() => entry.target.classList.add("animate-scale-in"), delay);
               observer.unobserve(entry.target);
             }
           });
         },
         { threshold: 0.2 }
       );
-
       stats.forEach((stat) => observer.observe(stat));
       observers.push(observer);
     };
 
-    // Parallax animation for map and dots backgrounds
+    // Parallax
     let raf = 0;
     const onScroll = () => {
-      if (reduceMotion) return;
-      if (raf) return;
+      if (reduceMotion || raf) return;
       raf = window.requestAnimationFrame(() => {
         raf = 0;
         const y = window.scrollY || 0;
-        const mapOffset = Math.min(40, y * 0.12);
-        const dotsOffset = Math.min(18, y * 0.05);
-        if (mapBgRef.current) {
-          mapBgRef.current.style.transform = `translate3d(0, ${mapOffset}px, 0)`;
-        }
-        if (dotsBgRef.current) {
-          dotsBgRef.current.style.transform = `translate3d(0, ${dotsOffset}px, 0)`;
-        }
+        if (mapBgRef.current)
+          mapBgRef.current.style.transform = `translate3d(0, ${Math.min(40, y * 0.12)}px, 0)`;
+        if (dotsBgRef.current)
+          dotsBgRef.current.style.transform = `translate3d(0, ${Math.min(18, y * 0.05)}px, 0)`;
       });
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
 
-    // Initialize element animations
     setTimeout(() => {
       animateElements();
+      animateDataAnimate();
       animateStats();
     }, 100);
 
     return () => {
       observers.forEach((obs) => obs.disconnect());
       window.removeEventListener("scroll", onScroll);
-      if (raf) {
-        window.cancelAnimationFrame(raf);
-      }
+      if (raf) window.cancelAnimationFrame(raf);
     };
   }, []);
 
-  const accordionItems = [
-    {
-      id: 0,
-      title: "Post your ride",
-      content:
-        "Enter your destination, preferred time window, and flight details. Our system anchors your timing to your flight schedule for perfect coordination.",
-      icon: MapPin,
-    },
-    {
-      id: 1,
-      title: "Smart matching algorithm",
-      content:
-        "We match you with verified travelers heading the same way. Our algorithm considers time overlap, destination proximity, and user compatibility scores to find your perfect ride partner.",
-      icon: Sparkles,
-    },
-    {
-      id: 2,
-      title: "Message and coordinate",
-      content:
-        "Chat directly with your match to coordinate meetup details, split the fare, and ensure a smooth ride together. All communication happens securely within Knot.",
-      icon: MessageSquare,
-    },
-  ];
+  // How It Works scroll progress
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateProgress = () => {
+      const section = howItWorksSectionRef.current;
+      const stepEls = howItWorksStepRefs.current.filter((s): s is HTMLDivElement => s !== null);
+      const iconEls = howItWorksIconRefs.current.filter((i): i is HTMLDivElement => i !== null);
+      if (!section || stepEls.length === 0 || iconEls.length === 0) return;
+
+      const sectionRect = section.getBoundingClientRect();
+      const marker = window.innerHeight * 0.42;
+      const iconCenters = iconEls.map((icon) => {
+        const r = icon.getBoundingClientRect();
+        return r.top - sectionRect.top + r.height / 2;
+      });
+      const lineTop = iconCenters[0];
+      const lineHeight = Math.max(iconCenters[iconCenters.length - 1] - lineTop, 1);
+      const markerOffset = marker - sectionRect.top;
+      const nextProgress = Math.min(Math.max((markerOffset - lineTop) / lineHeight, 0), 1);
+
+      let nextActiveStep = 0;
+      for (let i = 1; i < stepEls.length; i++) {
+        const prev = stepEls[i - 1].getBoundingClientRect();
+        const curr = stepEls[i].getBoundingClientRect();
+        const switchPoint =
+          (prev.top - sectionRect.top + prev.height / 2 +
+            curr.top - sectionRect.top + curr.height / 2) / 2;
+        if (markerOffset >= switchPoint) nextActiveStep = i;
+      }
+
+      setHowItWorksProgress(nextProgress);
+      setActiveHowItWorksStep(nextActiveStep);
+      setHowItWorksLineMetrics((prev) => {
+        const t = Math.round(lineTop);
+        const h = Math.round(lineHeight);
+        return prev.top === t && prev.height === h ? prev : { top: t, height: h };
+      });
+    };
+
+    let frame = 0;
+    const requestUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => { frame = 0; updateProgress(); });
+    };
+
+    updateProgress();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white relative">
@@ -282,28 +276,20 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-transparent border-b border-gray-200/20 backdrop-blur-[2px]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold tracking-tight text-[#0052FF]">
-              Knot
-            </span>
+            <span className="text-2xl font-bold tracking-tight text-[#0052FF]">Knot</span>
           </Link>
-
-
-
           <div className="flex items-center gap-4">
             <a
-              href="#waitlist-form"
+              href="#how-it-works"
               onClick={(e) => {
                 e.preventDefault();
-                document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
+                document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
               }}
               className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Early access
+              How it works
             </a>
-            <Link
-              href="/login"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-            >
+            <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               Login
             </Link>
             <Link href="/signup">
@@ -315,30 +301,26 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section (Page 1) */}
+      {/* Hero Section */}
       <section
         ref={heroRef}
         className="pt-28 pb-16 px-6 lg:min-h-[78vh] opacity-0 transition-opacity duration-1000 relative overflow-hidden z-10"
       >
-        {/* Subtle dotted background */}
         <div
           aria-hidden="true"
           ref={dotsBgRef}
           className="pointer-events-none absolute inset-0 will-change-transform"
           style={{
-            backgroundImage:
-              "radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px)",
             backgroundSize: "18px 18px",
-            maskImage:
-              "radial-gradient(ellipse at 35% 30%, black 55%, transparent 75%)",
-            WebkitMaskImage:
-              "radial-gradient(ellipse at 35% 30%, black 55%, transparent 75%)",
+            maskImage: "radial-gradient(ellipse at 35% 30%, black 55%, transparent 75%)",
+            WebkitMaskImage: "radial-gradient(ellipse at 35% 30%, black 55%, transparent 75%)",
           }}
         />
 
         <div className="max-w-7xl mx-auto relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Column - Text */}
+            {/* Left Column */}
             <div className="space-y-8 pl-6 lg:pl-8">
               <div className="space-y-5">
                 <h2 className="text-5xl md:text-6xl font-bold text-[#0F172A] leading-tight">
@@ -347,35 +329,23 @@ export default function LandingPage() {
                 </h2>
                 <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
                   Why pay <span className="line-through">$100</span> when it&apos;s{" "}
-                  <span className="font-semibold text-[#0052FF]">$25 each</span>
-                  ? Connect with verified travelers heading your way and split
-                  the fare instantly.
+                  <span className="font-semibold text-[#0052FF]">$25 each</span>?
+                  Connect with verified travelers heading your way and split the fare instantly.
                 </p>
               </div>
 
               <div className="flex items-center gap-3 pt-1">
                 <div className="flex -space-x-2">
                   {["ea", "km", "sr"].map((name) => (
-                    <div
-                      key={name}
-                      className="size-9 rounded-full bg-white border border-gray-200 shadow-sm overflow-hidden"
-                    >
-                      <Image
-                        src={`/avatars/${name}.png`}
-                        alt={name.toUpperCase()}
-                        width={36}
-                        height={36}
-                        className="h-full w-full object-cover"
-                      />
+                    <div key={name} className="size-9 rounded-full bg-white border border-gray-200 shadow-sm overflow-hidden">
+                      <Image src={`/avatars/${name}.png`} alt={name.toUpperCase()} width={36} height={36} className="h-full w-full object-cover" />
                     </div>
                   ))}
                   <div className="size-9 rounded-full bg-gray-900 text-white border border-white shadow-sm flex items-center justify-center text-[11px] font-semibold">
                     1k+
                   </div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Join 1,000+ happy travelers this week.
-                </p>
+                <p className="text-sm text-gray-600">Join 1,000+ happy travelers this week.</p>
               </div>
             </div>
 
@@ -383,41 +353,29 @@ export default function LandingPage() {
             <div className="relative">
               <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#EEF2FF] via-white to-[#EFF6FF] p-6 lg:p-8 shadow-[0_24px_80px_rgba(15,23,42,0.12)] transition-transform duration-300 ease-out hover:scale-[1.02] border border-gray-100">
                 <div className="grid gap-6">
-                  <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-gray-500">
-                        Arriving at
-                      </p>
-                      <p className="text-sm font-semibold text-[#0F172A]">
-                        JFK Terminal 4
-                      </p>
+                  <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 flex items-center justify-center gap-3">
+                    <div className="text-center space-y-1">
+                      <p className="text-xs font-semibold text-gray-500">From</p>
+                      <p className="text-sm font-semibold text-[#0F172A]">UCI</p>
                     </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-xs font-semibold text-gray-500">
-                        Heading to
-                      </p>
-                      <p className="text-sm font-semibold text-[#0F172A]">
-                        Brooklyn
-                      </p>
+                    <div className="flex flex-1 items-center gap-1 px-4">
+                      <div className="h-px flex-1 bg-[#BFDBFE]" />
+                      <ArrowRight className="size-4 shrink-0 text-[#0052FF]" />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-xs font-semibold text-gray-500">To</p>
+                      <p className="text-sm font-semibold text-[#0F172A]">LAX</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="rounded-2xl bg-[#FEE2E2]/40 border border-[#FECACA] px-5 py-5 text-center">
-                      <p className="text-xs font-semibold text-gray-500">
-                        Solo Ride
-                      </p>
-                      <p className="text-2xl font-bold text-[#0F172A] mt-2">
-                        $102
-                      </p>
+                      <p className="text-xs font-semibold text-gray-500">Solo Ride</p>
+                      <p className="text-2xl font-bold text-[#0F172A] mt-2">$102</p>
                     </div>
                     <div className="rounded-2xl bg-[#DCFCE7]/40 border border-[#BBF7D0] px-5 py-5 text-center">
-                      <p className="text-xs font-semibold text-gray-500">
-                        With Knot
-                      </p>
-                      <p className="text-2xl font-bold text-[#0052FF] mt-2">
-                        $28
-                      </p>
+                      <p className="text-xs font-semibold text-gray-500">With Knot</p>
+                      <p className="text-2xl font-bold text-[#0052FF] mt-2">$28</p>
                     </div>
                   </div>
 
@@ -425,31 +383,15 @@ export default function LandingPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex -space-x-2">
                         <div className="size-9 rounded-full bg-white border border-gray-200 shadow-sm overflow-hidden">
-                          <Image
-                            src="/avatars/sarah.png"
-                            alt="Sarah"
-                            width={36}
-                            height={36}
-                            className="h-full w-full object-cover"
-                          />
+                          <Image src="/avatars/sarah.png" alt="Sarah" width={36} height={36} className="h-full w-full object-cover" />
                         </div>
                         <div className="size-9 rounded-full bg-white border border-gray-200 shadow-sm overflow-hidden">
-                          <Image
-                            src="/avatars/mike.png"
-                            alt="Mike"
-                            width={36}
-                            height={36}
-                            className="h-full w-full object-cover"
-                          />
+                          <Image src="/avatars/mike.png" alt="Mike" width={36} height={36} className="h-full w-full object-cover" />
                         </div>
                       </div>
                       <div className="leading-tight">
-                        <p className="text-sm font-semibold text-[#0F172A]">
-                          Matched with Sarah & Mike
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Flight UA234 · Landing in 15m
-                        </p>
+                        <p className="text-sm font-semibold text-[#0F172A]">Matched with Sarah & Mike</p>
+                        <p className="text-xs text-gray-500">Flight UA234 · Landing in 15m</p>
                       </div>
                     </div>
                     <div className="size-9 rounded-full bg-[#0052FF]/10 border border-[#BFDBFE] flex items-center justify-center">
@@ -469,57 +411,28 @@ export default function LandingPage() {
                 Post a ride now!
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto_auto] gap-4 items-end">
-                {/* From */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">From</label>
-                  <AddressInput
-                    value={searchFrom}
-                    onChange={(val) => setSearchFrom(val)}
-                    placeholder="Leaving from"
-                    inputId="landing-from"
-                    className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm"
-                  />
+                  <AddressInput value={searchFrom} onChange={setSearchFrom} placeholder="Leaving from" inputId="landing-from" className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm" />
                 </div>
-
-                {/* To */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">To</label>
-                  <AddressInput
-                    value={searchTo}
-                    onChange={(val) => setSearchTo(val)}
-                    placeholder="Going to"
-                    inputId="landing-to"
-                    className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm"
-                  />
+                  <AddressInput value={searchTo} onChange={setSearchTo} placeholder="Going to" inputId="landing-to" className="h-12 bg-gray-50 border-gray-200 rounded-lg text-sm" />
                 </div>
-
-                {/* Date */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-12 w-full min-w-[150px] justify-start bg-gray-50 border-gray-200 rounded-lg text-sm text-left font-normal"
-                      >
+                      <Button variant="outline" className="h-12 w-full min-w-[150px] justify-start bg-gray-50 border-gray-200 rounded-lg text-sm text-left font-normal">
                         <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
-                        {searchDate
-                          ? format(searchDate, "MMM d, yyyy")
-                          : <span className="text-gray-400">Select date</span>}
+                        {searchDate ? format(searchDate, "MMM d, yyyy") : <span className="text-gray-400">Select date</span>}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={searchDate}
-                        onSelect={setSearchDate}
-                        disabled={(d) => d < new Date()}
-                      />
+                      <Calendar mode="single" selected={searchDate} onSelect={setSearchDate} disabled={(d) => d < new Date()} />
                     </PopoverContent>
                   </Popover>
                 </div>
-
-                {/* Passengers */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-gray-500">Passengers</label>
                   <Select value={searchSeats} onValueChange={setSearchSeats}>
@@ -529,15 +442,11 @@ export default function LandingPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {[1, 2, 3, 4].map((n) => (
-                        <SelectItem key={n} value={n.toString()}>
-                          {n} {n === 1 ? "passenger" : "passengers"}
-                        </SelectItem>
+                        <SelectItem key={n} value={n.toString()}>{n} {n === 1 ? "passenger" : "passengers"}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Search / Post Button */}
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-transparent select-none hidden lg:block">Go</label>
                   <Button
@@ -549,14 +458,9 @@ export default function LandingPage() {
                       const params = new URLSearchParams();
                       params.set("from", searchFrom.trim());
                       params.set("to", searchTo.trim());
-                      if (searchDate) {
-                        params.set("date", format(searchDate, "yyyy-MM-dd"));
-                      }
-                      if (searchSeats !== "1") {
-                        params.set("seats", searchSeats);
-                      }
-                      const postUrl = `/post-ride?${params.toString()}`;
-                      router.push(postUrl);
+                      if (searchDate) params.set("date", format(searchDate, "yyyy-MM-dd"));
+                      if (searchSeats !== "1") params.set("seats", searchSeats);
+                      router.push(`/post-ride?${params.toString()}`);
                     }}
                     className="h-12 w-full px-6 bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg font-semibold text-sm shadow-[0_8px_20px_rgba(0,82,255,0.25)] transition-all hover:scale-[1.02]"
                   >
@@ -573,325 +477,355 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Waitlist — Early access */}
-      <section
-        id="waitlist-form"
-        className="scroll-mt-20 py-16 px-6 bg-white/60 backdrop-blur-[2px] border-t border-gray-100/50 relative z-10"
-      >
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-10">
-            <h3 className="text-3xl font-bold text-[#0F172A]">
-              Flying out for spring break?
-            </h3>
-            <p className="mt-3 text-lg text-gray-600">
-              Split your airport ride with students from your school. Match with nearby students, share the ride, and cut the cost.
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              Built by students. Focused on safety + same-campus matching.
-            </p>
-          </div>
-          <Card className="border-gray-200 bg-white shadow-xl rounded-2xl">
-            <CardContent className="p-6 sm:p-8">
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-5">
-                Join early access
-              </h4>
-              <form onSubmit={handleWaitlistSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="waitlist-school" className="text-gray-700">
-                    School
-                  </Label>
-                  <Select
-                    value={waitlistSchool}
-                    onValueChange={(v) => setWaitlistSchool(v as WaitlistSchool)}
-                    required
-                  >
-                    <SelectTrigger
-                      id="waitlist-school"
-                      className="w-full h-11 rounded-full border-gray-200 bg-white"
-                    >
-                      <SelectValue placeholder="Select your school" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WAITLIST_SCHOOLS.map((s) => (
-                        <SelectItem key={s} value={s} className="rounded-lg">
-                          {s === "other" ? "Other" : s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {waitlistSchool === "other" && (
-                    <Input
-                      id="waitlist-school-other"
-                      type="text"
-                      placeholder="Type your school name"
-                      value={waitlistSchoolOther}
-                      onChange={(e) => setWaitlistSchoolOther(e.target.value)}
-                      className="mt-2 h-11 rounded-full border-gray-200"
-                      maxLength={200}
-                    />
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="waitlist-email" className="text-gray-700">
-                    Email
-                  </Label>
-                  <Input
-                    id="waitlist-email"
-                    type="email"
-                    placeholder="you@school.edu"
-                    value={waitlistEmail}
-                    onChange={(e) => setWaitlistEmail(e.target.value)}
-                    className="h-11 rounded-full border-gray-200"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="waitlist-airport" className="text-gray-700">
-                    Airport traveling to
-                  </Label>
-                  <Select
-                    value={waitlistAirport}
-                    onValueChange={(v) => setWaitlistAirport(v as WaitlistAirport)}
-                    required
-                  >
-                    <SelectTrigger
-                      id="waitlist-airport"
-                      className="w-full h-11 rounded-full border-gray-200 bg-white"
-                    >
-                      <SelectValue placeholder="Select airport" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WAITLIST_AIRPORTS.map((a) => (
-                        <SelectItem key={a} value={a} className="rounded-lg">
-                          {a}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full h-12 rounded-full bg-[#0052FF] hover:bg-[#0042CC] text-white font-semibold shadow-[0_14px_30px_rgba(0,82,255,0.28)]"
-                  disabled={waitlistSubmitting}
-                >
-                  {waitlistSubmitting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    "Join early access"
-                  )}
-                </Button>
-              </form>
-              <p className="mt-4 text-xs text-gray-500 text-center">
-                We&apos;ll only message you about launch + important ride updates. No spam.
-              </p>
-            </CardContent>
-          </Card>
-          <div className="mt-8 text-center">
-            <p className="text-xl font-semibold text-[#0F172A]">
-              {waitlistTotal.toLocaleString()} students joined early access
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Impact & Focus Section (Page 2) */}
+      {/* Shared Trips Feature Section */}
       <section
         ref={featuresRef}
-        className="py-28 px-6 bg-white/40 backdrop-blur-[2px] opacity-0 transition-opacity duration-1000 delay-200 border-t border-gray-100/50 relative z-10"
+        className="py-24 px-6 bg-white/60 backdrop-blur-[2px] opacity-0 transition-opacity duration-1000 delay-200 relative z-10"
       >
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h3
-              data-scroll-animate
-              className="text-4xl font-bold text-[#0F172A] mb-4 opacity-0 translate-y-8"
-            >
+          <div className="text-center mb-14">
+            <p data-scroll-animate className="text-sm font-semibold uppercase tracking-widest text-[#0052FF] mb-3 opacity-0 translate-y-8">
+              Why Knot
+            </p>
+            <h3 data-scroll-animate className="text-4xl font-bold text-[#0F172A] opacity-0 translate-y-8">
               Designed for shared trips
             </h3>
-            <p
-              data-scroll-animate
-              className="text-xl text-gray-600 max-w-2xl mx-auto opacity-0 translate-y-8"
-            >
-              Knot brings people heading to the same direction into one ride,
-              turning solo trips into shared savings.
+            <p data-scroll-animate className="mt-4 text-xl text-gray-600 max-w-2xl mx-auto opacity-0 translate-y-8">
+              Knot brings students heading the same direction into one ride, turning solo fares into shared savings.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-14">
-            <div
-              data-stat-animate
-              className="space-y-2 text-center opacity-0 translate-y-8 transition-all duration-700"
-            >
-              <div className="text-5xl font-bold text-[#0F172A] mb-2">
-                75%
+          {/* Stats row */}
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {[
+              { val: "75%", label: "Average savings", sub: "vs. solo ride" },
+              { val: "12K+", label: "Rides matched", sub: "and counting" },
+              { val: "4.9★", label: "Traveler rating", sub: "from verified riders" },
+            ].map(({ val, label, sub }) => (
+              <div
+                key={label}
+                data-stat-animate
+                className="rounded-2xl border border-gray-100 bg-white px-6 py-8 text-center shadow-sm opacity-0 translate-y-8 transition-all duration-700"
+              >
+                <div className="text-5xl font-bold text-[#0052FF]">{val}</div>
+                <div className="mt-2 text-lg font-semibold text-[#0F172A]">{label}</div>
+                <div className="mt-1 text-sm text-gray-400">{sub}</div>
               </div>
-              <div className="text-lg text-gray-600">Average savings</div>
-            </div>
-            <div
-              data-stat-animate
-              className="space-y-2 text-center opacity-0 translate-y-8 transition-all duration-700"
-            >
-              <div className="text-5xl font-bold text-[#0F172A] mb-2">
-                12K+
-              </div>
-              <div className="text-lg text-gray-600">Rides matched</div>
-            </div>
-            <div
-              data-stat-animate
-              className="space-y-2 text-center opacity-0 translate-y-8 transition-all duration-700"
-            >
-              <div className="text-5xl font-bold text-[#0F172A] mb-2">
-                4.9★
-              </div>
-              <div className="text-lg text-gray-600">Traveler rating</div>
-            </div>
+            ))}
           </div>
 
+          {/* Feature cards */}
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
                 icon: TrendingUp,
                 title: "Maximum Savings",
-                description:
-                  "Split fares and save up to 75% on rides. Why pay full price when you can share the cost?",
+                description: "Split fares with students heading the same way. Pay a fraction of the solo price every trip.",
               },
               {
                 icon: Users,
-                title: "Verified Community",
-                description:
-                  "All users are verified with email and phone. See ratings and ride history before you match.",
+                title: "Campus-first Matching",
+                description: "Knot prioritises people from your school heading toward the same destination window.",
               },
               {
                 icon: CheckCircle2,
-                title: "Smart Coordination",
-                description:
-                  "Our algorithm matches you with travelers heading the same way at the same time. No hassle.",
+                title: "Clear Coordination",
+                description: "One shared ride plan, one visible split, and less back-and-forth before pickup.",
               },
             ].map((feature, idx) => (
               <div
                 key={idx}
                 data-scroll-animate
-                className="bg-white text-[#0F172A] p-8 rounded-xl space-y-4 transition-all hover:scale-105 hover:shadow-xl border border-gray-200 opacity-0 translate-y-8 scale-95 group"
+                className="group rounded-2xl border border-gray-200 bg-white p-8 text-[#0F172A] shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 opacity-0 translate-y-8 scale-95"
               >
-                <feature.icon className="w-12 h-12 mb-4 text-[#0052FF] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />
-                <h4 className="text-xl font-semibold">{feature.title}</h4>
-                <p className="text-gray-700 leading-relaxed">
-                  {feature.description}
-                </p>
+                <div className="mb-5 inline-flex size-12 items-center justify-center rounded-xl bg-[#EFF6FF]">
+                  <feature.icon className="size-6 text-[#0052FF]" />
+                </div>
+                <h4 className="text-lg font-semibold">{feature.title}</h4>
+                <p className="mt-3 leading-relaxed text-gray-600">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How It Works Section (Page 3) */}
+      {/* How It Works */}
       <section
-        ref={howItWorksRef}
         id="how-it-works"
-        className="py-28 px-6 bg-white/40 backdrop-blur-[2px] opacity-0 transition-opacity duration-1000 delay-300 border-t border-gray-100/50 relative z-10"
+        className="py-12 px-6 bg-white/60 backdrop-blur-[2px] relative z-10"
       >
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-12">
-            <h3
-              data-scroll-animate
-              className="text-4xl font-bold text-[#0F172A] mb-4 opacity-0 translate-y-8"
-            >
-              How It Works
-            </h3>
-            <p
-              data-scroll-animate
-              className="text-xl text-gray-600 opacity-0 translate-y-8"
-            >
-              Three simple steps to start saving on your next ride.
-            </p>
+        <div className="max-w-5xl mx-auto">
+          <div data-animate className="how-step-reveal mb-4 text-center">
+            <h3 className="text-4xl font-bold text-[#0052FF]">How Knot Works</h3>
           </div>
 
-          <div className="space-y-2">
-            {accordionItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeAccordion === item.id;
-              return (
-                <div
-                  key={item.id}
-                  data-scroll-animate
-                  className="border border-gray-200 rounded-lg overflow-hidden transition-all hover:border-[#0052FF] opacity-0 translate-y-8 scale-95"
-                >
-                  <button
-                    onClick={() =>
-                      setActiveAccordion(isActive ? null : item.id)
-                    }
-                    className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Icon className="w-6 h-6 text-[#0052FF]" />
-                      <span className="text-lg font-semibold text-[#0F172A]">
-                        {item.title}
-                      </span>
-                    </div>
-                    <ArrowRight
-                      className={`w-5 h-5 text-gray-400 transition-transform ${isActive ? "rotate-90" : ""
-                        }`}
-                    />
-                  </button>
+          <div ref={howItWorksSectionRef} className="relative">
+            {/* Progress line */}
+            <div
+              aria-hidden="true"
+              className="absolute left-6 hidden w-px bg-gray-200 sm:block"
+              style={{ top: `${howItWorksLineMetrics.top}px`, height: `${howItWorksLineMetrics.height}px` }}
+            />
+            <div
+              aria-hidden="true"
+              className="absolute left-6 hidden w-px bg-[#0052FF] sm:block"
+              style={{ top: `${howItWorksLineMetrics.top}px`, height: `${howItWorksLineMetrics.height * howItWorksProgress}px` }}
+            />
+
+            <div className="space-y-0">
+              {HOW_KNOT_WORKS_STEPS.map((step, index) => {
+                const Icon = step.icon;
+                const isStepActive = index <= activeHowItWorksStep;
+                const isCurrentStep = index === activeHowItWorksStep;
+                const isPast = index < activeHowItWorksStep;
+
+                return (
                   <div
-                    className={`overflow-hidden transition-all duration-300 ${isActive ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                      }`}
+                    key={step.id}
+                    data-animate
+                    aria-current={isCurrentStep ? "step" : undefined}
+                    ref={(el) => { howItWorksStepRefs.current[index] = el; }}
+                    className="how-step-reveal how-works-step-card relative flex min-h-[85vh] items-center"
+                    style={{ transitionDelay: `${index * 150}ms` }}
                   >
-                    <div className="px-6 pb-5 pt-2 text-gray-600 leading-relaxed">
-                      {item.content}
+                    <div className={cn(
+                      "relative grid w-full gap-5 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-8 transition-all duration-500",
+                      isCurrentStep
+                        ? "opacity-100 scale-100"
+                        : isPast
+                          ? "opacity-40 scale-[0.97]"
+                          : "opacity-30 scale-[0.97]"
+                    )}>
+                    <div
+                      ref={(el) => { howItWorksIconRefs.current[index] = el; }}
+                      className={cn(
+                        "relative z-10 flex h-12 w-12 items-center justify-center rounded-full border transition-all duration-300 sm:mx-auto",
+                        isCurrentStep
+                          ? "border-[#BFDBFE] bg-[#0052FF] text-white shadow-[0_14px_32px_rgba(0,82,255,0.32)] scale-110"
+                          : isStepActive
+                            ? "border-[#BFDBFE] bg-[#0052FF] text-white shadow-[0_8px_20px_rgba(0,82,255,0.15)]"
+                            : "border-gray-200 bg-white text-gray-400"
+                      )}
+                    >
+                      <Icon className="size-5" />
+                    </div>
+
+                    <div className={cn(
+                      "rounded-3xl border bg-white p-8 sm:p-12 transition-all duration-500",
+                      isCurrentStep
+                        ? "border-[#BFDBFE] shadow-[0_32px_80px_rgba(0,82,255,0.14)]"
+                        : "border-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+                    )}>
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors duration-300",
+                          isCurrentStep ? "bg-[#0052FF] text-white" : "bg-gray-100 text-gray-400"
+                        )}>
+                          {index + 1}
+                        </span>
+                        <p className={cn(
+                          "text-sm font-semibold uppercase tracking-wider transition-colors duration-300",
+                          isCurrentStep ? "text-[#0052FF]" : "text-gray-400"
+                        )}>Step {index + 1}</p>
+                      </div>
+                      <h4 className="mt-5 text-4xl font-bold text-[#0F172A]">{step.title}</h4>
+                      <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-600">{step.description}</p>
+
+                      {index === 0 ? (
+                        <div className="mt-10 rounded-2xl border border-gray-200 bg-gray-50 p-5 sm:p-8">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {[
+                              ["From", "LAX Terminal 2"],
+                              ["To", "UCLA Campus"],
+                              ["Date", "Fri, Mar 20 · 5:30 PM"],
+                              ["Passengers", "2 seats"],
+                              ["Preference", "Conversation"],
+                            ].map(([label, value]) => (
+                              <div key={label} className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">{label}</p>
+                                <p className="mt-2 text-lg font-semibold text-[#0F172A]">{value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {index === 1 ? (
+                        <div className="mt-10 rounded-2xl border border-gray-200 bg-gray-50 p-5 sm:p-8">
+                          <div className="grid gap-5 sm:grid-cols-[1fr_auto_1fr] sm:items-stretch">
+                            {/* Your ride card */}
+                            <div className="match-column rounded-2xl border border-gray-200 bg-white p-6">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Your ride</p>
+                              <p className="mt-3 text-xl font-semibold text-[#0F172A]">LAX → UCLA</p>
+                              <p className="mt-2 text-sm text-gray-500">Fri, Mar 20 · 5:30 PM</p>
+                            </div>
+
+                            {/* Connection */}
+                            <div className="match-arrow flex flex-col items-center justify-center gap-2 py-2">
+                              <div className="hidden h-full w-px bg-[#BFDBFE] sm:block" />
+                              <div className="flex items-center gap-2 text-[#0052FF]">
+                                <CheckCircle2 className="size-5" />
+                                <span className="text-base font-semibold whitespace-nowrap">92% route match</span>
+                              </div>
+                              <div className="hidden h-full w-px bg-[#BFDBFE] sm:block" />
+                            </div>
+
+                            {/* Matched rider card */}
+                            <div className="match-column rounded-2xl border border-gray-200 bg-white p-6">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0052FF] text-sm font-semibold text-white">KM</div>
+                                <div>
+                                  <p className="text-lg font-semibold text-[#0F172A]">Kevin M.</p>
+                                  <p className="text-sm text-gray-500">UCLA · 4.9 ★</p>
+                                </div>
+                              </div>
+                              <p className="mt-4 text-xl font-semibold text-[#0F172A]">LAX → Westwood</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {index === 2 ? (
+                        <div className="mt-10 rounded-2xl border border-gray-200 bg-gray-50 p-5 sm:p-8">
+                          <div className="cost-split-visual relative overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 py-6 sm:px-8">
+                            <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
+                              <p className="-translate-y-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Total ride cost</p>
+                              <div className="split-total mt-2 flex h-20 w-20 items-center justify-center rounded-full border border-[#BFDBFE] bg-[#0052FF] text-[1.75rem] font-bold text-white shadow-[0_14px_32px_rgba(0,82,255,0.22)]">
+                                $100
+                              </div>
+                              <div className="-mt-px h-6 w-px bg-[#93C5FD]" />
+                              <div className="relative w-full">
+                                <div className="mx-auto h-px bg-[#93C5FD]" style={{ width: "75%" }} />
+                                <div className="grid grid-cols-2 sm:grid-cols-4">
+                                  {[1, 2, 3, 4].map((share) => (
+                                    <div key={share} className="flex flex-col items-center">
+                                      <div className="split-line h-5 w-px bg-[#93C5FD]" style={{ transitionDelay: `${share * 60}ms` }} />
+                                      <div className="split-share w-full border border-gray-200 bg-gray-50 px-2 py-4 text-center" style={{ transitionDelay: `${share * 80}ms` }}>
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Person {share}</p>
+                                        <p className="mt-1 text-2xl font-semibold text-[#0F172A]">$25</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Safety Section */}
+      <section className="py-28 px-6 bg-white/60 backdrop-blur-[2px] relative z-10">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-1.5 text-sm font-semibold text-[#0052FF] mb-4">
+              <ShieldCheck className="size-4" />
+              Safety first
+            </div>
+            <h3 className="text-4xl font-bold text-[#0F172A]">We value your safety</h3>
+            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">Every rider on Knot is verified. We built multiple layers of trust so you can ride with confidence.</p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: Phone,
+                title: "Phone verified",
+                desc: "Every account requires SMS verification before posting or joining a ride.",
+              },
+              {
+                icon: GraduationCap,
+                title: "School verified",
+                desc: "Riders verify their .edu email so you know you're sharing with a real student.",
+              },
+              {
+                icon: Star,
+                title: "Rider ratings",
+                desc: "Rate every ride. Low-rated users are flagged and reviewed by our team.",
+              },
+              {
+                icon: Users,
+                title: "Ride preferences",
+                desc: "Filter by gender preference, max passengers, and verified-only riders.",
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-gray-200 bg-white/90 p-7 text-center transition-all hover:shadow-lg hover:-translate-y-1"
+                >
+                  <div className="mx-auto mb-5 inline-flex size-14 items-center justify-center rounded-2xl bg-[#EFF6FF] text-[#0052FF]">
+                    <Icon className="size-6" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-[#0F172A]">{item.title}</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.desc}</p>
                 </div>
               );
             })}
           </div>
+        </div>
+      </section>
 
-          <div
-            data-scroll-animate
-            className="mt-14 border-t border-gray-200 pt-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 opacity-0 translate-y-8"
-          >
-            <div className="space-y-3 max-w-md">
-              <h4 className="text-2xl font-semibold text-[#0F172A]">
-                Ready to split your next ride?
-              </h4>
-              <p className="text-base text-gray-600">
-                Post a ride, get matched, and message your ride partner—all in
-                a few taps. Same trip, smaller bill.
-              </p>
-            </div>
-            <Link href="/login">
-              <Button
-                size="lg"
-                className="h-14 px-8 text-lg bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg transition-all hover:scale-105"
-              >
-                Get Started
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+      {/* CTA strip */}
+      <section className="py-20 px-6 bg-white/60 backdrop-blur-[2px] relative z-10">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-3 max-w-md">
+            <h4 className="text-2xl font-semibold text-[#0F172A]">Ready to split your next ride?</h4>
+            <p className="text-base text-gray-600">Post a ride, get matched, and message your ride partner—all in a few taps.</p>
           </div>
+          <Link href="/login">
+            <Button size="lg" className="h-14 px-8 text-lg bg-[#0052FF] hover:bg-[#0042CC] text-white rounded-lg transition-all hover:scale-105">
+              Get Started
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-6 border-t border-gray-200/50 bg-white/40 backdrop-blur-[2px] relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-gray-600 text-sm">
-            © {new Date().getFullYear()} Knot. All rights reserved.
+      <footer className="py-8 px-6 border-t border-gray-200/30 bg-white/60 backdrop-blur-[2px] relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col gap-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-gray-600 text-sm">© {new Date().getFullYear()} Knot. All rights reserved.</div>
+            <div className="flex items-center gap-6 text-sm text-gray-600">
+              <Link href="/privacy" className="hover:text-[#0052FF] transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-[#0052FF] transition-colors">Terms</Link>
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-sm text-gray-600">
-            <Link href="/privacy" className="hover:text-[#0052FF] transition-colors">
-              Privacy
-            </Link>
-            <Link href="/terms" className="hover:text-[#0052FF] transition-colors">
-              Terms
-            </Link>
-            <Link href="#" className="hover:text-[#0052FF] transition-colors">
-              Contact
-            </Link>
+
+          <div className="flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-5">
+              <a href="mailto:eddiewang46@gmail.com" className="hover:text-[#0052FF] transition-colors">
+                eddiewang46@gmail.com
+              </a>
+              <a href="tel:6124699098" className="hover:text-[#0052FF] transition-colors">
+                6124699098
+              </a>
+            </div>
+            <div className="flex items-center">
+              <a
+                href="https://www.instagram.com/knot_ride/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-[#BFDBFE] hover:text-[#0052FF]"
+              >
+                <Instagram className="size-4" />
+                Instagram
+              </a>
+            </div>
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

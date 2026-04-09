@@ -48,10 +48,18 @@ function estimateSavingsDollars(match: MatchCandidate) {
 
 async function fetchMatchesPageData(profileId: string, rideParam: string | null) {
   const supabase = getSupabaseClientOrThrow();
-  const [myRides, myRequests] = await Promise.all([
-    getMyRides(profileId),
-    getMyRequests(profileId),
-  ]);
+
+  let myRides: Awaited<ReturnType<typeof getMyRides>>;
+  let myRequests: Awaited<ReturnType<typeof getMyRequests>>;
+  try {
+    [myRides, myRequests] = await Promise.all([
+      getMyRides(profileId),
+      getMyRequests(profileId),
+    ]);
+  } catch (err) {
+    console.error("[matches] Failed loading rides/requests:", err);
+    throw err;
+  }
 
   let id: string | null = rideParam;
   if (!id) {
@@ -70,17 +78,24 @@ async function fetchMatchesPageData(profileId: string, rideParam: string | null)
     ? { origin: selected.origin_name, dest: selected.dest_name }
     : null;
 
-  const [results, existingRes] = await Promise.all([
-    findMatches(id),
-    supabase
-      .from("ride_requests")
-      .select("ride_id, requester_ride_id, status")
-      .or(`ride_id.eq.${id},requester_ride_id.eq.${id}`)
-      .in("status", ["accepted", "pending"]),
-  ]);
+  let results: MatchCandidate[];
+  try {
+    results = await findMatches(id);
+  } catch (err) {
+    console.error("[matches] findMatches failed for ride", id, err);
+    throw err;
+  }
 
-  const { data: existingRequests, error: existingError } = existingRes;
-  if (existingError) throw existingError;
+  const { data: existingRequests, error: existingError } = await supabase
+    .from("ride_requests")
+    .select("ride_id, requester_ride_id, status")
+    .or(`ride_id.eq.${id},requester_ride_id.eq.${id}`)
+    .in("status", ["accepted", "pending"]);
+
+  if (existingError) {
+    console.error("[matches] ride_requests query failed:", existingError);
+    throw existingError;
+  }
 
   let filtered: MatchCandidate[];
   if (existingRequests && existingRequests.length > 0) {
@@ -756,11 +771,22 @@ function MatchesContent() {
   }
 
   if (error === "load_failed") {
+    const errMsg =
+      queryError instanceof Error
+        ? queryError.message
+        : typeof queryError === "object" && queryError !== null && "message" in queryError
+          ? String((queryError as { message: unknown }).message)
+          : String(queryError);
     return (
       <div className="py-16 text-center">
         <p className="mb-4 text-sm text-zinc-500">
           Something went wrong loading matches.
         </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="mx-auto mb-4 max-w-md break-words font-mono text-xs text-red-400">
+            {errMsg}
+          </p>
+        )}
         <Button variant="outline" size="sm" onClick={() => refetch()}>
           Try again
         </Button>

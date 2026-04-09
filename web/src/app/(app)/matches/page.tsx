@@ -49,16 +49,24 @@ function estimateSavingsDollars(match: MatchCandidate) {
 async function fetchMatchesPageData(profileId: string, rideParam: string | null) {
   const supabase = getSupabaseClientOrThrow();
 
-  let myRides: Awaited<ReturnType<typeof getMyRides>>;
-  let myRequests: Awaited<ReturnType<typeof getMyRequests>>;
-  try {
-    [myRides, myRequests] = await Promise.all([
-      getMyRides(profileId),
-      getMyRequests(profileId),
-    ]);
-  } catch (err) {
-    console.error("[matches] Failed loading rides/requests:", err);
-    throw err;
+  const [ridesResult, requestsResult] = await Promise.allSettled([
+    getMyRides(profileId),
+    getMyRequests(profileId),
+  ]);
+
+  if (ridesResult.status === "rejected") {
+    console.error("[matches] Failed loading rides:", ridesResult.reason);
+    throw ridesResult.reason;
+  }
+  const myRides = ridesResult.value;
+  let myRequests: Awaited<ReturnType<typeof getMyRequests>> = [];
+  if (requestsResult.status === "rejected") {
+    console.error(
+      "[matches] getMyRequests failed (showing matches without request list):",
+      requestsResult.reason,
+    );
+  } else {
+    myRequests = requestsResult.value;
   }
 
   let id: string | null = rideParam;

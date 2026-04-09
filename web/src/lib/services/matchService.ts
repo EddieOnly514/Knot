@@ -3,6 +3,7 @@ import type { MatchCandidate, MatchMemberSummary } from "@/types";
 
 /**
  * Find matches for a ride using the V3 scoring algorithm.
+ * Always calls the Supabase RPC directly — no silent dev fallback.
  */
 export async function findMatches(
     rideId: string,
@@ -31,25 +32,15 @@ export async function findMatches(
         p_min_score: options?.minScore ?? 0,
     });
 
-    if (!error) {
-        return normalize((data || []) as Array<MatchCandidate & { members: unknown }>);
+    if (error) {
+        const msg = [error.message, error.code && `(${error.code})`, error.details, error.hint]
+            .filter(Boolean)
+            .join(" ");
+        console.error("[findMatches] find_matches_v3 RPC failed:", msg || error, error);
+        throw new Error(msg || "find_matches_v3 failed");
     }
 
-    if (process.env.NODE_ENV !== "development") {
-        throw error;
-    }
-
-    const res = await fetch(
-        `/api/dev-matches?rideId=${encodeURIComponent(rideId)}&maxResults=${options?.maxResults ?? 10}`,
-        { cache: "no-store" }
-    );
-
-    if (!res.ok) {
-        throw error;
-    }
-
-    const fallbackData = (await res.json()) as Array<MatchCandidate & { members: unknown }>;
-    return normalize(fallbackData);
+    return normalize((data || []) as Array<MatchCandidate & { members: unknown }>);
 }
 
 /** Extract a user-friendly message from a Supabase/Postgrest error. */

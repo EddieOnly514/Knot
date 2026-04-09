@@ -62,13 +62,23 @@ import { TripCardMeta } from "@/components/match-trip-meta";
 
 function toErrorDetails(err: unknown): string {
   if (!err) return "";
-  if (err instanceof Error) return err.message;
-  if (typeof err === "object") {
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return String(err);
+  if (err instanceof Error) return err.message || String(err);
+  if (typeof err === "object" && err !== null) {
+    const o = err as Record<string, unknown>;
+    const message = typeof o.message === "string" ? o.message : "";
+    const code = typeof o.code === "string" ? o.code : "";
+    const details = typeof o.details === "string" ? o.details : "";
+    const hint = typeof o.hint === "string" ? o.hint : "";
+    if (message || code || details || hint) {
+      return [code && `[${code}]`, message, details, hint].filter(Boolean).join(" ");
     }
+    try {
+      const s = JSON.stringify(err);
+      if (s !== "{}") return s;
+    } catch {
+      /* fall through */
+    }
+    return "Unknown error";
   }
   return String(err);
 }
@@ -568,9 +578,7 @@ export default function HomePage() {
       setSuggestedMatches([]);
       persistCache({ suggestedMatches: [] });
       const details = toErrorDetails(err);
-      // Suggested matches are non-critical. Avoid noisy console errors when
-      // backend RPC is unavailable or returns empty objects in dev.
-      if (process.env.NODE_ENV === "development" && details && details !== "{}") {
+      if (process.env.NODE_ENV === "development" && details) {
         console.warn("[HomePage] Suggested matches unavailable:", details);
       }
     } finally {

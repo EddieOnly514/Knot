@@ -86,6 +86,7 @@ export interface Database {
           pets_ok: boolean;
           smoking_ok: boolean;
           verified_only: boolean;
+          notes: string | null;
           status: "active" | "matched" | "completed" | "cancelled";
           created_at: string;
           updated_at: string;
@@ -112,6 +113,7 @@ export interface Database {
           pets_ok?: boolean;
           smoking_ok?: boolean;
           verified_only?: boolean;
+          notes?: string | null;
           status?: string;
         };
         Update: Partial<Database["public"]["Tables"]["rides"]["Insert"]>;
@@ -158,6 +160,7 @@ export interface Database {
           ride_id: string;
           requester_ride_id: string;
           status: "pending" | "accepted" | "rejected";
+          ride_status: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -166,6 +169,7 @@ export interface Database {
           ride_id: string;
           requester_ride_id: string;
           status?: string;
+          ride_status?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["ride_requests"]["Insert"]>;
       };
@@ -175,13 +179,59 @@ export interface Database {
           id: string;
           ride_id: string;
           created_at: string;
+          status: "active" | "archived";
+          archived_at: string | null;
+          updated_at: string | null;
+          rider_count: number;
+          total_bags: number;
+          has_oversized: boolean;
+          needs_xl: boolean;
+          match_label: string | null;
+          effective_departure_earliest: string | null;
+          effective_departure_latest: string | null;
+          effective_date: string | null;
+          origin_centroid_lat: number | null;
+          origin_centroid_lng: number | null;
         };
         Insert: {
           id?: string;
           ride_id: string;
           created_at?: string;
+          status?: "active" | "archived";
+          archived_at?: string | null;
+          updated_at?: string | null;
+          rider_count?: number;
+          total_bags?: number;
+          has_oversized?: boolean;
+          needs_xl?: boolean;
+          match_label?: string | null;
+          effective_departure_earliest?: string | null;
+          effective_departure_latest?: string | null;
+          effective_date?: string | null;
+          origin_centroid_lat?: number | null;
+          origin_centroid_lng?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["ride_groups"]["Insert"]>;
+      };
+
+      ride_group_members: {
+        Row: {
+          id: string;
+          ride_group_id: string;
+          ride_id: string;
+          joined_at: string;
+          left_at: string | null;
+          is_main: boolean;
+        };
+        Insert: {
+          id?: string;
+          ride_group_id: string;
+          ride_id: string;
+          joined_at?: string;
+          left_at?: string | null;
+          is_main?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["ride_group_members"]["Insert"]>;
       };
 
       messages: {
@@ -234,6 +284,10 @@ export interface Database {
         Args: { p_ride_id: string };
         Returns: number;
       };
+      count_group_seats_for_ride: {
+        Args: { p_ride_id: string };
+        Returns: number;
+      };
       find_matches_v3: {
         Args: {
           p_ride_id: string;
@@ -241,6 +295,10 @@ export interface Database {
           p_min_score?: number;
         };
         Returns: {
+          candidate_id: string;
+          candidate_type: string;
+          request_target_ride_id: string;
+          ride_group_id: string | null;
           ride_id: string;
           user_id: string;
           ride_type: string;
@@ -249,31 +307,81 @@ export interface Database {
           departure_earliest: string;
           departure_latest: string;
           departure_preferred: string | null;
-          seats_available: number;
           seats_needed: number;
           space_capacity: number;
           gender_pref: string;
           quiet_ride: boolean;
           music_ok: boolean;
+          notes: string | null;
           first_name: string;
           last_name: string;
           photo_url: string | null;
           bio: string | null;
-          rating: number;
-          total_rides: number;
-          phone_verified: boolean;
-          email_verified: boolean;
-          id_verified: boolean;
-          total_score: number;
-          score_route: number;
-          score_time: number;
-          score_trust: number;
-          score_space: number;
-          score_prefs: number;
-          origin_distance_miles: number | null;
-          dest_distance_miles: number | null;
-          time_overlap_minutes: number;
+          school: string | null;
+          time_tier: string;
+          overlap_minutes: number;
+          gap_minutes: number;
+          d_origin_miles: number | null;
+          d_origin_tier: string;
+          d_destination_miles: number | null;
+          d_destination_tier: string;
+          needs_xl: boolean;
+          xl_flag_message: string | null;
+          seats_remaining_after_join: number;
+          fill_efficiency: number;
+          gender_compatible: boolean;
+          pref_overall: number;
+          group_size_before_join: number;
+          group_size_after_join: number;
+          members: Json;
           match_label: string;
+          match_explanation: string;
+        }[];
+      };
+      leave_current_ride_group: {
+        Args: { p_anchor_ride_id: string };
+        Returns: string;
+      };
+      leave_ride_group: {
+        Args: { p_ride_group_id: string };
+        Returns: string;
+      };
+      get_message_thread_summaries: {
+        Args: {
+          p_reader_profile_id: string;
+          p_conversation_ids: string[];
+          p_group_ids: string[];
+        };
+        Returns: {
+          thread_id: string;
+          is_group: boolean;
+          last_content: string | null;
+          last_created_at: string | null;
+          last_message_type: string | null;
+          unread_count: number;
+        }[];
+      };
+      get_ride_requests_enriched: {
+        Args: { p_profile_id: string };
+        Returns: {
+          request_id: string;
+          request_status: string;
+          ride_status: string | null;
+          created_at: string;
+          ride_id: string;
+          my_ride_origin: string;
+          my_ride_dest: string;
+          requester_ride_id: string;
+          requester_name: string;
+          requester_photo: string | null;
+          requester_school: string | null;
+          requester_rating: number;
+          requester_origin: string;
+          requester_dest: string;
+          requester_departure: string;
+          requester_seats: number;
+          requester_profile_id: string;
+          direction: string;
         }[];
       };
     };

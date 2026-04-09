@@ -39,7 +39,7 @@ export async function sendWaitlistThankYou(to: string): Promise<{ ok: boolean; e
       We'll only email you about launch and important ride updates. No spam, ever.
     </p>
     <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
-      In the meantime: tell friends from your school who are splitting airport rides. Same trip, smaller bill.
+      In the meantime: tell friends from your school who are splitting airport rides. Your people are already heading your way.
     </p>
     <p style="margin: 0; font-size: 14px; color: #71717a;">
       — The Knot team

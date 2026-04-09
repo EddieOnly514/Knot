@@ -20,9 +20,11 @@ export const metadata: Metadata = {
     title: "Knot",
   },
   icons: {
-    icon: "/knot-logo.png",
-    apple: "/knot-logo.png",
-    shortcut: "/knot-logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
   },
 };
 

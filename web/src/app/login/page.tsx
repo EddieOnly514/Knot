@@ -83,28 +83,10 @@ function LoginForm() {
     setResendLoading(false);
   };
 
-  const fillTestAccount = () => {
-    const testEmail = process.env.NEXT_PUBLIC_TEST_EMAIL_1;
-    const testPass = process.env.NEXT_PUBLIC_TEST_PASSWORD;
-    if (!testEmail || !testPass) {
-      toast.error("Test credentials not configured in .env.local");
-      return;
-    }
-    setEmail(testEmail);
-    setPassword(testPass);
-    toast.success("Test credentials filled. Click Sign in.");
-  };
-
-  const fillGroupChatTestAccount = () => {
-    const testEmail = process.env.NEXT_PUBLIC_TEST_EMAIL_2;
-    const testPass = process.env.NEXT_PUBLIC_TEST_PASSWORD;
-    if (!testEmail || !testPass) {
-      toast.error("Test credentials not configured in .env.local");
-      return;
-    }
-    setEmail(testEmail);
-    setPassword(testPass);
-    toast.success("Group chat test account filled. Go to Messages after sign-in.");
+  const fillAccount = (email: string, hint: string) => {
+    setEmail(email);
+    setPassword("KnotTest2026!");
+    toast.success(hint);
   };
 
   const seedTestAccounts = async () => {
@@ -116,8 +98,7 @@ function LoginForm() {
         toast.error(data.error ?? `Seed failed (${res.status})`);
         return;
       }
-      fillTestAccount();
-      toast.success("Test accounts created. You can sign in now.");
+      fillAccount("casey@knot-test.dev", "Test data created. Casey account filled — accept requests to grow your group.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create test accounts");
     } finally {
@@ -243,7 +224,7 @@ function LoginForm() {
         {process.env.NODE_ENV === "development" && (
           <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <p className="text-amber-800 text-xs font-medium">
-              Dev: Test accounts for simulated match
+              Dev: Test accounts for group chat
             </p>
             <button
               type="button"
@@ -257,29 +238,39 @@ function LoginForm() {
                   Creating test accounts…
                 </>
               ) : (
-                "1. Create test accounts (run seed)"
+                "1. Seed test data"
               )}
             </button>
             <button
               type="button"
-              onClick={fillTestAccount}
+              onClick={() => fillAccount("casey@knot-test.dev", "Casey: accept 5 requests to grow group 1→6")}
               className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
             >
-              2. Fill 1:1 test account (sarah@knot-test.dev)
+              2. Casey — accept flow (1→6 group)
             </button>
             <button
               type="button"
-              onClick={fillGroupChatTestAccount}
+              onClick={() => fillAccount("david@knot-test.dev", "David: existing 3-person group chat")}
               className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
             >
-              3. Fill group chat test account (david@knot-test.dev)
+              3. David — existing group chat
+            </button>
+            <button
+              type="button"
+              onClick={() => fillAccount("maya@knot-test.dev", "Maya: leave group test — group survives for others")}
+              className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
+            >
+              4. Maya — host leaves group
+            </button>
+            <button
+              type="button"
+              onClick={() => fillAccount("sarah@knot-test.dev", "Sarah: browse matches and send requests")}
+              className="w-full py-2 px-4 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-xs font-medium hover:bg-amber-200 transition-colors"
+            >
+              5. Sarah — match discovery
             </button>
             <p className="text-amber-700 text-[11px]">
-              Password: KnotTest2026! — Then click Sign in. If sign-in fails,
-              enable &quot;Email&quot; in Supabase → Auth → Providers.
-            </p>
-            <p className="text-amber-700 text-[11px]">
-              <strong>1:1 → group test:</strong> Sign in as david@… → Messages (1:1 with Sophia) → Home → accept Alex&apos;s request → Messages shows Group (3) with same messages. Chris@… already has Group (4).
+              Password: KnotTest2026! — Click Seed first, then pick an account and Sign in.
             </p>
             <button
               type="button"
@@ -289,7 +280,7 @@ function LoginForm() {
               }}
               className="w-full py-2 px-4 rounded-lg border border-amber-300 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
             >
-              🔧 Dev: Mock login (no Supabase)
+              Dev: Mock login (no Supabase)
             </button>
           </div>
         )}

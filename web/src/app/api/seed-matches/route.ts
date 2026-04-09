@@ -4,17 +4,14 @@ import path from "path";
 import fs from "fs";
 
 const TEST_DOMAIN = "knot-test.dev";
+const TEST_PASSWORD = "KnotTest2026!";
 
-/** Load .env.local into process.env so API route always sees vars (Next.js sometimes doesn't load it). */
 function loadEnvLocalIfNeeded() {
-    // Try every plausible location for web/.env.local
     const cwd = process.cwd();
     const possibleDirs = [
         cwd,
         path.join(cwd, "web"),
-        // From source: web/src/app/api/seed-matches -> web (4 levels up)
         path.join(__dirname, "..", "..", "..", ".."),
-        // From compiled: .next/server/app/api/seed-matches -> web (5 levels up)
         path.join(__dirname, "..", "..", "..", "..", ".."),
     ];
     for (const dir of possibleDirs) {
@@ -33,14 +30,13 @@ function loadEnvLocalIfNeeded() {
             }
             return;
         } catch {
-            // continue to next path
+            // continue
         }
     }
 }
 
 interface FakeUser {
     email: string;
-    password: string;
     firstName: string;
     lastName: string;
     school: string;
@@ -51,52 +47,92 @@ interface FakeUser {
     phoneVerified: boolean;
     emailVerified: boolean;
     idVerified: boolean;
-    conversationPref: string;
-    musicPref: string;
-    smokingPref: string;
-    photoUrl: string | null;
 }
 
 const FAKE_USERS: FakeUser[] = [
+    // ── Casey: main accept-flow account (grows group from 1→6) ──
     {
-        email: `sarah@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
-        firstName: "Sarah",
-        lastName: "Johnson",
+        email: `casey@${TEST_DOMAIN}`,
+        firstName: "Casey",
+        lastName: "Nguyen",
         school: "UCLA",
-        bio: "Film major at UCLA. Road trips > everything.",
-        rating: 4.8,
-        completedRides: 12,
-        totalRides: 15,
+        bio: "Always coordinating airport runs for friends.",
+        rating: 4.7,
+        completedRides: 10,
+        totalRides: 12,
         phoneVerified: true,
         emailVerified: true,
         idVerified: true,
-        conversationPref: "chatty",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: "/avatars/sarah.svg",
     },
     {
-        email: `mike@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
-        firstName: "Mike",
-        lastName: "Chen",
-        school: "USC",
-        bio: "CS student. Low-key, always on time.",
-        rating: 4.5,
-        completedRides: 8,
-        totalRides: 10,
+        email: `morgan@${TEST_DOMAIN}`,
+        firstName: "Morgan",
+        lastName: "Lee",
+        school: "UCLA",
+        bio: "Red-eye flights and one backpack.",
+        rating: 4.6,
+        completedRides: 5,
+        totalRides: 7,
         phoneVerified: true,
         emailVerified: true,
         idVerified: false,
-        conversationPref: "chill",
-        musicPref: "no_preference",
-        smokingPref: "no",
-        photoUrl: "/avatars/mike.svg",
     },
     {
+        email: `jamie@${TEST_DOMAIN}`,
+        firstName: "Jamie",
+        lastName: "Patel",
+        school: "USC",
+        bio: "Usually down to share if pickup is easy.",
+        rating: 4.5,
+        completedRides: 4,
+        totalRides: 6,
+        phoneVerified: true,
+        emailVerified: true,
+        idVerified: false,
+    },
+    {
+        email: `sam@${TEST_DOMAIN}`,
+        firstName: "Sam",
+        lastName: "Lopez",
+        school: "Santa Monica College",
+        bio: "Flexible on timing if it saves money.",
+        rating: 4.4,
+        completedRides: 3,
+        totalRides: 5,
+        phoneVerified: true,
+        emailVerified: true,
+        idVerified: false,
+    },
+    {
+        email: `liam@${TEST_DOMAIN}`,
+        firstName: "Liam",
+        lastName: "Brooks",
+        school: "UCLA",
+        bio: "Good with airport pickups as long as timing is clear.",
+        rating: 4.6,
+        completedRides: 8,
+        totalRides: 11,
+        phoneVerified: true,
+        emailVerified: true,
+        idVerified: false,
+    },
+    {
+        email: `ava@${TEST_DOMAIN}`,
+        firstName: "Ava",
+        lastName: "Singh",
+        school: "USC",
+        bio: "One carry-on and a clear pickup spot is all I need.",
+        rating: 4.7,
+        completedRides: 9,
+        totalRides: 12,
+        phoneVerified: true,
+        emailVerified: true,
+        idVerified: false,
+    },
+
+    // ── David: existing 3-person group chat ──
+    {
         email: `david@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "David",
         lastName: "Kim",
         school: "SJSU",
@@ -107,14 +143,9 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: true,
         idVerified: false,
-        conversationPref: "chill",
-        musicPref: "no_preference",
-        smokingPref: "no",
-        photoUrl: "/avatars/km.svg",
     },
     {
         email: `sophia@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "Sophia",
         lastName: "Taylor",
         school: "Stanford",
@@ -125,14 +156,9 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: true,
         idVerified: true,
-        conversationPref: "quiet",
-        musicPref: "no",
-        smokingPref: "no",
-        photoUrl: null,
     },
     {
         email: `alex@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "Alex",
         lastName: "Rivera",
         school: "UC Berkeley",
@@ -143,32 +169,37 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: true,
         idVerified: false,
-        conversationPref: "chatty",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: null,
     },
+
+    // ── Sarah: match discovery (sees available solo candidates) ──
     {
-        email: `chris@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
-        firstName: "Chris",
-        lastName: "Park",
+        email: `sarah@${TEST_DOMAIN}`,
+        firstName: "Sarah",
+        lastName: "Johnson",
         school: "UCLA",
-        bio: "Engineering student. Burbank to campus all the time.",
+        bio: "Film major at UCLA. Road trips > everything.",
         rating: 4.8,
-        completedRides: 11,
-        totalRides: 14,
+        completedRides: 12,
+        totalRides: 15,
         phoneVerified: true,
         emailVerified: true,
         idVerified: true,
-        conversationPref: "chill",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: null,
+    },
+    {
+        email: `mike@${TEST_DOMAIN}`,
+        firstName: "Mike",
+        lastName: "Chen",
+        school: "USC",
+        bio: "CS student. Low-key, always on time.",
+        rating: 4.5,
+        completedRides: 8,
+        totalRides: 10,
+        phoneVerified: true,
+        emailVerified: true,
+        idVerified: false,
     },
     {
         email: `jordan@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "Jordan",
         lastName: "Liu",
         school: "USC",
@@ -179,32 +210,24 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: false,
         idVerified: false,
-        conversationPref: "quiet",
-        musicPref: "no_preference",
-        smokingPref: "no",
-        photoUrl: null,
     },
+
+    // ── Maya: host-leaves test (3-person group, creator can leave) ──
     {
-        email: `taylor@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
-        firstName: "Taylor",
-        lastName: "Green",
-        school: "USC",
-        bio: "LAX runs every other week.",
-        rating: 4.7,
-        completedRides: 7,
-        totalRides: 9,
+        email: `maya@${TEST_DOMAIN}`,
+        firstName: "Maya",
+        lastName: "Rodriguez",
+        school: "LMU",
+        bio: "Usually the planner, but happy to hand things off.",
+        rating: 4.8,
+        completedRides: 13,
+        totalRides: 16,
         phoneVerified: true,
         emailVerified: true,
-        idVerified: false,
-        conversationPref: "chatty",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: null,
+        idVerified: true,
     },
     {
         email: `riley@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "Riley",
         lastName: "Brown",
         school: "UCLA",
@@ -215,14 +238,9 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: true,
         idVerified: false,
-        conversationPref: "chill",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: null,
     },
     {
         email: `quinn@${TEST_DOMAIN}`,
-        password: "KnotTest2026!",
         firstName: "Quinn",
         lastName: "Harris",
         school: "UC Berkeley",
@@ -233,10 +251,6 @@ const FAKE_USERS: FakeUser[] = [
         phoneVerified: true,
         emailVerified: true,
         idVerified: true,
-        conversationPref: "chill",
-        musicPref: "yes",
-        smokingPref: "no",
-        photoUrl: null,
     },
 ];
 
@@ -245,13 +259,8 @@ function getAdmin() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) {
-        const cwd = process.env.NODE_ENV === "development" ? process.cwd() : "";
-        const hint =
-            process.env.NODE_ENV === "development"
-                ? ` cwd=${cwd} — run from web folder: cd web && npm run dev`
-                : "";
         throw new Error(
-            `Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add them to web/.env.local.${hint}`
+            "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Add them to web/.env.local."
         );
     }
     return createClient(url, key, {
@@ -266,24 +275,16 @@ function tomorrowAtHour(hour: number, min = 0): string {
     return d.toISOString();
 }
 
-async function cleanupTestUsers(
-    supabase: ReturnType<typeof createClient>
-): Promise<number> {
-    const {
-        data: { users },
-    } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    const testUsers = (users || []).filter((u) =>
-        u.email?.endsWith(`@${TEST_DOMAIN}`)
-    );
+type Supabase = ReturnType<typeof createClient>;
 
+async function cleanupTestUsers(supabase: Supabase): Promise<number> {
+    const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    const testUsers = (users || []).filter((u) => u.email?.endsWith(`@${TEST_DOMAIN}`));
     for (const user of testUsers) {
         await supabase.auth.admin.deleteUser(user.id);
     }
     return testUsers.length;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Supabase = ReturnType<typeof createClient>;
 
 async function createTestUsers(supabase: Supabase) {
     const authIds: Record<string, string> = {};
@@ -291,456 +292,328 @@ async function createTestUsers(supabase: Supabase) {
     for (const u of FAKE_USERS) {
         const { data, error } = await supabase.auth.admin.createUser({
             email: u.email,
-            password: u.password,
+            password: TEST_PASSWORD,
             email_confirm: true,
-            user_metadata: {
-                first_name: u.firstName,
-                last_name: u.lastName,
-            },
+            user_metadata: { first_name: u.firstName, last_name: u.lastName },
         });
-        if (error)
-            throw new Error(
-                `Failed to create user ${u.email}: ${error.message}`
-            );
+        if (error) throw new Error(`Failed to create user ${u.email}: ${error.message}`);
         authIds[u.email] = data.user.id;
     }
 
-    // Let the handle_new_user trigger fire and create profiles
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1500));
 
     const profileIds: Record<string, string> = {};
     for (const u of FAKE_USERS) {
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("user_id", authIds[u.email])
-            .single();
-        if (!profile)
-            throw new Error(`Profile not created for ${u.email}`);
-        profileIds[u.email] = (profile as { id: string }).id;
+        let profile: { id: string } | null = null;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            const { data } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("user_id", authIds[u.email])
+                .maybeSingle();
+            if (data) { profile = data as { id: string }; break; }
+            await new Promise((r) => setTimeout(r, 500));
+        }
+
+        if (!profile) {
+            const { data, error } = await (
+                supabase.from("profiles") as unknown as {
+                    insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }> } };
+                }
+            ).insert({
+                user_id: authIds[u.email],
+                email: u.email,
+                first_name: u.firstName,
+                last_name: u.lastName,
+            }).select("id").single();
+            if (error || !data) throw new Error(`Profile not created for ${u.email}: ${error?.message ?? "unknown"}`);
+            profile = data;
+        }
+
+        profileIds[u.email] = profile.id;
     }
 
-    // Enrich profiles (cast needed: Supabase client types can infer never for tables without generated types)
-    const profileUpdate = (u: (typeof FAKE_USERS)[number]) => ({
-        school: u.school,
-        bio: u.bio,
-        rating: u.rating,
-        completed_rides: u.completedRides,
-        total_rides: u.totalRides,
-        phone_verified: u.phoneVerified,
-        email_verified: u.emailVerified,
-        id_verified: u.idVerified,
-        conversation_pref: u.conversationPref,
-        music_pref: u.musicPref,
-        smoking_pref: u.smokingPref,
-        photo_url: u.photoUrl,
-        is_verified: u.idVerified,
-    });
     for (const u of FAKE_USERS) {
-        // Cast: Supabase client types can infer never for profiles without generated types
-        const table = supabase.from("profiles") as unknown as { update: (p: unknown) => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> } };
-        const { error } = await table.update(profileUpdate(u)).eq("id", profileIds[u.email]);
-        if (error)
-            throw new Error(
-                `Failed to update profile ${u.email}: ${error.message}`
-            );
+        const table = supabase.from("profiles") as unknown as {
+            update: (p: unknown) => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> };
+        };
+        const { error } = await table.update({
+            school: u.school,
+            bio: u.bio,
+            rating: u.rating,
+            completed_rides: u.completedRides,
+            total_rides: u.totalRides,
+            phone_verified: u.phoneVerified,
+            email_verified: u.emailVerified,
+            id_verified: u.idVerified,
+            is_verified: u.idVerified,
+        }).eq("id", profileIds[u.email]);
+        if (error) throw new Error(`Failed to update profile ${u.email}: ${error.message}`);
     }
 
     return profileIds;
 }
 
-async function createTestRides(
-    supabase: Supabase,
-    profileIds: Record<string, string>
-) {
+async function createTestRides(supabase: Supabase, profileIds: Record<string, string>) {
     const rideIds: Record<string, string> = {};
 
     const rides = [
-        // ── Route A: LAX → UCLA (single match) ──
+        // ── Casey accept flow: host ride + 5 candidates with nearby origins/dest ──
         {
-            key: "sarah_offering",
-            userId: profileIds[`sarah@${TEST_DOMAIN}`],
-            rideType: "offering",
-            originName: "Los Angeles International Airport (LAX)",
-            originLat: 33.9425,
-            originLng: -118.4081,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(14),
-            latest: tomorrowAtHour(16),
-            preferred: tomorrowAtHour(15),
-            seatsAvailable: 4,
+            key: "casey_host",
+            userId: profileIds[`casey@${TEST_DOMAIN}`],
+            originName: "UCLA Ackerman Union, Los Angeles, CA",
+            originLat: 34.0703, originLng: -118.4441,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9435, destLng: -118.4085,
+            earliest: tomorrowAtHour(18), latest: tomorrowAtHour(19),
+            preferred: tomorrowAtHour(18, 30),
             seatsNeeded: 1,
-            spaceCapacity: 3,
         },
         {
-            key: "mike_seeking",
-            userId: profileIds[`mike@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "Los Angeles International Airport (LAX)",
-            originLat: 33.9425,
-            originLng: -118.4081,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(14, 30),
-            latest: tomorrowAtHour(16, 30),
-            preferred: tomorrowAtHour(15, 15),
-            seatsAvailable: 1,
+            key: "morgan_req",
+            userId: profileIds[`morgan@${TEST_DOMAIN}`],
+            originName: "Westwood Plaza, Los Angeles, CA",
+            originLat: 34.0719, originLng: -118.4449,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9432, destLng: -118.4084,
+            earliest: tomorrowAtHour(18, 10), latest: tomorrowAtHour(19, 10),
+            preferred: tomorrowAtHour(18, 40),
             seatsNeeded: 1,
-            spaceCapacity: 1,
+        },
+        {
+            key: "jamie_req",
+            userId: profileIds[`jamie@${TEST_DOMAIN}`],
+            originName: "Sawtelle Japantown, Los Angeles, CA",
+            originLat: 34.0423, originLng: -118.4427,
+            destName: "LAX Terminal 4, Los Angeles, CA",
+            destLat: 33.9416, destLng: -118.4088,
+            earliest: tomorrowAtHour(18, 20), latest: tomorrowAtHour(19, 15),
+            preferred: tomorrowAtHour(18, 45),
+            seatsNeeded: 1,
+        },
+        {
+            key: "sam_req",
+            userId: profileIds[`sam@${TEST_DOMAIN}`],
+            originName: "Brentwood, Los Angeles, CA",
+            originLat: 34.0546, originLng: -118.4695,
+            destName: "LAX Terminal 6, Los Angeles, CA",
+            destLat: 33.9427, destLng: -118.4067,
+            earliest: tomorrowAtHour(18, 15), latest: tomorrowAtHour(19, 5),
+            preferred: tomorrowAtHour(18, 35),
+            seatsNeeded: 1,
+        },
+        {
+            key: "liam_req",
+            userId: profileIds[`liam@${TEST_DOMAIN}`],
+            originName: "Westwood Village, Los Angeles, CA",
+            originLat: 34.0637, originLng: -118.4455,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9431, destLng: -118.4081,
+            earliest: tomorrowAtHour(18, 5), latest: tomorrowAtHour(19),
+            preferred: tomorrowAtHour(18, 30),
+            seatsNeeded: 1,
+        },
+        {
+            key: "ava_req",
+            userId: profileIds[`ava@${TEST_DOMAIN}`],
+            originName: "West Los Angeles, Los Angeles, CA",
+            originLat: 34.0508, originLng: -118.4308,
+            destName: "LAX Terminal 5, Los Angeles, CA",
+            destLat: 33.9421, destLng: -118.4078,
+            earliest: tomorrowAtHour(18, 10), latest: tomorrowAtHour(19, 10),
+            preferred: tomorrowAtHour(18, 40),
+            seatsNeeded: 1,
         },
 
-        // ── Route B: SFO → Stanford (group of 3) ──
+        // ── David's existing group (3 accepted) ──
         {
-            key: "david_offering",
+            key: "david_host",
             userId: profileIds[`david@${TEST_DOMAIN}`],
-            rideType: "offering",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14),
-            latest: tomorrowAtHour(15),
-            preferred: tomorrowAtHour(14, 30),
-            seatsAvailable: 3,
+            originName: "Westwood Gateway, Los Angeles, CA",
+            originLat: 34.0621, originLng: -118.4468,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9433, destLng: -118.4079,
+            earliest: tomorrowAtHour(16, 45), latest: tomorrowAtHour(18),
+            preferred: tomorrowAtHour(17, 15),
             seatsNeeded: 1,
-            spaceCapacity: 2,
         },
         {
-            key: "sophia_seeking",
+            key: "sophia_member",
             userId: profileIds[`sophia@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14),
-            latest: tomorrowAtHour(15),
-            preferred: tomorrowAtHour(14, 30),
-            seatsAvailable: 1,
+            originName: "UCLA Gayley Center, Los Angeles, CA",
+            originLat: 34.0733, originLng: -118.4441,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9442, destLng: -118.4082,
+            earliest: tomorrowAtHour(16, 50), latest: tomorrowAtHour(18, 10),
+            preferred: tomorrowAtHour(17, 20),
             seatsNeeded: 1,
-            spaceCapacity: 1,
         },
         {
-            key: "alex_seeking",
+            key: "alex_member",
             userId: profileIds[`alex@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14, 15),
-            latest: tomorrowAtHour(15, 15),
-            preferred: tomorrowAtHour(14, 45),
-            seatsAvailable: 1,
+            originName: "Westwood Gardens, Los Angeles, CA",
+            originLat: 34.0661, originLng: -118.4438,
+            destName: "LAX Terminal 3, Los Angeles, CA",
+            destLat: 33.9426, destLng: -118.4103,
+            earliest: tomorrowAtHour(17), latest: tomorrowAtHour(18),
+            preferred: tomorrowAtHour(17, 25),
             seatsNeeded: 1,
-            spaceCapacity: 1,
-        },
-        {
-            key: "jordan_seeking_sfo",
-            userId: profileIds[`jordan@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14, 10),
-            latest: tomorrowAtHour(15, 10),
-            preferred: tomorrowAtHour(14, 35),
-            seatsAvailable: 1,
-            seatsNeeded: 1,
-            spaceCapacity: 1,
-        },
-        {
-            key: "taylor_seeking_sfo",
-            userId: profileIds[`taylor@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14, 20),
-            latest: tomorrowAtHour(15, 20),
-            preferred: tomorrowAtHour(14, 50),
-            seatsAvailable: 1,
-            seatsNeeded: 1,
-            spaceCapacity: 1,
-        },
-        {
-            key: "riley_seeking_sfo",
-            userId: profileIds[`riley@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "San Francisco International Airport (SFO)",
-            originLat: 37.6213,
-            originLng: -122.379,
-            destName: "Stanford University, Palo Alto, CA",
-            destLat: 37.4275,
-            destLng: -122.1697,
-            earliest: tomorrowAtHour(14, 25),
-            latest: tomorrowAtHour(15, 25),
-            preferred: tomorrowAtHour(14, 55),
-            seatsAvailable: 1,
-            seatsNeeded: 1,
-            spaceCapacity: 1,
         },
 
-        // ── Route C: BUR → UCLA (group of 4 + 1 pending) ──
+        // ── Sarah: match discovery (has a ride, sees Mike + Jordan as candidates) ──
         {
-            key: "chris_offering",
-            userId: profileIds[`chris@${TEST_DOMAIN}`],
-            rideType: "offering",
-            originName: "Hollywood Burbank Airport (BUR)",
-            originLat: 34.2,
-            originLng: -118.3587,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(8),
-            latest: tomorrowAtHour(10),
-            preferred: tomorrowAtHour(9),
-            seatsAvailable: 4,
+            key: "sarah_main",
+            userId: profileIds[`sarah@${TEST_DOMAIN}`],
+            originName: "UCLA De Neve Plaza, Los Angeles, CA",
+            originLat: 34.0713, originLng: -118.4501,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9435, destLng: -118.4085,
+            earliest: tomorrowAtHour(16), latest: tomorrowAtHour(18),
+            preferred: tomorrowAtHour(17),
             seatsNeeded: 1,
-            spaceCapacity: 2,
         },
         {
-            key: "jordan_seeking",
+            key: "mike_candidate",
+            userId: profileIds[`mike@${TEST_DOMAIN}`],
+            originName: "Westwood Village, Los Angeles, CA",
+            originLat: 34.0637, originLng: -118.4455,
+            destName: "LAX Terminal B, Los Angeles, CA",
+            destLat: 33.9431, destLng: -118.4081,
+            earliest: tomorrowAtHour(16, 30), latest: tomorrowAtHour(18, 30),
+            preferred: tomorrowAtHour(17, 30),
+            seatsNeeded: 1,
+        },
+        {
+            key: "jordan_candidate",
             userId: profileIds[`jordan@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "Hollywood Burbank Airport (BUR)",
-            originLat: 34.2,
-            originLng: -118.3587,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(8),
-            latest: tomorrowAtHour(10),
-            preferred: tomorrowAtHour(9, 15),
-            seatsAvailable: 1,
+            originName: "Sawtelle, Los Angeles, CA",
+            originLat: 34.0454, originLng: -118.4487,
+            destName: "LAX Terminal 4, Los Angeles, CA",
+            destLat: 33.9416, destLng: -118.4088,
+            earliest: tomorrowAtHour(17, 15), latest: tomorrowAtHour(18, 15),
+            preferred: tomorrowAtHour(17, 45),
             seatsNeeded: 1,
-            spaceCapacity: 1,
+        },
+
+        // ── Maya host-leaves test: 3-person group ──
+        {
+            key: "maya_host",
+            userId: profileIds[`maya@${TEST_DOMAIN}`],
+            originName: "LMU Campus, Los Angeles, CA",
+            originLat: 33.9696, originLng: -118.4167,
+            destName: "LAX Terminal 2, Los Angeles, CA",
+            destLat: 33.9438, destLng: -118.4092,
+            earliest: tomorrowAtHour(17, 30), latest: tomorrowAtHour(18, 30),
+            preferred: tomorrowAtHour(18),
+            seatsNeeded: 1,
         },
         {
-            key: "taylor_seeking",
-            userId: profileIds[`taylor@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "Hollywood Burbank Airport (BUR)",
-            originLat: 34.2,
-            originLng: -118.3587,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(8, 15),
-            latest: tomorrowAtHour(10, 15),
-            preferred: tomorrowAtHour(9, 30),
-            seatsAvailable: 1,
-            seatsNeeded: 1,
-            spaceCapacity: 1,
-        },
-        {
-            key: "riley_seeking",
+            key: "riley_member",
             userId: profileIds[`riley@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "Hollywood Burbank Airport (BUR)",
-            originLat: 34.2,
-            originLng: -118.3587,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(8, 30),
-            latest: tomorrowAtHour(10, 30),
-            preferred: tomorrowAtHour(9, 45),
-            seatsAvailable: 1,
+            originName: "Westchester, Los Angeles, CA",
+            originLat: 33.9598, originLng: -118.4182,
+            destName: "LAX Terminal 2, Los Angeles, CA",
+            destLat: 33.9433, destLng: -118.4089,
+            earliest: tomorrowAtHour(17, 40), latest: tomorrowAtHour(18, 20),
+            preferred: tomorrowAtHour(18),
             seatsNeeded: 1,
-            spaceCapacity: 1,
         },
         {
-            key: "quinn_seeking",
+            key: "quinn_member",
             userId: profileIds[`quinn@${TEST_DOMAIN}`],
-            rideType: "seeking",
-            originName: "Hollywood Burbank Airport (BUR)",
-            originLat: 34.2,
-            originLng: -118.3587,
-            destName: "UCLA, Westwood, Los Angeles, CA",
-            destLat: 34.0689,
-            destLng: -118.4452,
-            earliest: tomorrowAtHour(8, 45),
-            latest: tomorrowAtHour(10, 45),
-            preferred: tomorrowAtHour(9, 30),
-            seatsAvailable: 1,
+            originName: "Playa Vista, Los Angeles, CA",
+            originLat: 33.9761, originLng: -118.4186,
+            destName: "LAX Terminal 2, Los Angeles, CA",
+            destLat: 33.9431, destLng: -118.4094,
+            earliest: tomorrowAtHour(17, 45), latest: tomorrowAtHour(18, 25),
+            preferred: tomorrowAtHour(18, 5),
             seatsNeeded: 1,
-            spaceCapacity: 1,
         },
     ];
 
     for (const r of rides) {
-        const { data, error } = await (supabase.from("rides") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } } })
-            .insert({
-                user_id: r.userId,
-                ride_type: r.rideType,
-                origin_name: r.originName,
-                origin_lat: r.originLat,
-                origin_lng: r.originLng,
-                dest_name: r.destName,
-                dest_lat: r.destLat,
-                dest_lng: r.destLng,
-                departure_earliest: r.earliest,
-                departure_latest: r.latest,
-                departure_preferred: r.preferred,
-                seats_available: r.seatsAvailable,
-                seats_needed: r.seatsNeeded,
-                space_capacity: r.spaceCapacity,
-                gender_pref: "any",
-                quiet_ride: false,
-                music_ok: true,
-                status: "active",
-            })
-            .select("id")
-            .single();
-        if (error)
-            throw new Error(`Failed to create ride ${r.key}: ${error.message}`);
+        const { data, error } = await (supabase.from("rides") as unknown as {
+            insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } };
+        }).insert({
+            user_id: r.userId,
+            ride_type: "seeking",
+            origin_name: r.originName,
+            origin_lat: r.originLat,
+            origin_lng: r.originLng,
+            dest_name: r.destName,
+            dest_lat: r.destLat,
+            dest_lng: r.destLng,
+            departure_earliest: r.earliest,
+            departure_latest: r.latest,
+            departure_preferred: r.preferred,
+            seats_available: 1,
+            seats_needed: r.seatsNeeded,
+            space_capacity: 1,
+            gender_pref: "any",
+            quiet_ride: false,
+            music_ok: true,
+            status: "active",
+        }).select("id").single();
+        if (error) throw new Error(`Failed to create ride ${r.key}: ${error.message}`);
         rideIds[r.key] = data.id;
     }
 
     return rideIds;
 }
 
-interface MatchRequest {
-    id: string;
-    rideId: string;
-    requesterRideId: string;
-    status: string;
-}
-
-async function createTestMatches(
-    supabase: Supabase,
-    rideIds: Record<string, string>
-) {
-    const requests: MatchRequest[] = [];
-
+async function createTestMatches(supabase: Supabase, rideIds: Record<string, string>) {
     const matchPairs: Array<{
         rideKey: string;
         requesterKey: string;
         status: string;
         rideStatus: string;
     }> = [
-            // Route A: single match (Sarah ↔ Mike)
-            {
-                rideKey: "sarah_offering",
-                requesterKey: "mike_seeking",
-                status: "accepted",
-                rideStatus: "accepted",
-            },
-            // Route B (flow test): 0 accepted, 4 pending — max group = 4 people (host + 3). Accept 1→1:1, 2→GC3, 3→GC4 (max), 4th→blocked
-            {
-                rideKey: "david_offering",
-                requesterKey: "sophia_seeking",
-                status: "pending",
-                rideStatus: "requested",
-            },
-            {
-                rideKey: "david_offering",
-                requesterKey: "alex_seeking",
-                status: "pending",
-                rideStatus: "requested",
-            },
-            {
-                rideKey: "david_offering",
-                requesterKey: "jordan_seeking_sfo",
-                status: "pending",
-                rideStatus: "requested",
-            },
-            {
-                rideKey: "david_offering",
-                requesterKey: "taylor_seeking_sfo",
-                status: "pending",
-                rideStatus: "requested",
-            },
-            // Route C: group of 4 (Chris ↔ Jordan, Taylor, Riley) + Quinn pending
-            {
-                rideKey: "chris_offering",
-                requesterKey: "jordan_seeking",
-                status: "accepted",
-                rideStatus: "accepted",
-            },
-            {
-                rideKey: "chris_offering",
-                requesterKey: "taylor_seeking",
-                status: "accepted",
-                rideStatus: "accepted",
-            },
-            {
-                rideKey: "chris_offering",
-                requesterKey: "riley_seeking",
-                status: "accepted",
-                rideStatus: "accepted",
-            },
-            {
-                rideKey: "chris_offering",
-                requesterKey: "quinn_seeking",
-                status: "pending",
-                rideStatus: "requested",
-            },
-        ];
+        // ── David's group: 2 accepted (3 people total) ──
+        { rideKey: "david_host", requesterKey: "sophia_member", status: "accepted", rideStatus: "accepted" },
+        { rideKey: "david_host", requesterKey: "alex_member", status: "accepted", rideStatus: "accepted" },
 
-    // Insert one at a time so triggers fire in order
+        // ── Casey accept flow: 5 pending requests (accept them one by one: 1→2→3→4→5→6) ──
+        { rideKey: "casey_host", requesterKey: "morgan_req", status: "pending", rideStatus: "requested" },
+        { rideKey: "casey_host", requesterKey: "jamie_req", status: "pending", rideStatus: "requested" },
+        { rideKey: "casey_host", requesterKey: "sam_req", status: "pending", rideStatus: "requested" },
+        { rideKey: "casey_host", requesterKey: "liam_req", status: "pending", rideStatus: "requested" },
+        { rideKey: "casey_host", requesterKey: "ava_req", status: "pending", rideStatus: "requested" },
+
+        // ── Maya host-leaves group: 2 accepted (3 people total) ──
+        { rideKey: "maya_host", requesterKey: "riley_member", status: "accepted", rideStatus: "accepted" },
+        { rideKey: "maya_host", requesterKey: "quinn_member", status: "accepted", rideStatus: "accepted" },
+    ];
+
+    const requests: Array<{ id: string; rideId: string; requesterRideId: string; status: string }> = [];
+
     for (const pair of matchPairs) {
-        const { data, error } = await (supabase.from("ride_requests") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } } })
-            .insert({
-                ride_id: rideIds[pair.rideKey],
-                requester_ride_id: rideIds[pair.requesterKey],
-                status: pair.status,
-                ride_status: pair.rideStatus,
-            })
-            .select("id")
-            .single();
-        if (error)
-            throw new Error(
-                `Failed to create match ${pair.rideKey} ↔ ${pair.requesterKey}: ${error.message}`
-            );
-        requests.push({
-            id: data.id,
-            rideId: rideIds[pair.rideKey],
-            requesterRideId: rideIds[pair.requesterKey],
+        const { data, error } = await (supabase.from("ride_requests") as unknown as {
+            insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string }; error: { message: string } | null }> } };
+        }).insert({
+            ride_id: rideIds[pair.rideKey],
+            requester_ride_id: rideIds[pair.requesterKey],
             status: pair.status,
-        });
+            ride_status: pair.rideStatus,
+        }).select("id").single();
+
+        if (error) throw new Error(`Failed to create match ${pair.rideKey} ↔ ${pair.requesterKey}: ${error.message}`);
+        requests.push({ id: data.id, rideId: rideIds[pair.rideKey], requesterRideId: rideIds[pair.requesterKey], status: pair.status });
     }
 
-    // Give triggers a moment to create ride_groups (only Chris has 2+ accepted here; David has 1 accepted + 1 pending)
     await new Promise((r) => setTimeout(r, 500));
+
+    const acceptedHostRideIds = [
+        ...new Set(matchPairs.filter((p) => p.status === "accepted").map((p) => rideIds[p.rideKey])),
+    ];
 
     const { data: groups } = await supabase
         .from("ride_groups")
         .select("id, ride_id")
-        .in("ride_id", [rideIds.chris_offering]);
+        .in("ride_id", acceptedHostRideIds);
 
     const groupMap: Record<string, string> = {};
-    (groups || []).forEach(
-        (g: { id: string; ride_id: string }) =>
-            (groupMap[g.ride_id] = g.id)
-    );
-
-    // If trigger didn't fire for Chris's ride, insert group manually (David's stays 1:1 until user accepts Alex)
-    if (!groupMap[rideIds.chris_offering]) {
-        const { data, error } = await (supabase.from("ride_groups") as unknown as { insert: (p: unknown) => { select: (cols: string) => { single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }> } } })
-            .insert({ ride_id: rideIds.chris_offering })
-            .select("id")
-            .single();
-        if (!error && data) {
-            groupMap[rideIds.chris_offering] = data.id;
-        }
-    }
+    (groups || []).forEach((g: { id: string; ride_id: string }) => (groupMap[g.ride_id] = g.id));
 
     return { requests, groupMap };
 }
@@ -748,93 +621,32 @@ async function createTestMatches(
 async function createTestMessages(
     supabase: Supabase,
     profileIds: Record<string, string>,
-    requests: MatchRequest[],
     rideIds: Record<string, string>,
     groupMap: Record<string, string>
 ) {
     const p = (name: string) => profileIds[`${name}@${TEST_DOMAIN}`];
 
-    // Route A: 1:1 messages (Sarah ↔ Mike)
-    const singleReq = requests.find(
-        (r) => r.requesterRideId === rideIds.mike_seeking
-    );
-    if (singleReq) {
+    const davidGroup = groupMap[rideIds.david_host];
+    if (davidGroup) {
         await (supabase.from("messages") as unknown as { insert: (p: unknown) => Promise<unknown> }).insert([
-            {
-                conversation_id: singleReq.id,
-                ride_group_id: null,
-                sender_id: p("sarah"),
-                content:
-                    "Hey Mike! I'll be at LAX Terminal 2 around 3pm tomorrow. Where should I pick you up?",
-                message_type: "text",
-            },
-            {
-                conversation_id: singleReq.id,
-                ride_group_id: null,
-                sender_id: p("mike"),
-                content:
-                    "Awesome! I'll be at arrivals. I have a small roller bag, hope that's ok.",
-                message_type: "text",
-            },
-            {
-                conversation_id: singleReq.id,
-                ride_group_id: null,
-                sender_id: p("sarah"),
-                content:
-                    "Totally fine! I have plenty of trunk space. See you there!",
-                message_type: "text",
-            },
+            { conversation_id: null, ride_group_id: davidGroup, sender_id: p("david"), content: "I can leave Westwood around 5:15 tomorrow. Terminal B still good for everyone?", message_type: "text" },
+            { conversation_id: null, ride_group_id: davidGroup, sender_id: p("sophia"), content: "Works for me. I only have one carry-on.", message_type: "text" },
+            { conversation_id: null, ride_group_id: davidGroup, sender_id: p("alex"), content: "Same here. I can walk to the pickup spot by 5:20.", message_type: "text" },
+            { conversation_id: null, ride_group_id: davidGroup, sender_id: p("david"), content: "Confirm pickup time", message_type: "quick_action" },
         ]);
     }
 
-    // Route B: no messages (flow test — 0 accepted until user accepts from Home)
-
-    // Route C: group messages (Chris + Jordan + Taylor + Riley)
-    const groupC = groupMap[rideIds.chris_offering];
-    if (groupC) {
+    const mayaGroup = groupMap[rideIds.maya_host];
+    if (mayaGroup) {
         await (supabase.from("messages") as unknown as { insert: (p: unknown) => Promise<unknown> }).insert([
-            {
-                conversation_id: null,
-                ride_group_id: groupC,
-                sender_id: p("chris"),
-                content:
-                    "Morning everyone! I'll be at BUR curbside around 9am. White Toyota RAV4.",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupC,
-                sender_id: p("jordan"),
-                content: "Sweet. I'll be there at 9:15 — is that too late?",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupC,
-                sender_id: p("chris"),
-                content:
-                    "No worries, I can wait. Taylor & Riley, what's your ETA?",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupC,
-                sender_id: p("taylor"),
-                content: "I'll be there at 9! Right on time.",
-                message_type: "text",
-            },
-            {
-                conversation_id: null,
-                ride_group_id: groupC,
-                sender_id: p("riley"),
-                content: "Same, around 9:15 with Jordan. Can't wait!",
-                message_type: "text",
-            },
+            { conversation_id: null, ride_group_id: mayaGroup, sender_id: p("maya"), content: "I set up this group so everyone sees updates in one place.", message_type: "text" },
+            { conversation_id: null, ride_group_id: mayaGroup, sender_id: p("riley"), content: "Awesome, I only have a backpack.", message_type: "text" },
+            { conversation_id: null, ride_group_id: mayaGroup, sender_id: p("quinn"), content: "Same here. Pickup from LMU area works for me.", message_type: "text" },
         ]);
     }
 }
 
-// ─── POST: create all fake matches ───
+// ─── POST: create all test data ───
 
 export async function POST() {
     if (process.env.NODE_ENV !== "development") {
@@ -843,29 +655,11 @@ export async function POST() {
     try {
         const supabase = getAdmin() as Supabase;
 
-        // 1. Clean up old test data
         const cleaned = await cleanupTestUsers(supabase);
-
-        // 2. Create users + enriched profiles
         const profileIds = await createTestUsers(supabase);
-
-        // 3. Create rides
         const rideIds = await createTestRides(supabase, profileIds);
-
-        // 4. Create ride_requests (matches) — triggers create ride_groups
-        const { requests, groupMap } = await createTestMatches(
-            supabase,
-            rideIds
-        );
-
-        // 5. Create messages
-        await createTestMessages(
-            supabase,
-            profileIds,
-            requests,
-            rideIds,
-            groupMap
-        );
+        const { requests, groupMap } = await createTestMatches(supabase, rideIds);
+        await createTestMessages(supabase, profileIds, rideIds, groupMap);
 
         return NextResponse.json({
             success: true,
@@ -873,59 +667,43 @@ export async function POST() {
             summary: {
                 users: FAKE_USERS.length,
                 rides: Object.keys(rideIds).length,
-                acceptedMatches: requests.filter((r) => r.status === "accepted")
-                    .length,
-                pendingRequests: requests.filter((r) => r.status === "pending")
-                    .length,
+                acceptedMatches: requests.filter((r) => r.status === "accepted").length,
+                pendingRequests: requests.filter((r) => r.status === "pending").length,
                 groups: Object.keys(groupMap).length,
             },
-            matches: {
-                single: [
-                    {
-                        route: "LAX → UCLA",
-                        driver: "Sarah Johnson",
-                        rider: "Mike Chen",
-                        type: "1:1 match with chat",
-                    },
-                ],
-                groups: [
-                    {
-                        route: "SFO → Stanford",
-                        driver: "David Kim",
-                        riders: "5 pending (Sophia, Alex, Jordan, Taylor, Riley)",
-                        type: "Flow test: accept 1→1:1, 2→GC3, 3→GC4 (max 4 people), 4th blocked",
-                    },
-                    {
-                        route: "BUR → UCLA",
-                        driver: "Chris Park",
-                        riders: [
-                            "Jordan Liu",
-                            "Taylor Green",
-                            "Riley Brown",
-                        ],
-                        pending: ["Quinn Harris"],
-                        type: "Group of 4 with group chat (+ 1 pending)",
-                    },
-                ],
+            scenarios: {
+                casey_accept_flow: {
+                    login: `casey@${TEST_DOMAIN}`,
+                    description: "Main test: accept 5 pending requests one by one. Group grows from 1→2→3→4→5→6.",
+                    pending: ["Morgan Lee", "Jamie Patel", "Sam Lopez", "Liam Brooks", "Ava Singh"],
+                },
+                david_group_chat: {
+                    login: `david@${TEST_DOMAIN}`,
+                    description: "Existing 3-person group chat with messages. Test chatting, viewing members, leaving.",
+                    members: ["David Kim", "Sophia Taylor", "Alex Rivera"],
+                },
+                sarah_match_discovery: {
+                    login: `sarah@${TEST_DOMAIN}`,
+                    description: "See match candidates (Mike, Jordan) and send requests.",
+                },
+                maya_host_leaves: {
+                    login: `maya@${TEST_DOMAIN}`,
+                    description: "3-person group where the creator (Maya) can leave. Group survives for Riley and Quinn.",
+                    members: ["Maya Rodriguez", "Riley Brown", "Quinn Harris"],
+                },
             },
-            credentials: FAKE_USERS.map((u) => ({
-                email: u.email,
-                name: `${u.firstName} ${u.lastName}`,
-            })),
+            credentials: {
+                password: TEST_PASSWORD,
+                accounts: FAKE_USERS.map((u) => ({ email: u.email, name: `${u.firstName} ${u.lastName}` })),
+            },
         });
     } catch (error) {
-        console.error("Seed matches error:", error);
-        return NextResponse.json(
-            {
-                error:
-                    error instanceof Error ? error.message : String(error),
-            },
-            { status: 500 }
-        );
+        console.error("Seed error:", error);
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }
 
-// ─── DELETE: remove all fake test data ───
+// ─── DELETE: remove all test data ───
 
 export async function DELETE() {
     if (process.env.NODE_ENV !== "development") {
@@ -934,18 +712,9 @@ export async function DELETE() {
     try {
         const supabase = getAdmin() as Supabase;
         const cleaned = await cleanupTestUsers(supabase);
-        return NextResponse.json({
-            success: true,
-            message: `Cleaned up ${cleaned} test users and all cascaded data`,
-        });
+        return NextResponse.json({ success: true, message: `Cleaned up ${cleaned} test users and all cascaded data` });
     } catch (error) {
         console.error("Cleanup error:", error);
-        return NextResponse.json(
-            {
-                error:
-                    error instanceof Error ? error.message : String(error),
-            },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
     }
 }

@@ -323,14 +323,13 @@ export default function LandingPage() {
             {/* Left Column */}
             <div className="space-y-8 pl-6 lg:pl-8">
               <div className="space-y-5">
-                <h2 className="text-5xl md:text-6xl font-bold text-[#0F172A] leading-tight">
-                  <span className="block">Same trip.</span>
-                  <span className="block text-[#0052FF] ml-16 md:ml-24">Smaller bill.</span>
+                <h2 className="text-5xl md:text-6xl font-bold text-[#0F172A] leading-tight tracking-tight">
+                  <span className="block">Your people are</span>
+                  <span className="block text-[#0052FF]">already heading</span>
+                  <span className="block">your way.</span>
                 </h2>
                 <p className="text-lg text-gray-600 leading-relaxed max-w-xl">
-                  Why pay <span className="line-through">$100</span> when it&apos;s{" "}
-                  <span className="font-semibold text-[#0052FF]">$25 each</span>?
-                  Connect with verified travelers heading your way and split the fare instantly.
+                  Knot matches you with verified students from your campus heading the same way — so you never have to uber solo again.
                 </p>
               </div>
 
@@ -351,7 +350,7 @@ export default function LandingPage() {
 
             {/* Right Column - Savings visualization */}
             <div className="relative">
-              <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#EEF2FF] via-white to-[#EFF6FF] p-6 lg:p-8 shadow-[0_24px_80px_rgba(15,23,42,0.12)] transition-transform duration-300 ease-out hover:scale-[1.02] border border-gray-100">
+              <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#E0E7FF] via-white to-[#DBEAFE] p-6 lg:p-8 shadow-[0_24px_80px_rgba(15,23,42,0.12)] transition-transform duration-300 ease-out hover:scale-[1.02] border border-gray-100">
                 <div className="grid gap-6">
                   <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4 flex items-center justify-center gap-3">
                     <div className="text-center space-y-1">
@@ -405,7 +404,7 @@ export default function LandingPage() {
 
           {/* Search Bar */}
           <div className="mt-10 lg:mt-14">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_8px_40px_rgba(15,23,42,0.10)] border border-gray-100 p-5 md:p-7 lg:p-8">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-[0_8px_40px_rgba(15,23,42,0.10)] border-2 border-[#0052FF] p-5 md:p-7 lg:p-8">
               <p className="text-sm font-semibold text-[#0F172A] mb-3 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#0052FF]" />
                 Post a ride now!

@@ -267,4 +267,3 @@ export async function sendNewMessageEmail(
     return { ok: false, error: message };
   }
 }
-

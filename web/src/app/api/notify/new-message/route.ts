@@ -11,11 +11,6 @@ type MessageRow = Pick<
   "id" | "conversation_id" | "ride_group_id" | "sender_id" | "content" | "message_type" | "created_at"
 >;
 
-type RideRequestRow = Pick<
-  Database["public"]["Tables"]["ride_requests"]["Row"],
-  "id" | "status" | "ride_id" | "requester_ride_id"
->;
-
 type RideRow = Pick<
   Database["public"]["Tables"]["rides"]["Row"],
   "id" | "user_id" | "origin_name" | "dest_name"
@@ -141,7 +136,12 @@ export async function POST(request: Request) {
         .eq("id", message.conversation_id)
         .single();
 
-      const reqRow = reqData as RideRequestRow | null;
+      const reqRow = reqData as {
+        id: string;
+        status: string;
+        ride_id: string;
+        requester_ride_id: string;
+      } | null;
       if (reqErr || !reqRow) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
@@ -215,18 +215,19 @@ export async function POST(request: Request) {
 
       routeSummary = formatRouteSummary(groupRide.origin_name, groupRide.dest_name);
 
-      const { data: reqRows } = await admin
-        .from("ride_requests")
-        .select("ride_id, requester_ride_id, status")
-        .or(`ride_id.eq.${group.ride_id},requester_ride_id.eq.${group.ride_id}`)
-        .eq("status", "accepted");
+      const { data: memberRows } = await admin
+        .from("ride_group_members")
+        .select("ride_id")
+        .eq("ride_group_id", group.id)
+        .is("left_at", null);
 
       const rideIds = new Set<string>();
-      rideIds.add(group.ride_id);
-      (reqRows as RideRequestRow[] | null ?? []).forEach((row) => {
+      (memberRows as Array<{ ride_id: string }> | null ?? []).forEach((row) => {
         rideIds.add(row.ride_id);
-        rideIds.add(row.requester_ride_id);
       });
+      if (rideIds.size === 0) {
+        rideIds.add(group.ride_id);
+      }
 
       const { data: ridesData } = await admin
         .from("rides")
@@ -248,7 +249,7 @@ export async function POST(request: Request) {
         }
       }
 
-      threadUrl = `${appUrl}/messages/${message.ride_group_id}?group=1`;
+      threadUrl = `${appUrl}/messages/${message.ride_group_id}`;
       if (recipientProfiles.length) {
         const { data: cooldownData } = await admin
           .from("message_email_cooldowns")
@@ -333,4 +334,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }
-

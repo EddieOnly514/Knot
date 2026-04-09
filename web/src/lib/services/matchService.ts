@@ -1,5 +1,5 @@
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
-import type { PotentialMatch, MatchItem } from "@/types";
+import type { MatchCandidate, MatchMemberSummary } from "@/types";
 
 /**
  * Find matches for a ride using the V3 scoring algorithm.
@@ -10,17 +10,46 @@ export async function findMatches(
         maxResults?: number;
         minScore?: number;
     }
-): Promise<PotentialMatch[]> {
+): Promise<MatchCandidate[]> {
     const supabase = getSupabaseClientOrThrow();
+
+    const normalize = (
+        rows: Array<MatchCandidate & { members: unknown }>
+    ): MatchCandidate[] =>
+        rows.map((row) => ({
+            ...row,
+            candidate_type:
+                row.candidate_type === "group"
+                    ? ("group" as const)
+                    : ("solo" as const),
+            members: Array.isArray(row.members) ? (row.members as MatchMemberSummary[]) : [],
+        }));
 
     const { data, error } = await supabase.rpc("find_matches_v3", {
         p_ride_id: rideId,
         p_max_results: options?.maxResults ?? 10,
-        p_min_score: options?.minScore ?? 30,
+        p_min_score: options?.minScore ?? 0,
     });
 
-    if (error) throw error;
-    return (data || []) as PotentialMatch[];
+    if (!error) {
+        return normalize((data || []) as Array<MatchCandidate & { members: unknown }>);
+    }
+
+    if (process.env.NODE_ENV !== "development") {
+        throw error;
+    }
+
+    const res = await fetch(
+        `/api/dev-matches?rideId=${encodeURIComponent(rideId)}&maxResults=${options?.maxResults ?? 10}`,
+        { cache: "no-store" }
+    );
+
+    if (!res.ok) {
+        throw error;
+    }
+
+    const fallbackData = (await res.json()) as Array<MatchCandidate & { members: unknown }>;
+    return normalize(fallbackData);
 }
 
 /** Extract a user-friendly message from a Supabase/Postgrest error. */
@@ -35,7 +64,7 @@ function toMatchRequestErrorMessage(err: { message?: string; code?: string } | n
         return "You don't have permission to send this request.";
     }
     if (msg.includes("ride_match_cap_exceeded")) {
-        return "Reached max ride limit. Group can have at most 4 people.";
+        return "Reached max ride limit. Group can have at most 6 people.";
     }
     return msg || "Failed to send request.";
 }
@@ -67,127 +96,17 @@ export async function sendMatchRequest(
     return data.id;
 }
 
-/**
- * For a set of ride IDs (e.g. from potential matches), returns which are already in a group
- * (accepted ride_request with same host). Used to show "Already in a group of 2" instead of
- * two separate match cards.
- * Keys are ride_id; value is { groupHostRideId, size }. Solo rides get size 1.
- */
-export async function getGroupInfoForRides(
-    rideIds: string[]
-): Promise<Map<string, { groupHostRideId: string; size: number }>> {
-    const result = new Map<string, { groupHostRideId: string; size: number }>();
-    if (rideIds.length === 0) return result;
-
-    const supabase = getSupabaseClientOrThrow();
-    const ids = [...new Set(rideIds)];
-    const idSet = new Set(ids);
-
-    const [res1, res2] = await Promise.all([
-        supabase
-            .from("ride_requests")
-            .select("ride_id, requester_ride_id")
-            .eq("status", "accepted")
-            .in("ride_id", ids),
-        supabase
-            .from("ride_requests")
-            .select("ride_id, requester_ride_id")
-            .eq("status", "accepted")
-            .in("requester_ride_id", ids),
-    ]);
-
-    if (res1.error) throw res1.error;
-    if (res2.error) throw res2.error;
-
-    const rows = [...(res1.data || []), ...(res2.data || [])].filter(
-        (r) => idSet.has(r.ride_id as string) || idSet.has(r.requester_ride_id as string),
-    );
-
-    // Build groups: host ride_id -> set of all ride IDs in group (host + requesters)
-    const groupByHost = new Map<string, Set<string>>();
-    for (const row of rows || []) {
-        const host = row.ride_id as string;
-        const requester = row.requester_ride_id as string;
-        if (!groupByHost.has(host)) groupByHost.set(host, new Set([host]));
-        groupByHost.get(host)!.add(requester);
-    }
-
-    for (const rideId of ids) {
-        let found = false;
-        for (const [host, members] of groupByHost) {
-            if (members.has(rideId)) {
-                result.set(rideId, { groupHostRideId: host, size: members.size });
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            result.set(rideId, { groupHostRideId: rideId, size: 1 });
-        }
-    }
-    return result;
-}
+/** Max total seats per group (e.g. 2 rides with seats_needed=3 each = 6). */
+export const MAX_GROUP_SEATS = 6;
 
 /**
- * Collapse potential matches into single cards or group cards. When multiple matches
- * belong to the same existing group (same host + accepted requesters), they become
- * one MatchItem of kind "group" showing "Already in a group of N".
- */
-export async function collapseMatchesIntoItems(
-    matches: PotentialMatch[]
-): Promise<MatchItem[]> {
-    if (matches.length === 0) return [];
-    const rideIds = matches.map((m) => m.ride_id);
-    const groupInfo = await getGroupInfoForRides(rideIds);
-
-    const byGroupHost = new Map<string, PotentialMatch[]>();
-    for (const m of matches) {
-        const info = groupInfo.get(m.ride_id);
-        const host = info?.groupHostRideId ?? m.ride_id;
-        const size = info?.size ?? 1;
-        if (size >= 2) {
-            const list = byGroupHost.get(host) ?? [];
-            list.push(m);
-            byGroupHost.set(host, list);
-        }
-    }
-
-    const items: MatchItem[] = [];
-    const usedRideIds = new Set<string>();
-
-    for (const [hostRideId, groupMatches] of byGroupHost) {
-        if (groupMatches.length === 0) continue;
-        groupMatches.forEach((m) => usedRideIds.add(m.ride_id));
-        const size = groupInfo.get(groupMatches[0].ride_id)?.size ?? groupMatches.length;
-        const primary =
-            groupMatches.find((m) => m.ride_id === hostRideId) ?? groupMatches[0];
-        items.push({
-            kind: "group",
-            groupSize: size,
-            groupHostRideId: hostRideId,
-            primaryMatch: primary,
-            allMatches: groupMatches,
-        });
-    }
-
-    for (const m of matches) {
-        if (usedRideIds.has(m.ride_id)) continue;
-        items.push({ kind: "single", match: m });
-    }
-
-    return items;
-}
-
-/** Max number of accepted matches per ride (group = host + 3 = 4 people max). */
-export const MAX_MATCHES_PER_RIDE = 3;
-
-/**
- * Returns how many accepted matches this ride already has (0–4).
+ * Returns total seats currently filled in this ride's group.
+ * A ride with seats_needed=2 counts as 2 toward the 6-seat cap.
  * Use to disable Accept / send request when at cap.
  */
-export async function getAcceptedMatchCount(rideId: string): Promise<number> {
+export async function getGroupSeatCount(rideId: string): Promise<number> {
     const supabase = getSupabaseClientOrThrow();
-    const { data, error } = await supabase.rpc("count_accepted_matches_for_ride", {
+    const { data, error } = await supabase.rpc("count_group_seats_for_ride", {
         p_ride_id: rideId,
     });
     if (error) throw error;
@@ -356,4 +275,3 @@ export async function getMyRequests(profileId?: string): Promise<RideRequest[]> 
         direction: row.direction as "incoming" | "outgoing",
     })) as RideRequest[];
 }
-

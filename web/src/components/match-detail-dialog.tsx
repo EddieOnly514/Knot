@@ -185,7 +185,7 @@ export function MatchDetailDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   myRideId: string | null;
-  onRequested: () => void;
+  onRequested: (hideCandidateId?: string) => void;
 }) {
   const router = useRouter();
   const [requesting, setRequesting] = useState(false);
@@ -202,7 +202,7 @@ export function MatchDetailDialog({
     try {
       await sendMatchRequest(myRideId, targetRideId);
       toast.success(isGroup ? "Request sent to the group" : `Request sent to ${match.first_name}`);
-      onRequested();
+      onRequested(item.candidate_id);
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to send request:", err);

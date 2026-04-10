@@ -69,11 +69,9 @@ DECLARE
     v_host_id     UUID;
     v_dep_start   TIMESTAMPTZ;
     v_dep_end     TIMESTAMPTZ;
-    v_dep_min     INTEGER;
     v_cent_lat    DECIMAL;
     v_cent_lng    DECIMAL;
     v_seats       INTEGER;
-    v_date        DATE;
 BEGIN
     -- ── 1. Load anchor ride & profile ──────────────────────────────────
     SELECT * INTO v_my FROM rides WHERE id = p_ride_id;
@@ -100,11 +98,9 @@ BEGIN
     WHERE rgm.ride_id = v_my.id AND rgm.left_at IS NULL
     LIMIT 1;
 
-    -- Always use the ride's OWN time window for matching (not the
-    -- narrowed group intersection which hides valid candidates).
+    -- Always use the ride's OWN time window for matching.
     v_dep_start := v_my.departure_earliest;
     v_dep_end   := v_my.departure_latest;
-    v_date      := COALESCE(v_my.departure_preferred, v_my.departure_earliest)::DATE;
 
     IF v_anchor_grp IS NOT NULL THEN
         SELECT COALESCE(SUM(r.seats_needed), 0)
@@ -118,9 +114,6 @@ BEGIN
         v_cent_lng  := v_my.origin_lng;
         v_seats     := COALESCE(v_my.seats_needed, 1);
     END IF;
-
-    v_dep_min := GREATEST(0,
-        EXTRACT(EPOCH FROM (v_dep_end - v_dep_start))::INTEGER / 60);
 
     -- ── 3. Find, score, and return matches ─────────────────────────────
     RETURN QUERY
@@ -176,18 +169,12 @@ BEGIN
 
             h.departure_earliest AS c_g_start,
             h.departure_latest   AS c_g_end,
-            COALESCE(h.departure_preferred, h.departure_earliest)::DATE AS c_g_date,
             COALESCE(grp.origin_centroid_lat, h.origin_lat) AS c_g_lat,
             COALESCE(grp.origin_centroid_lng, h.origin_lng) AS c_g_lng,
             COALESCE(grp.rider_count, 1)::INTEGER           AS c_g_size,
             COALESCE(grp.total_bags,
                      luggage_units_from_space_capacity(h.space_capacity)) AS c_g_bags,
             COALESCE(grp.has_oversized, h.space_capacity = 3) AS c_g_over,
-            GREATEST(0,
-                EXTRACT(EPOCH FROM (
-                    h.departure_latest - h.departure_earliest
-                ))::INTEGER / 60
-            ) AS c_g_dep_min,
 
             CASE WHEN b.b_grp IS NOT NULL THEN
                 (SELECT COALESCE(SUM(r2.seats_needed), 0)::INTEGER
@@ -212,18 +199,22 @@ BEGIN
         ORDER BY b.b_host
     ),
 
+    -- Compute distances, time overlap, and time gap using raw timestamps.
+    -- No date filter needed — the gap threshold handles day boundaries.
     scored AS (
         SELECT c.*,
             haversine_miles(v_cent_lat, v_cent_lng,
                             c.c_g_lat, c.c_g_lng)    AS c_d_ori,
             haversine_miles(v_my.dest_lat, v_my.dest_lng,
                             c.c_dlat, c.c_dlng)       AS c_d_dst,
+            -- Overlap in minutes (0 if no overlap)
             GREATEST(0,
                 EXTRACT(EPOCH FROM (
                     LEAST(v_dep_end, c.c_g_end)
                   - GREATEST(v_dep_start, c.c_g_start)
                 ))::INTEGER / 60
             ) AS c_overlap,
+            -- Gap in minutes (0 if there is overlap)
             CASE
                 WHEN LEAST(v_dep_end, c.c_g_end)
                    > GREATEST(v_dep_start, c.c_g_start) THEN 0
@@ -234,12 +225,14 @@ BEGIN
                     ))::INTEGER / 60)
             END AS c_gap
         FROM cand c
-        WHERE ABS(c.c_g_date - v_date) <= 1
-          AND c.c_g_seats + v_seats <= 6
+        WHERE c.c_g_seats + v_seats <= 6
           AND haversine_miles(v_my.dest_lat, v_my.dest_lng,
                               c.c_dlat, c.c_dlng) <= 2.0
           AND haversine_miles(v_cent_lat, v_cent_lng,
                               c.c_g_lat, c.c_g_lng) <= 2.0
+          -- Only consider rides within 4 hours of each other
+          AND GREATEST(v_dep_start, c.c_g_start)
+            - LEAST(v_dep_end, c.c_g_end) <= INTERVAL '4 hours'
     ),
 
     tiered AS (
@@ -251,11 +244,8 @@ BEGIN
                 -- Any overlap + at least one distance within 1 mi → Okay
                 WHEN s.c_overlap >= 1 AND (s.c_d_ori <= 1.0 OR s.c_d_dst <= 1.0)
                     THEN 'OKAY'
-                -- Any overlap but farther apart → Possible
-                WHEN s.c_overlap >= 1
-                    THEN 'WEAK'
-                -- No overlap but within 2 hr per party (4 hr total gap) → Possible
-                WHEN s.c_gap <= 240
+                -- Any overlap or small gap → Possible
+                WHEN s.c_overlap >= 1 OR s.c_gap <= 240
                     THEN 'WEAK'
                 ELSE NULL
             END AS c_tier,
@@ -291,7 +281,6 @@ BEGIN
                 ) / 2.0)::NUMERIC, 3
             )::DECIMAL AS c_pref
         FROM scored s
-        WHERE s.c_overlap > 0 OR s.c_gap <= 240
     )
 
     SELECT

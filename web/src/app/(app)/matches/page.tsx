@@ -98,7 +98,7 @@ async function fetchMatchesPageData(profileId: string, rideParam: string | null)
     .from("ride_requests")
     .select("ride_id, requester_ride_id, status")
     .or(`ride_id.eq.${id},requester_ride_id.eq.${id}`)
-    .in("status", ["accepted", "pending"]);
+    .in("status", ["accepted", "pending", "withdrawn"]);
 
   if (existingError) {
     console.error("[matches] ride_requests query failed:", existingError);
@@ -236,9 +236,8 @@ function RequestCard({
 
   return (
     <Card
-      className={`cursor-pointer border bg-white shadow-sm transition-shadow hover:shadow-md ${
-        isIncoming ? "border-blue-200" : "border-amber-200/80"
-      }`}
+      className={`cursor-pointer border bg-white shadow-sm transition-shadow hover:shadow-md ${isIncoming ? "border-blue-200" : "border-amber-200/80"
+        }`}
       onClick={onOpenDetails}
     >
       <CardContent className="p-3">
@@ -246,11 +245,10 @@ function RequestCard({
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarImage src={request.requester_photo || undefined} />
             <AvatarFallback
-              className={`text-sm font-medium ${
-                isIncoming
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-amber-50 text-amber-600"
-              }`}
+              className={`text-sm font-medium ${isIncoming
+                ? "bg-blue-50 text-blue-600"
+                : "bg-amber-50 text-amber-600"
+                }`}
             >
               {request.requester_name[0]}
             </AvatarFallback>
@@ -330,7 +328,7 @@ function MatchCard({
 }: {
   match: MatchCandidate;
   myRideId: string;
-  onRequested: () => void;
+  onRequested: (hideCandidateId?: string) => void;
   onShowInfo: () => void;
 }) {
   const [requesting, setRequesting] = useState(false);
@@ -342,7 +340,7 @@ function MatchCard({
     try {
       await sendMatchRequest(myRideId, match.request_target_ride_id);
       toast.success(`Request sent to ${match.first_name}`);
-      onRequested();
+      onRequested(match.candidate_id);
     } catch (err) {
       console.error("Failed to send request:", err);
       toast.error("Failed to send request");
@@ -438,7 +436,7 @@ function GroupMatchCard({
 }: {
   item: MatchCandidate;
   myRideId: string;
-  onRequested: () => void;
+  onRequested: (hideCandidateId?: string) => void;
   onShowInfo: () => void;
 }) {
   const [requesting, setRequesting] = useState(false);
@@ -453,7 +451,7 @@ function GroupMatchCard({
     try {
       await sendMatchRequest(myRideId, groupHostRideId);
       toast.success("Request sent to the group");
-      onRequested();
+      onRequested(item.candidate_id);
     } catch (err) {
       console.error("Failed to send request:", err);
       toast.error("Failed to send request");
@@ -563,6 +561,7 @@ function MatchesContent() {
     staleTime: 45_000,
   });
   const [sortKey, setSortKey] = useState<SortKey>("best");
+  const [hiddenCandidateIds, setHiddenCandidateIds] = useState<Set<string>>(new Set());
   const [detailItem, setDetailItem] = useState<MatchCandidate | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [rideRequestDetail, setRideRequestDetail] = useState<RideRequest | null>(null);
@@ -620,7 +619,10 @@ function MatchesContent() {
     });
   }, [rideRequestDetail]);
 
-  const matchItems = useMemo(() => data?.matchItems ?? [], [data]);
+  const matchItems = useMemo(
+    () => (data?.matchItems ?? []).filter((m) => !hiddenCandidateIds.has(m.candidate_id)),
+    [data, hiddenCandidateIds],
+  );
   const requests = useMemo(() => data?.requests ?? [], [data]);
   const rideId = data?.rideId ?? null;
   const rideSummary = data?.rideSummary ?? null;
@@ -631,8 +633,11 @@ function MatchesContent() {
         ? "load_failed"
         : null;
 
-  const reloadMatches = useCallback(() => {
-    void refetch();
+  const reloadMatches = useCallback((hideCandidateId?: string) => {
+    if (hideCandidateId) {
+      setHiddenCandidateIds((prev) => new Set(prev).add(hideCandidateId));
+    }
+    refetch().then(() => setHiddenCandidateIds(new Set()));
   }, [refetch]);
 
   // All incoming ride requests (any of my rides) — show in matches section so they're visible beyond home
@@ -659,6 +664,16 @@ function MatchesContent() {
     [requests],
   );
 
+  const hideRequestedRide = useCallback((requestId: string) => {
+    const req = requests.find((r) => r.id === requestId);
+    if (!req) return;
+    const otherRideId = req.direction === "incoming" ? req.requester_ride_id : req.ride_id;
+    const candidate = matchItems.find((m) => m.request_target_ride_id === otherRideId);
+    if (candidate) {
+      setHiddenCandidateIds((prev) => new Set(prev).add(candidate.candidate_id));
+    }
+  }, [requests, matchItems]);
+
   const handleRespond = async (
     requestId: string,
     response: "accepted" | "rejected",
@@ -666,9 +681,9 @@ function MatchesContent() {
     setRespondingId(requestId);
     try {
       await respondToRequest(requestId, response);
+      hideRequestedRide(requestId);
       if (response === "accepted") {
         toast.success("Request accepted! Starting chat...");
-        // Fire email notification (best-effort)
         fetch("/api/notify/match-accepted", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -698,6 +713,7 @@ function MatchesContent() {
     setWithdrawingId(requestId);
     try {
       await withdrawRequest(requestId);
+      hideRequestedRide(requestId);
       toast.success("Request withdrawn");
       if (profile) {
         await queryClient.invalidateQueries({ queryKey: ["matches", profile.id] });
@@ -919,7 +935,7 @@ function MatchesContent() {
       {matchItems.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-sm text-zinc-500">No suggested matches for this ride yet — check back soon.</p>
-          <Button variant="outline" size="sm" onClick={reloadMatches} className="mt-3">
+          <Button variant="outline" size="sm" onClick={() => reloadMatches()} className="mt-3">
             Refresh
           </Button>
         </div>
@@ -1075,11 +1091,6 @@ function MatchesContent() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex justify-center pt-2">
-        <Button variant="outline" className="h-10 rounded-full px-5 text-sm">
-          Load More Matches
-        </Button>
-      </div>
     </div>
   );
 }

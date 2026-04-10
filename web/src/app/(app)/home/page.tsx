@@ -113,9 +113,8 @@ function RequestCard({
 
   return (
     <Card
-      className={`cursor-pointer border bg-white shadow-sm transition-shadow hover:shadow-md ${
-        isIncoming ? "border-blue-200" : "border-amber-200/80"
-      }`}
+      className={`cursor-pointer border bg-white shadow-sm transition-shadow hover:shadow-md ${isIncoming ? "border-blue-200" : "border-amber-200/80"
+        }`}
       onClick={onOpenDetails}
     >
       <CardContent className="p-3">
@@ -129,11 +128,10 @@ function RequestCard({
           >
             <AvatarImage src={request.requester_photo || undefined} />
             <AvatarFallback
-              className={`text-sm font-medium ${
-                isIncoming
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-amber-50 text-amber-600"
-              }`}
+              className={`text-sm font-medium ${isIncoming
+                ? "bg-blue-50 text-blue-600"
+                : "bg-amber-50 text-amber-600"
+                }`}
             >
               {request.requester_name[0]}
             </AvatarFallback>
@@ -385,8 +383,8 @@ export default function HomePage() {
   const [requests, setRequests] = useState<RideRequest[]>(
     cacheIsValid ? (homeCache!.requests as RideRequest[]) : [],
   );
-  const [suggestedMatches, setSuggestedMatches] = useState<MatchCandidate[]>(
-    cacheIsValid ? (homeCache!.suggestedMatches as MatchCandidate[]) : [],
+  const [suggestedMatchesByRide, setSuggestedMatchesByRide] = useState<Record<string, MatchCandidate[]>>(
+    cacheIsValid ? (homeCache!.suggestedMatches as Record<string, MatchCandidate[]>) : {},
   );
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [requestingMatchRideId, setRequestingMatchRideId] = useState<string | null>(
@@ -401,6 +399,7 @@ export default function HomePage() {
   const [rideRequestDetail, setRideRequestDetail] = useState<RideRequest | null>(null);
   const [detailItem, setDetailItem] = useState<MatchCandidate | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detailMyRideId, setDetailMyRideId] = useState<string | null>(null);
   const [rideRequestTrips, setRideRequestTrips] = useState<{
     myRide: RequestRideSnapshot | null;
     otherRide: RequestRideSnapshot | null;
@@ -468,7 +467,7 @@ export default function HomePage() {
     if (!cacheIsValid || !cache) return;
     setRides(cache.rides as Ride[]);
     setRequests(cache.requests as RideRequest[]);
-    setSuggestedMatches(cache.suggestedMatches as MatchCandidate[]);
+    setSuggestedMatchesByRide(cache.suggestedMatches as Record<string, MatchCandidate[]>);
     setLoadingRides(false);
     setLoadingRequests(false);
   }, [cacheIsValid]);
@@ -480,7 +479,7 @@ export default function HomePage() {
       const base =
         current && current.profileId === profile.id
           ? current
-          : { profileId: profile.id, fetchedAt: 0, rides: [] as Ride[], requests: [] as RideRequest[], suggestedMatches: [] as MatchCandidate[] };
+          : { profileId: profile.id, fetchedAt: 0, rides: [] as Ride[], requests: [] as RideRequest[], suggestedMatches: {} as Record<string, MatchCandidate[]> };
       setHomeCache({
         profileId: profile.id,
         fetchedAt: Date.now(),
@@ -541,42 +540,66 @@ export default function HomePage() {
     }
   }, [loading, user, fetchRides, fetchRequests, cacheIsValid]);
 
-  // Use same ride as matches page default (first ride) so home and /matches show same pool
-  const suggestedMatchRideId = useMemo(() => rides[0]?.id ?? null, [rides]);
+  // Rides that are involved in an accepted/confirmed/completed request
+  // should not appear in "Your requested rides" — they're already matched
+  const matchedRideIds = new Set(
+    requests
+      .filter(
+        (r) =>
+          r.status === "accepted" ||
+          r.ride_status === "confirmed" ||
+          r.ride_status === "completed",
+      )
+      .flatMap((r) => [r.ride_id, r.requester_ride_id]),
+  );
+  const activeRides = rides.filter((r) => !matchedRideIds.has(r.id));
+  const firstActiveRideId = activeRides[0]?.id ?? null;
 
   const fetchSuggestedMatches = useCallback(async () => {
-    if (!user || !profile || !suggestedMatchRideId) {
-      setSuggestedMatches([]);
-      persistCache({ suggestedMatches: [] });
+    if (!user || !profile || activeRides.length === 0) {
+      setSuggestedMatchesByRide({});
+      persistCache({ suggestedMatches: {} });
       return;
     }
     setLoadingMatches(true);
     try {
-      // Same options as matches page: default maxResults (10), minScore (30)
-      const results = await findMatches(suggestedMatchRideId);
       const supabase = getSupabaseClientOrThrow();
-      const { data: existingRequests } = await supabase
-        .from("ride_requests")
-        .select("ride_id, requester_ride_id, status")
-        .or(`ride_id.eq.${suggestedMatchRideId},requester_ride_id.eq.${suggestedMatchRideId}`)
-        .in("status", ["accepted", "pending"]);
+      const byRide: Record<string, MatchCandidate[]> = {};
 
-      let filtered = results;
-      if (existingRequests && existingRequests.length > 0) {
-        const matchedRideIds = new Set(
-          existingRequests.map(
-            (r: { ride_id: string; requester_ride_id: string }) =>
-              r.ride_id === suggestedMatchRideId ? r.requester_ride_id : r.ride_id,
-          ),
-        );
-        filtered = results.filter((m) => !matchedRideIds.has(m.request_target_ride_id));
+      for (const ride of activeRides) {
+        try {
+          const results = await findMatches(ride.id);
+          const { data: existingRequests } = await supabase
+            .from("ride_requests")
+            .select("ride_id, requester_ride_id, status")
+            .or(`ride_id.eq.${ride.id},requester_ride_id.eq.${ride.id}`)
+            .in("status", ["accepted", "pending"]);
+
+          let filtered = results;
+          if (existingRequests && existingRequests.length > 0) {
+            const matchedRideIds = new Set(
+              existingRequests.map(
+                (r: { ride_id: string; requester_ride_id: string }) =>
+                  r.ride_id === ride.id ? r.requester_ride_id : r.ride_id,
+              ),
+            );
+            filtered = results.filter((m) => !matchedRideIds.has(m.request_target_ride_id));
+          }
+          byRide[ride.id] = filtered.slice(0, 3);
+        } catch (err) {
+          const details = toErrorDetails(err);
+          if (process.env.NODE_ENV === "development" && details) {
+            console.warn(`[HomePage] Matches for ride ${ride.id} unavailable:`, details);
+          }
+          byRide[ride.id] = [];
+        }
       }
-      const nextMatches = filtered.slice(0, 3);
-      setSuggestedMatches(nextMatches);
-      persistCache({ suggestedMatches: nextMatches });
+
+      setSuggestedMatchesByRide(byRide);
+      persistCache({ suggestedMatches: byRide });
     } catch (err) {
-      setSuggestedMatches([]);
-      persistCache({ suggestedMatches: [] });
+      setSuggestedMatchesByRide({});
+      persistCache({ suggestedMatches: {} });
       const details = toErrorDetails(err);
       if (process.env.NODE_ENV === "development" && details) {
         console.warn("[HomePage] Suggested matches unavailable:", details);
@@ -584,7 +607,7 @@ export default function HomePage() {
     } finally {
       setLoadingMatches(false);
     }
-  }, [user, profile, suggestedMatchRideId, persistCache]);
+  }, [user, profile, activeRides, persistCache]);
 
   useEffect(() => {
     if (!loadingRides) {
@@ -599,6 +622,12 @@ export default function HomePage() {
     setRespondingId(requestId);
     try {
       await respondToRequest(requestId, response);
+      const req = requests.find((r) => r.id === requestId);
+      if (req) {
+        const myRideId = req.direction === "incoming" ? req.ride_id : req.requester_ride_id;
+        const otherRideId = req.direction === "incoming" ? req.requester_ride_id : req.ride_id;
+        removeSuggestedMatch(myRideId, otherRideId);
+      }
       if (response === "accepted") {
         toast.success("Request accepted! Starting chat...");
         fetch("/api/notify/match-accepted", {
@@ -631,6 +660,12 @@ export default function HomePage() {
       await withdrawRequest(requestId);
       toast.success("Request removed");
       setRideRequestDetail((prev) => (prev?.id === requestId ? null : prev));
+      const req = requests.find((r) => r.id === requestId);
+      if (req) {
+        const myRideId = req.direction === "outgoing" ? req.requester_ride_id : req.ride_id;
+        const otherRideId = req.direction === "outgoing" ? req.ride_id : req.requester_ride_id;
+        removeSuggestedMatch(myRideId, otherRideId);
+      }
       fetchRequests();
       fetchSuggestedMatches();
     } catch (err) {
@@ -642,22 +677,7 @@ export default function HomePage() {
     }
   };
 
-  // Rides that are involved in an accepted/confirmed/completed request
-  // should not appear in "Your requested rides" — they're already matched
-  const matchedRideIds = new Set(
-    requests
-      .filter(
-        (r) =>
-          r.status === "accepted" ||
-          r.ride_status === "confirmed" ||
-          r.ride_status === "completed",
-      )
-      .flatMap((r) => [r.ride_id, r.requester_ride_id]),
-  );
-  const activeRides = rides.filter((r) => !matchedRideIds.has(r.id));
-  const firstActiveRideId = activeRides[0]?.id ?? null;
 
-  const activeRideCount = activeRides.length;
   // Only count completed rides for stats (Total Saved, Rides Shared, CO2 Reduced)
   const ridesShared = requests.filter(
     (r) => r.ride_status === "completed",
@@ -689,15 +709,25 @@ export default function HomePage() {
     return { dateStr, timeStr, tolerance: `±${diffMin} min` };
   };
 
-  const handleConnect = async (targetRideId: string) => {
-    if (!firstActiveRideId) {
+  const removeSuggestedMatch = useCallback((myRideId: string, targetRideId: string) => {
+    setSuggestedMatchesByRide((prev) => {
+      const rideMatches = prev[myRideId] ?? [];
+      const next = { ...prev, [myRideId]: rideMatches.filter((m) => m.request_target_ride_id !== targetRideId) };
+      persistCache({ suggestedMatches: next });
+      return next;
+    });
+  }, [persistCache]);
+
+  const handleConnect = async (myRideId: string, targetRideId: string) => {
+    if (!myRideId) {
       toast.error("Post a ride first to connect with matches");
       return;
     }
     setRequestingMatchRideId(targetRideId);
     try {
-      await sendMatchRequest(firstActiveRideId, targetRideId);
+      await sendMatchRequest(myRideId, targetRideId);
       toast.success("Request sent");
+      removeSuggestedMatch(myRideId, targetRideId);
       fetchRequests();
       fetchSuggestedMatches();
     } catch (err) {
@@ -793,7 +823,7 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-900">
-            {activeRideCount === 1 ? "Requested ride" : "Requested rides"}
+            {activeRides.length === 1 ? "Requested ride" : "Requested rides"}
           </h2>
           <Button
             variant="ghost"
@@ -810,7 +840,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {!loadingRides && !loadingRequests && activeRideCount === 0 && (
+        {!loadingRides && !loadingRequests && activeRides.length === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/30 p-8 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100">
               <Navigation className="h-6 w-6 text-zinc-400" />
@@ -971,292 +1001,330 @@ export default function HomePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Suggested Matches */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-900">
-            Suggested Matches
-          </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-zinc-500 hover:text-zinc-900"
-            onClick={() => router.push(suggestedMatchRideId ? `/matches?ride=${suggestedMatchRideId}` : "/matches")}
-          >
-            Show more
-            <ArrowRight className="ml-1 h-3.5 w-3.5" />
-          </Button>
-        </div>
+      {/* Suggested Matches — per-ride sections */}
+      {activeRides.map((ride) => {
+        const rideMatches = suggestedMatchesByRide[ride.id] ?? [];
+        const totalMatchCount = Object.values(suggestedMatchesByRide).reduce((sum, arr) => sum + arr.length, 0);
 
-        {loadingMatches && (
-          <div className="flex justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-          </div>
-        )}
+        return (
+          <section key={ride.id} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-900">
+                  Suggested Matches
+                </h2>
+                {activeRides.length > 1 && (
+                  <p className="text-xs text-zinc-500">
+                    {ride.origin_name} → {ride.dest_name}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-zinc-500 hover:text-zinc-900"
+                onClick={() => router.push(`/matches?ride=${ride.id}`)}
+              >
+                Show more
+                <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </div>
 
-        {!loadingMatches && suggestedMatches.length === 0 && (
+            {loadingMatches && (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+              </div>
+            )}
+
+            {!loadingMatches && rideMatches.length === 0 && totalMatchCount === 0 && (
+              <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/30 p-8 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100">
+                  <Users className="h-6 w-6 text-zinc-400" />
+                </div>
+                <p className="text-sm font-semibold text-zinc-900">
+                  Looking for matches…
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Update your preferences or post a new route to see community members near you.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
+                  onClick={() => router.push("/post")}
+                >
+                  Edit Preferences
+                </Button>
+              </div>
+            )}
+
+            {!loadingMatches && rideMatches.length === 0 && totalMatchCount > 0 && (
+              <p className="py-4 text-center text-sm text-zinc-500">
+                No matches for this ride yet.
+              </p>
+            )}
+
+            {!loadingMatches && rideMatches.length > 0 && (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {rideMatches.map((item: MatchCandidate) => {
+                  const targetRideId = item.request_target_ride_id;
+                  return (
+                    <SuggestedMatchCard
+                      key={item.candidate_id}
+                      match={item}
+                      groupSize={item.candidate_type === "group" ? item.group_size_before_join : undefined}
+                      requesting={requestingMatchRideId === targetRideId}
+                      onConnect={() => handleConnect(ride.id, targetRideId)}
+                      onViewProfile={() => router.push(`/profile/${item.user_id}`)}
+                      onShowInfo={() => {
+                        setDetailItem(item);
+                        setDetailOpen(true);
+                        setDetailMyRideId(ride.id);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {activeRides.length === 0 && !loadingRides && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-zinc-900">Suggested Matches</h2>
           <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/30 p-8 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100">
               <Users className="h-6 w-6 text-zinc-400" />
             </div>
-            <p className="text-sm font-semibold text-zinc-900">
-              Looking for matches…
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              Update your preferences or post a new route to see community members near you.
-            </p>
+            <p className="text-sm font-semibold text-zinc-900">Post a ride to find matches</p>
+            <p className="mt-1 text-xs text-zinc-500">See who&apos;s headed your way.</p>
             <Button
               variant="outline"
               className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
               onClick={() => router.push("/post")}
             >
-              Edit Preferences
+              Post a Ride
             </Button>
           </div>
-        )}
-
-        {!loadingMatches && suggestedMatches.length > 0 && (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {suggestedMatches.map((item) => {
-        const match = item;
-        const targetRideId = item.request_target_ride_id;
-        const key = item.candidate_id;
-        return (
-          <SuggestedMatchCard
-            key={key}
-            match={match}
-            groupSize={item.candidate_type === "group" ? item.group_size_before_join : undefined}
-            requesting={requestingMatchRideId === targetRideId}
-            onConnect={() => handleConnect(targetRideId)}
-            onViewProfile={() => router.push(`/profile/${match.user_id}`)}
-            onShowInfo={() => {
-              setDetailItem(item);
-              setDetailOpen(true);
-            }}
-          />
-        );
-      })}
-    </div>
-  )
-}
-      </section >
+        </section>
+      )}
 
       <MatchDetailDialog
         item={detailItem}
         open={detailOpen}
         onOpenChange={(open) => {
           setDetailOpen(open);
-          if (!open) setDetailItem(null);
+          if (!open) { setDetailItem(null); setDetailMyRideId(null); }
         }}
-        myRideId={firstActiveRideId}
+        myRideId={detailMyRideId}
         onRequested={fetchSuggestedMatches}
       />
 
-  {/* Pending requests (sent) — requests I sent waiting for response */ }
-{
-  requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-zinc-900">
-            Pending Requests
-          </h2>
-          <Badge className="border-0 bg-amber-50 text-xs font-medium text-amber-700">
-            {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length} sent
-          </Badge>
-        </div>
-      </div>
-      {requests
-        .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
-        .map((req) => (
-          <RequestCard
-            key={req.id}
-            request={req}
-            variant="outgoing"
-            busy={withdrawingRequestId === req.id}
-            onPrimary={() => handleWithdraw(req.id)}
-            onOpenProfile={() => router.push(`/profile/${req.requester_profile_id}`)}
-            onOpenDetails={() => setRideRequestDetail(req)}
-          />
-        ))}
-    </section>
-  )
-}
-
-{/* Ride requests — incoming pending (others requested me) */ }
-{
-  requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-zinc-900">
-            Incoming Requests
-          </h2>
-          <Badge className="border-0 bg-blue-50 text-xs font-medium text-blue-700">
-            {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length} pending
-          </Badge>
-        </div>
-      </div>
-      {requests
-        .filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed")
-        .map((req) => (
-          <RequestCard
-            key={req.id}
-            request={req}
-            variant="incoming"
-            busy={respondingId === req.id}
-            onPrimary={() => handleRespond(req.id, "accepted")}
-            onSecondary={() => handleRespond(req.id, "rejected")}
-            onOpenProfile={() => router.push(`/profile/${req.requester_profile_id}`)}
-            onOpenDetails={() => setRideRequestDetail(req)}
-          />
-        ))}
-    </section>
-  )
-}
-
-{/* Ride request detail dialog — view ride preference, time, etc. */ }
-<Dialog open={!!rideRequestDetail} onOpenChange={(open) => !open && setRideRequestDetail(null)}>
-  <DialogContent showCloseButton={true} className="max-w-md">
-    {rideRequestDetail && (
-      <>
-        <DialogHeader>
-          <DialogTitle>
-            {rideRequestDetail.direction === "outgoing"
-              ? "Request sent"
-              : "Ride request"}
-          </DialogTitle>
-          <DialogDescription>
-            {rideRequestDetail.direction === "outgoing"
-              ? "Details of the ride you requested to match with"
-              : "Details of the incoming request"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <DetailProfileCard
-            photoUrl={rideRequestDetail.requester_photo}
-            fallback={rideRequestDetail.requester_name[0]}
-            name={rideRequestDetail.requester_name}
-            school={rideRequestDetail.requester_school}
-            secondaryLine={`${rideRequestDetail.requester_rating.toFixed(1)} rating`}
-          />
-
-          {rideRequestTripsLoading && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-              Loading full trip details...
-            </div>
-          )}
-
-          {!rideRequestTripsLoading && rideRequestTrips.otherRide && (
-            <DetailTripCard
-              origin={rideRequestTrips.otherRide.origin_name}
-              destination={rideRequestTrips.otherRide.dest_name}
-              departureEarliest={rideRequestTrips.otherRide.departure_earliest}
-              departureLatest={rideRequestTrips.otherRide.departure_latest}
-              seatsNeeded={rideRequestTrips.otherRide.seats_needed}
-              spaceCapacity={rideRequestTrips.otherRide.space_capacity}
-              quietRide={rideRequestTrips.otherRide.quiet_ride}
-              musicOk={rideRequestTrips.otherRide.music_ok}
-              genderPref={rideRequestTrips.otherRide.gender_pref}
-            />
-          )}
-
-          {!rideRequestTripsLoading &&
-            !rideRequestTrips.otherRide &&
-            rideRequestTripsError && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-                Full trip details could not be loaded right now.
+      {/* Pending requests (sent) — requests I sent waiting for response */}
+      {
+        requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-zinc-900">
+                  Pending Requests
+                </h2>
+                <Badge className="border-0 bg-amber-50 text-xs font-medium text-amber-700">
+                  {requests.filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed").length} sent
+                </Badge>
               </div>
-            )}
-        </div>
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => {
-              setRideRequestDetail(null);
-              router.push(`/profile/${rideRequestDetail.requester_profile_id}`);
-            }}
-          >
-            View full profile
-          </Button>
-          {rideRequestDetail.direction === "incoming" && (
+            </div>
+            {requests
+              .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
+              .map((req) => (
+                <RequestCard
+                  key={req.id}
+                  request={req}
+                  variant="outgoing"
+                  busy={withdrawingRequestId === req.id}
+                  onPrimary={() => handleWithdraw(req.id)}
+                  onOpenProfile={() => router.push(`/profile/${req.requester_profile_id}`)}
+                  onOpenDetails={() => setRideRequestDetail(req)}
+                />
+              ))}
+          </section>
+        )
+      }
+
+      {/* Ride requests — incoming pending (others requested me) */}
+      {
+        requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-zinc-900">
+                  Incoming Requests
+                </h2>
+                <Badge className="border-0 bg-blue-50 text-xs font-medium text-blue-700">
+                  {requests.filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed").length} pending
+                </Badge>
+              </div>
+            </div>
+            {requests
+              .filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed")
+              .map((req) => (
+                <RequestCard
+                  key={req.id}
+                  request={req}
+                  variant="incoming"
+                  busy={respondingId === req.id}
+                  onPrimary={() => handleRespond(req.id, "accepted")}
+                  onSecondary={() => handleRespond(req.id, "rejected")}
+                  onOpenProfile={() => router.push(`/profile/${req.requester_profile_id}`)}
+                  onOpenDetails={() => setRideRequestDetail(req)}
+                />
+              ))}
+          </section>
+        )
+      }
+
+      {/* Ride request detail dialog — view ride preference, time, etc. */}
+      <Dialog open={!!rideRequestDetail} onOpenChange={(open) => !open && setRideRequestDetail(null)}>
+        <DialogContent showCloseButton={true} className="max-w-md">
+          {rideRequestDetail && (
             <>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto border-zinc-200 text-zinc-600"
-                onClick={() => {
-                  handleRespond(rideRequestDetail.id, "rejected");
-                  setRideRequestDetail(null);
-                }}
-                disabled={respondingId === rideRequestDetail.id}
-              >
-                <XCircle className="mr-1 h-3 w-3" />
-                Decline
-              </Button>
-              <Button
-                className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
-                onClick={() => {
-                  handleRespond(rideRequestDetail.id, "accepted");
-                  setRideRequestDetail(null);
-                }}
-                disabled={respondingId === rideRequestDetail.id}
-              >
-                {respondingId === rideRequestDetail.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
+              <DialogHeader>
+                <DialogTitle>
+                  {rideRequestDetail.direction === "outgoing"
+                    ? "Request sent"
+                    : "Ride request"}
+                </DialogTitle>
+                <DialogDescription>
+                  {rideRequestDetail.direction === "outgoing"
+                    ? "Details of the ride you requested to match with"
+                    : "Details of the incoming request"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <DetailProfileCard
+                  photoUrl={rideRequestDetail.requester_photo}
+                  fallback={rideRequestDetail.requester_name[0]}
+                  name={rideRequestDetail.requester_name}
+                  school={rideRequestDetail.requester_school}
+                  secondaryLine={`${rideRequestDetail.requester_rating.toFixed(1)} rating`}
+                />
+
+                {rideRequestTripsLoading && (
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+                    Loading full trip details...
+                  </div>
+                )}
+
+                {!rideRequestTripsLoading && rideRequestTrips.otherRide && (
+                  <DetailTripCard
+                    origin={rideRequestTrips.otherRide.origin_name}
+                    destination={rideRequestTrips.otherRide.dest_name}
+                    departureEarliest={rideRequestTrips.otherRide.departure_earliest}
+                    departureLatest={rideRequestTrips.otherRide.departure_latest}
+                    seatsNeeded={rideRequestTrips.otherRide.seats_needed}
+                    spaceCapacity={rideRequestTrips.otherRide.space_capacity}
+                    quietRide={rideRequestTrips.otherRide.quiet_ride}
+                    musicOk={rideRequestTrips.otherRide.music_ok}
+                    genderPref={rideRequestTrips.otherRide.gender_pref}
+                  />
+                )}
+
+                {!rideRequestTripsLoading &&
+                  !rideRequestTrips.otherRide &&
+                  rideRequestTripsError && (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
+                      Full trip details could not be loaded right now.
+                    </div>
+                  )}
+              </div>
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setRideRequestDetail(null);
+                    router.push(`/profile/${rideRequestDetail.requester_profile_id}`);
+                  }}
+                >
+                  View full profile
+                </Button>
+                {rideRequestDetail.direction === "incoming" && (
                   <>
-                    <Check className="mr-1 h-3 w-3" />
-                    Accept
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto border-zinc-200 text-zinc-600"
+                      onClick={() => {
+                        handleRespond(rideRequestDetail.id, "rejected");
+                        setRideRequestDetail(null);
+                      }}
+                      disabled={respondingId === rideRequestDetail.id}
+                    >
+                      <XCircle className="mr-1 h-3 w-3" />
+                      Decline
+                    </Button>
+                    <Button
+                      className="w-full sm:w-auto bg-blue-600 text-white hover:bg-blue-700"
+                      onClick={() => {
+                        handleRespond(rideRequestDetail.id, "accepted");
+                        setRideRequestDetail(null);
+                      }}
+                      disabled={respondingId === rideRequestDetail.id}
+                    >
+                      {respondingId === rideRequestDetail.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="mr-1 h-3 w-3" />
+                          Accept
+                        </>
+                      )}
+                    </Button>
                   </>
                 )}
-              </Button>
+                {rideRequestDetail.direction === "outgoing" && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                    onClick={() => {
+                      handleWithdraw(rideRequestDetail.id);
+                      setRideRequestDetail(null);
+                    }}
+                    disabled={withdrawingRequestId === rideRequestDetail.id}
+                  >
+                    {withdrawingRequestId === rideRequestDetail.id ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <XCircle className="mr-1 h-3 w-3" />
+                    )}
+                    Remove request
+                  </Button>
+                )}
+              </DialogFooter>
             </>
           )}
-          {rideRequestDetail.direction === "outgoing" && (
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-              onClick={() => {
-                handleWithdraw(rideRequestDetail.id);
-                setRideRequestDetail(null);
-              }}
-              disabled={withdrawingRequestId === rideRequestDetail.id}
-            >
-              {withdrawingRequestId === rideRequestDetail.id ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              ) : (
-                <XCircle className="mr-1 h-3 w-3" />
-              )}
-              Remove request
-            </Button>
-          )}
-        </DialogFooter>
-      </>
-    )}
-  </DialogContent>
-</Dialog>
+        </DialogContent>
+      </Dialog>
 
-{/* How Knot works */ }
-<section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-700">
-  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-    How Knot works
-  </h3>
-  <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
-    <li>
-      <span className="font-medium text-zinc-800">1. Post a ride</span>{" "}
-      — share where you&apos;re going and your time window.
-    </li>
-    <li>
-      <span className="font-medium text-zinc-800">2. Get matches</span>{" "}
-      — we score people by route, timing, trust, and preferences.
-    </li>
-    <li>
-      <span className="font-medium text-zinc-800">3. Send a request</span>{" "}
-      — if they accept, you&apos;ll get a chat to coordinate details.
-    </li>
-  </ol>
-</section>
+      {/* How Knot works */}
+      <section className="mt-4 rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-700">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          How Knot works
+        </h3>
+        <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-600">
+          <li>
+            <span className="font-medium text-zinc-800">1. Post a ride</span>{" "}
+            — share where you&apos;re going and your time window.
+          </li>
+          <li>
+            <span className="font-medium text-zinc-800">2. Get matches</span>{" "}
+            — we score people by route, timing, trust, and preferences.
+          </li>
+          <li>
+            <span className="font-medium text-zinc-800">3. Send a request</span>{" "}
+            — if they accept, you&apos;ll get a chat to coordinate details.
+          </li>
+        </ol>
+      </section>
     </div >
   );
 }

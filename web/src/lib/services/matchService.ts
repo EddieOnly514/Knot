@@ -137,6 +137,29 @@ export async function respondToRequest(
         ? { status: "accepted", ride_status: "accepted" }
         : { status: response };
 
+    // When accepting, verify both rides are still active (not cancelled)
+    if (response === "accepted") {
+        const { data: reqFull } = await supabase
+            .from("ride_requests")
+            .select("ride_id, requester_ride_id")
+            .eq("id", requestId)
+            .single();
+        if (reqFull) {
+            const { data: ridesCheck } = await supabase
+                .from("rides")
+                .select("id, status")
+                .in("id", [reqFull.ride_id, reqFull.requester_ride_id]);
+            const cancelledRide = (ridesCheck ?? []).find(
+                (r: { id: string; status: string }) => r.status === "cancelled"
+            );
+            if (cancelledRide) {
+                throw new Error(
+                    "One of the rides in this request has been cancelled. This match is no longer available."
+                );
+            }
+        }
+    }
+
     const { error } = await supabase
         .from("ride_requests")
         .update(updates)
@@ -178,7 +201,7 @@ export async function withdrawRequest(requestId: string): Promise<void> {
 
     const { error } = await supabase
         .from("ride_requests")
-        .update({ status: "rejected" })
+        .update({ status: "withdrawn" })
         .eq("id", requestId);
     if (error) {
         const msg =

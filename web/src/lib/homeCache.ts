@@ -11,7 +11,7 @@ export type HomeCache = {
   fetchedAt: number;
   rides: unknown[];
   requests: unknown[];
-  suggestedMatches: unknown[];
+  suggestedMatches: Record<string, unknown[]>;
 };
 
 let homeCache: HomeCache | null = null;

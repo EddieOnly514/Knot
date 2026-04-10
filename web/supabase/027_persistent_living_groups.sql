@@ -241,7 +241,7 @@ BEGIN
         ))::INTEGER / 60
     );
 
-    RETURN v_gap_minutes <= 180;
+    RETURN v_gap_minutes <= 240;
 END;
 $$;
 

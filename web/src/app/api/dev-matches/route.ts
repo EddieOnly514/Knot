@@ -131,8 +131,9 @@ function deriveTimeTier(
                   )
               );
 
+    const bufferedGapMinutes = Math.max(0, gapMinutes - 240);
     const narrowWindowFloor =
-        gapMinutes <= 180 &&
+        gapMinutes <= 240 &&
         Math.min(myGroup.intervalMinutes, candidate.intervalMinutes) < 30;
 
     let timeTier: TimeTier | null = null;
@@ -141,9 +142,9 @@ function deriveTimeTier(
     else if (overlapMinutes >= 1) timeTier = "WEAK";
     else if (narrowWindowFloor) timeTier = "WEAK";
     else if (gapMinutes <= 60) timeTier = "BORDERLINE";
-    else if (gapMinutes <= 180) timeTier = "LAST_RESORT";
+    else if (gapMinutes <= 240) timeTier = "LAST_RESORT";
 
-    return { timeTier, overlapMinutes, gapMinutes };
+    return { timeTier, overlapMinutes, gapMinutes: bufferedGapMinutes };
 }
 
 function buildGroupSnapshot(
@@ -168,12 +169,10 @@ function buildGroupSnapshot(
         })
         .filter(Boolean) as Array<RideRow & { profile: ProfileRow | undefined }>;
 
-    const intervalStartMs = Math.max(
-        ...members.map((member) => new Date(member.departure_earliest).getTime())
-    );
-    const intervalEndMs = Math.min(
-        ...members.map((member) => new Date(member.departure_latest).getTime())
-    );
+    // Use the ride's own posted window for discovery so broad-flex riders
+    // still surface even if their current group is narrower.
+    const intervalStartMs = new Date(hostRide.departure_earliest).getTime();
+    const intervalEndMs = new Date(hostRide.departure_latest).getTime();
 
     const originCentroidLat =
         members.reduce((sum, member) => sum + member.origin_lat, 0) / members.length;

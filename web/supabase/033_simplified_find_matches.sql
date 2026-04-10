@@ -100,6 +100,12 @@ BEGIN
     WHERE rgm.ride_id = v_my.id AND rgm.left_at IS NULL
     LIMIT 1;
 
+    -- Always use the ride's OWN time window for matching (not the
+    -- narrowed group intersection which hides valid candidates).
+    v_dep_start := v_my.departure_earliest;
+    v_dep_end   := v_my.departure_latest;
+    v_date      := COALESCE(v_my.departure_preferred, v_my.departure_earliest)::DATE;
+
     IF v_anchor_grp IS NOT NULL THEN
         SELECT COALESCE(SUM(r.seats_needed), 0)
         INTO v_seats
@@ -108,12 +114,9 @@ BEGIN
         WHERE m.ride_group_id = v_anchor_grp AND m.left_at IS NULL;
     ELSE
         v_host_id   := v_my.id;
-        v_dep_start := v_my.departure_earliest;
-        v_dep_end   := v_my.departure_latest;
         v_cent_lat  := v_my.origin_lat;
         v_cent_lng  := v_my.origin_lng;
         v_seats     := COALESCE(v_my.seats_needed, 1);
-        v_date      := COALESCE(v_my.departure_preferred, v_my.departure_earliest)::DATE;
     END IF;
 
     v_dep_min := GREATEST(0,
@@ -171,10 +174,9 @@ BEGIN
             hp.school         AS c_school,
             hp.conversation_pref AS c_convpref,
 
-            COALESCE(grp.effective_departure_earliest, h.departure_earliest) AS c_g_start,
-            COALESCE(grp.effective_departure_latest,   h.departure_latest)   AS c_g_end,
-            COALESCE(grp.effective_date,
-                     COALESCE(h.departure_preferred, h.departure_earliest)::DATE) AS c_g_date,
+            h.departure_earliest AS c_g_start,
+            h.departure_latest   AS c_g_end,
+            COALESCE(h.departure_preferred, h.departure_earliest)::DATE AS c_g_date,
             COALESCE(grp.origin_centroid_lat, h.origin_lat) AS c_g_lat,
             COALESCE(grp.origin_centroid_lng, h.origin_lng) AS c_g_lng,
             COALESCE(grp.rider_count, 1)::INTEGER           AS c_g_size,
@@ -183,8 +185,7 @@ BEGIN
             COALESCE(grp.has_oversized, h.space_capacity = 3) AS c_g_over,
             GREATEST(0,
                 EXTRACT(EPOCH FROM (
-                    COALESCE(grp.effective_departure_latest,   h.departure_latest)
-                  - COALESCE(grp.effective_departure_earliest, h.departure_earliest)
+                    h.departure_latest - h.departure_earliest
                 ))::INTEGER / 60
             ) AS c_g_dep_min,
 
@@ -244,13 +245,18 @@ BEGIN
     tiered AS (
         SELECT s.*,
             CASE
-                WHEN s.c_overlap >= 60 THEN 'STRONG'
-                WHEN s.c_overlap >= 30 THEN 'OKAY'
-                WHEN s.c_overlap >= 1  THEN 'WEAK'
-                WHEN s.c_gap <= 180
-                     AND LEAST(v_dep_min, s.c_g_dep_min) < 30 THEN 'WEAK'
-                WHEN s.c_gap <= 60  THEN 'BORDERLINE'
-                WHEN s.c_gap <= 180 THEN 'LAST_RESORT'
+                -- Any overlap + both distances within 1 mi → Great
+                WHEN s.c_overlap >= 1 AND s.c_d_ori <= 1.0 AND s.c_d_dst <= 1.0
+                    THEN 'STRONG'
+                -- Any overlap + at least one distance within 1 mi → Okay
+                WHEN s.c_overlap >= 1 AND (s.c_d_ori <= 1.0 OR s.c_d_dst <= 1.0)
+                    THEN 'OKAY'
+                -- Any overlap but farther apart → Possible
+                WHEN s.c_overlap >= 1
+                    THEN 'WEAK'
+                -- No overlap but within 2 hr per party (4 hr total gap) → Possible
+                WHEN s.c_gap <= 240
+                    THEN 'WEAK'
                 ELSE NULL
             END AS c_tier,
             CASE
@@ -285,7 +291,7 @@ BEGIN
                 ) / 2.0)::NUMERIC, 3
             )::DECIMAL AS c_pref
         FROM scored s
-        WHERE s.c_overlap > 0 OR s.c_gap <= 180
+        WHERE s.c_overlap > 0 OR s.c_gap <= 240
     )
 
     SELECT
@@ -372,26 +378,21 @@ BEGIN
             ))
         END,
         CASE t.c_tier
-            WHEN 'STRONG'     THEN 'Great Match'
-            WHEN 'OKAY'       THEN 'Okay Match'
-            WHEN 'WEAK'       THEN 'Possible Match'
-            WHEN 'BORDERLINE' THEN 'Possible Match'
-            ELSE 'Low Match'
+            WHEN 'STRONG' THEN 'Great Match'
+            WHEN 'OKAY'   THEN 'Okay Match'
+            ELSE 'Possible Match'
         END,
         CASE t.c_tier
-            WHEN 'STRONG'     THEN 'Strong time overlap, close enough to share a ride.'
-            WHEN 'OKAY'       THEN 'Good time overlap for a shared ride.'
-            WHEN 'WEAK'       THEN 'Some time overlap, but less flexibility.'
-            WHEN 'BORDERLINE' THEN 'Time windows are close but do not fully overlap.'
-            ELSE 'Shown because there are no better nearby time matches.'
+            WHEN 'STRONG' THEN 'Strong time overlap, close enough to share a ride.'
+            WHEN 'OKAY'   THEN 'Good time overlap for a shared ride.'
+            ELSE 'Some time overlap, but less flexibility.'
         END
     FROM tiered t
     WHERE t.c_tier IS NOT NULL
     ORDER BY
         CASE t.c_tier
             WHEN 'STRONG' THEN 1  WHEN 'OKAY' THEN 2
-            WHEN 'WEAK'   THEN 3  WHEN 'BORDERLINE' THEN 4
-            ELSE 5
+            ELSE 3
         END,
         GREATEST(
             CASE t.c_otier WHEN 'CLOSE' THEN 1 WHEN 'NEAR' THEN 2 ELSE 3 END,

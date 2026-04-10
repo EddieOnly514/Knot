@@ -105,6 +105,16 @@ BEGIN
         v_my.id
     ) INTO v_my_host_ride_id;
 
+    -- Use the rider's own posted time window for discovery, not the group's
+    -- narrowed intersection window. That keeps broad-flex riders visible.
+    v_my_interval_start := v_my.departure_earliest;
+    v_my_interval_end := v_my.departure_latest;
+    v_my_interval_minutes := GREATEST(
+        0,
+        EXTRACT(EPOCH FROM (v_my_interval_end - v_my_interval_start))::INTEGER / 60
+    );
+    v_my_date := COALESCE(v_my.departure_preferred, v_my.departure_earliest)::DATE;
+
     WITH my_group AS (
         SELECT rgm.ride_group_id
         FROM ride_group_members rgm
@@ -113,37 +123,26 @@ BEGIN
         LIMIT 1
     ),
     my_group_members AS (
-        SELECT r.*
+        SELECT r.origin_lat, r.origin_lng, r.seats_needed
         FROM rides r
         WHERE r.id = v_my.id
           AND NOT EXISTS (SELECT 1 FROM my_group)
         UNION ALL
-        SELECT r.*
+        SELECT r.origin_lat, r.origin_lng, r.seats_needed
         FROM ride_group_members rgm
         JOIN rides r ON r.id = rgm.ride_id
         WHERE rgm.left_at IS NULL
           AND rgm.ride_group_id = (SELECT ride_group_id FROM my_group)
     )
     SELECT
-        MAX(mgm.departure_earliest),
-        MIN(mgm.departure_latest),
         AVG(mgm.origin_lat),
         AVG(mgm.origin_lng),
-        COALESCE(SUM(mgm.seats_needed), 0),
-        COALESCE((MAX(COALESCE(mgm.departure_preferred, mgm.departure_earliest)))::DATE, (MAX(mgm.departure_earliest))::DATE)
+        COALESCE(SUM(mgm.seats_needed), 0)
     INTO
-        v_my_interval_start,
-        v_my_interval_end,
         v_my_origin_centroid_lat,
         v_my_origin_centroid_lng,
-        v_my_total_seats,
-        v_my_date
+        v_my_total_seats
     FROM my_group_members mgm;
-
-    v_my_interval_minutes := GREATEST(
-        0,
-        EXTRACT(EPOCH FROM (v_my_interval_end - v_my_interval_start))::INTEGER / 60
-    );
 
     RETURN QUERY
     WITH candidate_base AS (
@@ -320,15 +319,15 @@ BEGIN
             GREATEST(
                 0,
                 EXTRACT(EPOCH FROM (
-                    LEAST(v_my_interval_end, c.interval_end) - GREATEST(v_my_interval_start, c.interval_start)
+                    LEAST(v_my_interval_end, c.departure_latest) - GREATEST(v_my_interval_start, c.departure_earliest)
                 ))::INTEGER / 60
             ) AS overlap_minutes_calc,
             CASE
-                WHEN LEAST(v_my_interval_end, c.interval_end) > GREATEST(v_my_interval_start, c.interval_start) THEN 0
+                WHEN LEAST(v_my_interval_end, c.departure_latest) > GREATEST(v_my_interval_start, c.departure_earliest) THEN 0
                 ELSE GREATEST(
                     0,
                     EXTRACT(EPOCH FROM (
-                        GREATEST(v_my_interval_start, c.interval_start) - LEAST(v_my_interval_end, c.interval_end)
+                        GREATEST(v_my_interval_start, c.departure_earliest) - LEAST(v_my_interval_end, c.departure_latest)
                     ))::INTEGER / 60
                 )
             END AS gap_minutes_calc
@@ -345,9 +344,9 @@ BEGIN
                 WHEN c.overlap_minutes_calc >= 60 THEN 'STRONG'
                 WHEN c.overlap_minutes_calc >= 30 THEN 'OKAY'
                 WHEN c.overlap_minutes_calc >= 1 THEN 'WEAK'
-                WHEN c.gap_minutes_calc <= 180 AND LEAST(v_my_interval_minutes, c.interval_minutes) < 30 THEN 'WEAK'
+                WHEN c.gap_minutes_calc <= 240 AND LEAST(v_my_interval_minutes, GREATEST(0, EXTRACT(EPOCH FROM (c.departure_latest - c.departure_earliest))::INTEGER / 60)) < 30 THEN 'WEAK'
                 WHEN c.gap_minutes_calc <= 60 THEN 'BORDERLINE'
-                WHEN c.gap_minutes_calc <= 180 THEN 'LAST_RESORT'
+                WHEN c.gap_minutes_calc <= 240 THEN 'LAST_RESORT'
                 ELSE NULL
             END AS computed_time_tier,
             CASE
@@ -379,7 +378,7 @@ BEGIN
             ROUND(((COALESCE(c.music_compatible_ratio, 0.5) + COALESCE(c.vibe_compatible_ratio, 0.5)) / 2.0)::NUMERIC, 3)::DECIMAL AS computed_pref_overall
         FROM compatible c
         WHERE c.overlap_minutes_calc > 0
-           OR c.gap_minutes_calc <= 180
+           OR c.gap_minutes_calc <= 240
     )
     SELECT
         COALESCE(t.ride_group_id, t.host_ride_id) AS candidate_id,

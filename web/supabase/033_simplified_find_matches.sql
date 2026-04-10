@@ -234,7 +234,7 @@ BEGIN
                     ))::INTEGER / 60)
             END AS c_gap
         FROM cand c
-        WHERE c.c_g_date = v_date
+        WHERE ABS(c.c_g_date - v_date) <= 1
           AND c.c_g_seats + v_seats <= 6
           AND haversine_miles(v_my.dest_lat, v_my.dest_lng,
                               c.c_dlat, c.c_dlng) <= 2.0

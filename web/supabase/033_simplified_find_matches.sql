@@ -61,7 +61,6 @@ SET search_path = public
 SET row_security = off
 LANGUAGE plpgsql
 AS $$
-#variable_conflict use_column
 DECLARE
     v_my          rides%ROWTYPE;
     v_my_profile  profiles%ROWTYPE;
@@ -87,11 +86,8 @@ BEGIN
 
     -- ── 2. Anchor group stats (procedural – no CTEs needed) ───────────
     SELECT rg.id, rg.ride_id,
-           rg.effective_departure_earliest, rg.effective_departure_latest,
-           rg.effective_date,
            rg.origin_centroid_lat, rg.origin_centroid_lng
     INTO v_anchor_grp, v_host_id,
-         v_dep_start, v_dep_end, v_date,
          v_cent_lat, v_cent_lng
     FROM ride_group_members rgm
     JOIN ride_groups rg ON rg.id = rgm.ride_group_id

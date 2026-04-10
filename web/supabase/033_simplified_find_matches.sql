@@ -127,13 +127,6 @@ BEGIN
           AND r.user_id   <> v_my.user_id
           AND r.ride_type  = 'seeking'
           AND r.status    <> 'cancelled'
-          AND NOT EXISTS (
-              SELECT 1 FROM ride_requests rr
-              WHERE (  (rr.ride_id = p_ride_id AND rr.requester_ride_id = r.id)
-                    OR (rr.ride_id = r.id      AND rr.requester_ride_id = p_ride_id))
-                AND (rr.status IN ('accepted', 'rejected', 'withdrawn')
-                     OR rr.created_at > NOW() - INTERVAL '7 days')
-          )
     ),
 
     cand AS (

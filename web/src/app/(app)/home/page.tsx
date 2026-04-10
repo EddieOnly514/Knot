@@ -540,9 +540,7 @@ export default function HomePage() {
     }
   }, [loading, user, fetchRides, fetchRequests, cacheIsValid]);
 
-  // Rides that are involved in an accepted/confirmed/completed request
-  // should not appear in "Your requested rides" — they're already matched
-  const matchedRideIds = new Set(
+  const matchedRideIds = useMemo(() => new Set(
     requests
       .filter(
         (r) =>
@@ -551,8 +549,9 @@ export default function HomePage() {
           r.ride_status === "completed",
       )
       .flatMap((r) => [r.ride_id, r.requester_ride_id]),
-  );
-  const activeRides = rides.filter((r) => !matchedRideIds.has(r.id));
+  ), [requests]);
+
+  const activeRides = useMemo(() => rides.filter((r) => !matchedRideIds.has(r.id)), [rides, matchedRideIds]);
   const firstActiveRideId = activeRides[0]?.id ?? null;
 
   const fetchSuggestedMatches = useCallback(async () => {

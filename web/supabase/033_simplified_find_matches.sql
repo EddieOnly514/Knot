@@ -199,55 +199,39 @@ BEGIN
         ORDER BY b.b_host
     ),
 
-    -- Compute distances, time overlap, and time gap using raw timestamps.
-    -- No date filter needed — the gap threshold handles day boundaries.
+    -- Simple time check: do the two departure windows overlap?
+    -- Window A: [v_dep_start, v_dep_end]  (my ride)
+    -- Window B: [c_g_start, c_g_end]      (candidate ride)
+    -- Overlap exists when A.start < B.end AND B.start < A.end
     scored AS (
         SELECT c.*,
             haversine_miles(v_cent_lat, v_cent_lng,
                             c.c_g_lat, c.c_g_lng)    AS c_d_ori,
             haversine_miles(v_my.dest_lat, v_my.dest_lng,
                             c.c_dlat, c.c_dlng)       AS c_d_dst,
-            -- Overlap in minutes (0 if no overlap)
             GREATEST(0,
                 EXTRACT(EPOCH FROM (
                     LEAST(v_dep_end, c.c_g_end)
                   - GREATEST(v_dep_start, c.c_g_start)
                 ))::INTEGER / 60
-            ) AS c_overlap,
-            -- Gap in minutes (0 if there is overlap)
-            CASE
-                WHEN LEAST(v_dep_end, c.c_g_end)
-                   > GREATEST(v_dep_start, c.c_g_start) THEN 0
-                ELSE GREATEST(0,
-                    EXTRACT(EPOCH FROM (
-                        GREATEST(v_dep_start, c.c_g_start)
-                      - LEAST(v_dep_end, c.c_g_end)
-                    ))::INTEGER / 60)
-            END AS c_gap
+            ) AS c_overlap
         FROM cand c
         WHERE c.c_g_seats + v_seats <= 6
           AND haversine_miles(v_my.dest_lat, v_my.dest_lng,
                               c.c_dlat, c.c_dlng) <= 2.0
           AND haversine_miles(v_cent_lat, v_cent_lng,
                               c.c_g_lat, c.c_g_lng) <= 2.0
-          -- Only consider rides within 4 hours of each other
-          AND GREATEST(v_dep_start, c.c_g_start)
-            - LEAST(v_dep_end, c.c_g_end) <= INTERVAL '4 hours'
+          -- Time windows must overlap
+          AND v_dep_start < c.c_g_end
+          AND c.c_g_start < v_dep_end
     ),
 
     tiered AS (
         SELECT s.*,
             CASE
-                -- Any overlap + both distances within 1 mi → Great
-                WHEN s.c_overlap >= 1 AND s.c_d_ori <= 1.0 AND s.c_d_dst <= 1.0
-                    THEN 'STRONG'
-                -- Any overlap + at least one distance within 1 mi → Okay
-                WHEN s.c_overlap >= 1 AND (s.c_d_ori <= 1.0 OR s.c_d_dst <= 1.0)
-                    THEN 'OKAY'
-                -- Any overlap or small gap → Possible
-                WHEN s.c_overlap >= 1 OR s.c_gap <= 240
-                    THEN 'WEAK'
-                ELSE NULL
+                WHEN s.c_d_ori <= 1.0 AND s.c_d_dst <= 1.0 THEN 'STRONG'
+                WHEN s.c_d_ori <= 1.0 OR  s.c_d_dst <= 1.0 THEN 'OKAY'
+                ELSE 'WEAK'
             END AS c_tier,
             CASE
                 WHEN s.c_d_ori <= 0.5 THEN 'CLOSE'
@@ -309,7 +293,7 @@ BEGIN
         t.c_school,
         t.c_tier,
         t.c_overlap,
-        t.c_gap,
+        0,  -- gap_minutes: always 0 since we only include overlapping windows
         ROUND(t.c_d_ori::NUMERIC, 2)::DECIMAL,
         t.c_otier,
         ROUND(t.c_d_dst::NUMERIC, 2)::DECIMAL,
@@ -377,7 +361,6 @@ BEGIN
             ELSE 'Some time overlap, but less flexibility.'
         END
     FROM tiered t
-    WHERE t.c_tier IS NOT NULL
     ORDER BY
         CASE t.c_tier
             WHEN 'STRONG' THEN 1  WHEN 'OKAY' THEN 2

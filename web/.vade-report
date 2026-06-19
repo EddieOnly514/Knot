@@ -1,0 +1,44 @@
+# Vercel Speed Insights Implementation
+
+Successfully implemented Vercel Speed Insights for the Next.js 16.1.6 project.
+
+## Changes Made
+
+### 1. Package Installation
+- Installed `@vercel/speed-insights` version 1.3.1
+- Updated `package.json` with the new dependency
+- Updated `package-lock.json` with dependency resolutions
+
+### 2. Code Integration
+**Modified: `web/src/app/layout.tsx`**
+- Imported `SpeedInsights` from `@vercel/speed-insights/next`
+- Added `<SpeedInsights />` component inside the `<body>` tag, after the `{children}` wrapped in `<Providers>`
+- Placement ensures Speed Insights loads properly while maintaining existing app structure
+
+## Implementation Details
+
+This Next.js project uses:
+- **Next.js Version**: 16.1.6 (App Router)
+- **Package Manager**: npm
+- **Router Type**: App Router
+
+Since the project uses Next.js 16.1.6 with the App Router, I followed the recommended approach:
+1. Used the `/next` import path for automatic routing detection
+2. Added the component directly to the root layout
+3. No additional configuration needed - the component will automatically track route changes
+
+## Verification
+
+✅ Package successfully installed
+✅ Code changes applied to root layout
+✅ Linter passed (no new errors introduced)
+✅ Files staged for commit
+
+Note: Build verification showed pre-existing issues with missing Supabase environment variables, unrelated to Speed Insights implementation. The Speed Insights integration follows Next.js best practices and will work correctly when the application is deployed or run with proper environment configuration.
+
+## Files Modified
+- `web/package.json` - Added @vercel/speed-insights dependency
+- `web/package-lock.json` - Updated with new dependency tree
+- `web/src/app/layout.tsx` - Added SpeedInsights component
+
+The implementation is complete and ready for deployment.

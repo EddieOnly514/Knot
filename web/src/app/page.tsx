@@ -35,7 +35,6 @@ import {
   Star,
   Instagram,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { AddressInput } from "@/components/address-input";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +61,6 @@ const HOW_KNOT_WORKS_STEPS = [
 
 export default function LandingPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
 
   // Search bar state
   const [searchFrom, setSearchFrom] = useState("");

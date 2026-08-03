@@ -30,15 +30,21 @@ export async function POST(request: Request) {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get("authorization");
     let isAuthed = false;
+    let isCronAuthed = false;
+    let authenticatedUserId: string | null = null;
 
     if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
       isAuthed = true;
+      isCronAuthed = true;
     } else {
       // Fall back to Supabase session auth (for client-side calls)
       try {
         const supabase = await createServerClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) isAuthed = true;
+        if (user) {
+          isAuthed = true;
+          authenticatedUserId = user.id;
+        }
       } catch { /* no session */ }
     }
 
@@ -127,6 +133,15 @@ export async function POST(request: Request) {
     const requesterProfile = profiles.find((p) => p.id === requesterRide.user_id);
     if (!ownerProfile || !requesterProfile) {
       return NextResponse.json({ error: "Profiles not found" }, { status: 404 });
+    }
+
+    if (
+      !isCronAuthed &&
+      process.env.NODE_ENV !== "development" &&
+      (!authenticatedUserId ||
+        ![ownerProfile.user_id, requesterProfile.user_id].includes(authenticatedUserId))
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const ownerEmail = await resolveEmail(ownerProfile);

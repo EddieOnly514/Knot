@@ -8,7 +8,8 @@
     "dev:phone": "next dev --turbopack --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:matching": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/matching/time.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -20,7 +21,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.563.0",
     "mapbox-gl": "^3.18.1",
-    "next": "16.1.6",
+    "next": "16.2.12",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
@@ -40,7 +41,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.12",
     "shadcn": "^3.8.4",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",

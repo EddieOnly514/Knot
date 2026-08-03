@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import type { MatchCandidate, MatchMemberSummary, TimeTier } from "@/types";
+import { classifyTimeCompatibility } from "@/lib/matching/time";
 
 type RideRow = {
     id: string;
@@ -54,7 +55,6 @@ type GroupSnapshot = {
     intervalStartMs: number;
     intervalEndMs: number;
     intervalMinutes: number;
-    effectiveDate: string;
     originCentroidLat: number;
     originCentroidLng: number;
     totalSeats: number;
@@ -100,53 +100,6 @@ function luggageUnits(spaceCapacity: number) {
     }
 }
 
-function effectiveDateFromRide(ride: RideRow) {
-    return new Date(ride.departure_preferred ?? ride.departure_earliest)
-        .toISOString()
-        .slice(0, 10);
-}
-
-function deriveTimeTier(
-    myGroup: GroupSnapshot,
-    candidate: GroupSnapshot
-): { timeTier: TimeTier | null; overlapMinutes: number; gapMinutes: number } {
-    const overlapMinutes = Math.max(
-        0,
-        Math.floor(
-            (Math.min(myGroup.intervalEndMs, candidate.intervalEndMs) -
-                Math.max(myGroup.intervalStartMs, candidate.intervalStartMs)) /
-                60000
-        )
-    );
-
-    const gapMinutes =
-        overlapMinutes > 0
-            ? 0
-            : Math.max(
-                  0,
-                  Math.floor(
-                      (Math.max(myGroup.intervalStartMs, candidate.intervalStartMs) -
-                          Math.min(myGroup.intervalEndMs, candidate.intervalEndMs)) /
-                          60000
-                  )
-              );
-
-    const bufferedGapMinutes = Math.max(0, gapMinutes - 240);
-    const narrowWindowFloor =
-        gapMinutes <= 240 &&
-        Math.min(myGroup.intervalMinutes, candidate.intervalMinutes) < 30;
-
-    let timeTier: TimeTier | null = null;
-    if (overlapMinutes >= 60) timeTier = "STRONG";
-    else if (overlapMinutes >= 30) timeTier = "OKAY";
-    else if (overlapMinutes >= 1) timeTier = "WEAK";
-    else if (narrowWindowFloor) timeTier = "WEAK";
-    else if (gapMinutes <= 60) timeTier = "BORDERLINE";
-    else if (gapMinutes <= 240) timeTier = "LAST_RESORT";
-
-    return { timeTier, overlapMinutes, gapMinutes: bufferedGapMinutes };
-}
-
 function buildGroupSnapshot(
     hostRideId: string,
     ridesById: Map<string, RideRow>,
@@ -169,10 +122,12 @@ function buildGroupSnapshot(
         })
         .filter(Boolean) as Array<RideRow & { profile: ProfileRow | undefined }>;
 
-    // Use the ride's own posted window for discovery so broad-flex riders
-    // still surface even if their current group is narrower.
-    const intervalStartMs = new Date(hostRide.departure_earliest).getTime();
-    const intervalEndMs = new Date(hostRide.departure_latest).getTime();
+    const intervalStartMs = Math.max(
+        ...members.map((member) => new Date(member.departure_earliest).getTime())
+    );
+    const intervalEndMs = Math.min(
+        ...members.map((member) => new Date(member.departure_latest).getTime())
+    );
 
     const originCentroidLat =
         members.reduce((sum, member) => sum + member.origin_lat, 0) / members.length;
@@ -192,17 +147,6 @@ function buildGroupSnapshot(
         intervalStartMs,
         intervalEndMs,
         intervalMinutes: Math.max(0, Math.floor((intervalEndMs - intervalStartMs) / 60000)),
-        effectiveDate: effectiveDateFromRide(
-            members.reduce((latest, member) => {
-                const latestTime = new Date(
-                    latest.departure_preferred ?? latest.departure_earliest
-                ).getTime();
-                const memberTime = new Date(
-                    member.departure_preferred ?? member.departure_earliest
-                ).getTime();
-                return memberTime > latestTime ? member : latest;
-            }, members[0])
-        ),
         originCentroidLat,
         originCentroidLng,
         totalSeats,
@@ -384,7 +328,7 @@ export async function GET(request: NextRequest) {
                 rideGroupIdsByHost
             );
             if (!candidate) continue;
-            if (candidate.effectiveDate !== myGroup.effectiveDate) continue;
+            if (myGroup.members.length > 1 && candidate.members.length > 1) continue;
             if (candidate.totalSeats + myGroup.totalSeats > 6) continue;
 
             const dOrigin = haversineMiles(
@@ -402,9 +346,9 @@ export async function GET(request: NextRequest) {
 
             if (dOrigin > 2.0 || dDestination > 2.0) continue;
 
-            const { timeTier, overlapMinutes, gapMinutes } = deriveTimeTier(
-                myGroup,
-                candidate
+            const { timeTier, overlapMinutes, gapMinutes } = classifyTimeCompatibility(
+                { startMs: myGroup.intervalStartMs, endMs: myGroup.intervalEndMs },
+                { startMs: candidate.intervalStartMs, endMs: candidate.intervalEndMs }
             );
             if (!timeTier) continue;
 
@@ -427,7 +371,8 @@ export async function GET(request: NextRequest) {
             const needsXl =
                 myGroup.totalBags + candidate.totalBags >= 4 ||
                 myGroup.hasOversized ||
-                candidate.hasOversized;
+                candidate.hasOversized ||
+                myGroup.totalSeats + candidate.totalSeats > 4;
 
             candidates.push({
                 candidate_id: candidate.rideGroupId ?? candidate.hostRide.id,

@@ -116,8 +116,8 @@ function MatchCard({
                                 <Text style={styles.verifiedText}>Verified</Text>
                             </View>
                         )}
-                        <View style={styles.scoreBadge}>
-                            <Text style={styles.scoreText}>{match.match_score}%</Text>
+                        <View style={styles.matchBadge}>
+                            <Text style={styles.matchBadgeText}>{match.match_label ?? 'Suggested'}</Text>
                         </View>
                     </View>
                     <View style={styles.statsRow}>
@@ -368,11 +368,11 @@ const styles = StyleSheet.create({
     },
     verifiedIcon: { color: colors.primary, fontSize: 10, fontWeight: '700' },
     verifiedText: { ...typography.styles.caption, color: colors.primary, fontWeight: '600' },
-    scoreBadge: {
+    matchBadge: {
         backgroundColor: colors.primaryAlpha[10], paddingHorizontal: 6,
         paddingVertical: 2, borderRadius: borderRadius.full,
     },
-    scoreText: { ...typography.styles.caption, color: colors.primary, fontWeight: '700' },
+    matchBadgeText: { ...typography.styles.caption, color: colors.primary, fontWeight: '700' },
     statsRow: { flexDirection: 'row', marginTop: spacing.xs, gap: spacing.md },
     stat: { ...typography.styles.caption, color: colors.text.muted },
     timeIndicator: {

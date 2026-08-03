@@ -32,7 +32,7 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surface.elevated,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
   },
 });

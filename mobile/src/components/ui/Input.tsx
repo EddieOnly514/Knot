@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.ui.border,

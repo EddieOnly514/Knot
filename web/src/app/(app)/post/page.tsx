@@ -53,7 +53,6 @@ export default function PostRidePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(!!editRideId);
 
-  const rideType = "seeking";
   const [origin, setOrigin] = useState(searchParams.get("from") ?? "");
   const [originAddress, setOriginAddress] =
     useState<StructuredAddress | null>(null);
@@ -223,7 +222,7 @@ export default function PostRidePage() {
           departureEarliest,
           departureLatest,
           departurePreferred: departureTime,
-          seatsNeeded: rideType === "seeking" ? parseInt(seatsNeeded) : undefined,
+          seatsNeeded: parseInt(seatsNeeded),
           spaceCapacity: parseInt(spaceCapacity),
           quietRide,
           musicOk,
@@ -234,7 +233,6 @@ export default function PostRidePage() {
         router.push("/home");
       } else {
         const ride = await createRide({
-          rideType,
           originName: origin,
           originLat: effectiveOrigin?.lat,
           originLng: effectiveOrigin?.lng,
@@ -245,7 +243,7 @@ export default function PostRidePage() {
           departureLatest,
           departurePreferred: departureTime,
           seatsAvailable: undefined,
-          seatsNeeded: rideType === "seeking" ? parseInt(seatsNeeded) : undefined,
+          seatsNeeded: parseInt(seatsNeeded),
           spaceCapacity: parseInt(spaceCapacity),
           quietRide,
           musicOk,
@@ -638,4 +636,3 @@ export default function PostRidePage() {
     </div>
   );
 }
-

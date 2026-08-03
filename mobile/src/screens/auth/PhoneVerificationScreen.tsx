@@ -19,13 +19,11 @@ import { colors, typography, spacing, borderRadius, shadows } from '../../design
 import type { AuthStackParamList } from '../../types/navigation';
 import { KnotLogo } from '../../components/common/KnotLogo';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export function PhoneVerificationScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { devBypassAuth } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 

@@ -313,7 +313,7 @@ export const CreateTripNowScreen: React.FC<CreateTripNowScreenProps> = ({ naviga
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   content: {
     paddingHorizontal: spacing['2xl'],
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   destinationCard: {
     flex: 1,
     padding: spacing.lg,
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   },
   destinationCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   destinationIcon: {
     fontSize: 28,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   airportCard: {
     padding: spacing.md,
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.ui.border,
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   },
   airportCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   airportCode: {
     ...typography.styles.h4,
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   timeCard: {
     flex: 1,
     padding: spacing.lg,
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   },
   timeCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   timeText: {
     ...typography.styles.bodySmall,
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   partySizeCard: {
     flex: 1,
     padding: spacing.lg,
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   },
   partySizeCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   partySizeText: {
     ...typography.styles.body,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   luggageCard: {
     padding: spacing.md,
-    backgroundColor: colors.background.subtle,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   },
   luggageCardSelected: {
     borderColor: colors.primary,
-    backgroundColor: colors.background.pure,
+    backgroundColor: colors.surface,
   },
   luggageIcon: {
     fontSize: 24,

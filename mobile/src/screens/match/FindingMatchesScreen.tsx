@@ -121,9 +121,8 @@ function MatchCard({
                         </Text>
                     </View>
                 </View>
-                <View style={styles.scoreContainer}>
-                    <Text style={styles.scoreValue}>{match.match_score}%</Text>
-                    <Text style={styles.scoreLabel}>match</Text>
+                <View style={styles.matchTierContainer}>
+                    <Text style={styles.matchTierText}>{match.match_label ?? 'Suggested'}</Text>
                 </View>
             </TouchableOpacity>
 
@@ -430,17 +429,17 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: colors.text.muted,
     },
-    scoreContainer: {
+    matchTierContainer: {
         alignItems: 'center',
+        backgroundColor: colors.primaryAlpha[10],
+        borderRadius: 100,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
     },
-    scoreValue: {
-        fontSize: 18,
+    matchTierText: {
+        fontSize: 12,
         fontWeight: '700',
         color: colors.primary,
-    },
-    scoreLabel: {
-        fontSize: 11,
-        color: colors.text.muted,
     },
     chipsRow: {
         flexDirection: 'row',

@@ -1,7 +1,6 @@
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
 export interface CreateRideData {
-    rideType: "offering" | "seeking";
     // Origin
     originName: string;
     originLat?: number;
@@ -51,7 +50,7 @@ export async function createRide(data: CreateRideData) {
         .from("rides")
         .insert({
             user_id: profile.id,
-            ride_type: data.rideType,
+            ride_type: "seeking",
             // Origin
             origin_name: data.originName,
             origin_lat: data.originLat || null,

@@ -29,7 +29,7 @@ export interface CreateTripIntentParams {
     longitude?: number;
 }
 
-// Potential match with profile info and score
+// Potential match with profile info and a user-facing compatibility tier.
 export interface PotentialMatch {
     trip_intent_id: string;
     user_id: string;
@@ -43,7 +43,7 @@ export interface PotentialMatch {
     longitude: number | null;
     distance_meters: number | null;
     time_diff_minutes: number;
-    match_score: number;
+    match_label?: string;
     // Profile info
     first_name: string;
     last_name: string;
@@ -95,7 +95,7 @@ const mockMatches: PotentialMatch[] = [
         longitude: null,
         distance_meters: 500,
         time_diff_minutes: 15,
-        match_score: 85,
+        match_label: 'Great Match',
         first_name: 'Sarah',
         last_name: 'M.',
         photo_url: 'https://randomuser.me/api/portraits/women/44.jpg',
@@ -115,7 +115,7 @@ const mockMatches: PotentialMatch[] = [
         longitude: null,
         distance_meters: 1200,
         time_diff_minutes: 20,
-        match_score: 72,
+        match_label: 'Possible Match',
         first_name: 'Mike',
         last_name: 'J.',
         photo_url: 'https://randomuser.me/api/portraits/men/32.jpg',
@@ -135,7 +135,7 @@ const mockMatches: PotentialMatch[] = [
         longitude: null,
         distance_meters: 300,
         time_diff_minutes: 10,
-        match_score: 90,
+        match_label: 'Great Match',
         first_name: 'Emily',
         last_name: 'C.',
         photo_url: 'https://randomuser.me/api/portraits/women/68.jpg',

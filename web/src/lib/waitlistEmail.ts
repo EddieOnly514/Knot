@@ -53,7 +53,7 @@ export async function sendWaitlistThankYou(to: string): Promise<{ ok: boolean; e
   `.trim();
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { error } = await resend.emails.send({
       from,
       to: [to],
       subject,

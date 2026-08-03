@@ -58,6 +58,12 @@ export const typography = {
       lineHeight: 28,
       fontWeight: '600' as const,
     },
+    h4: {
+      fontFamily: fontFamilies.headlineMedium,
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: '600' as const,
+    },
 
     // Body text
     body: {

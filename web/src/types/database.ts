@@ -67,7 +67,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          ride_type: "offering" | "seeking";
+          ride_type: "seeking";
           origin_lat: number | null;
           origin_lng: number | null;
           origin_name: string;
@@ -94,7 +94,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
-          ride_type: "offering" | "seeking";
+          ride_type: "seeking";
           origin_lat?: number | null;
           origin_lng?: number | null;
           origin_name: string;
@@ -159,7 +159,7 @@ export interface Database {
           id: string;
           ride_id: string;
           requester_ride_id: string;
-          status: "pending" | "accepted" | "rejected";
+          status: "pending" | "accepted" | "rejected" | "withdrawn";
           ride_status: string | null;
           created_at: string;
           updated_at: string;
@@ -168,7 +168,7 @@ export interface Database {
           id?: string;
           ride_id: string;
           requester_ride_id: string;
-          status?: string;
+          status?: "pending" | "accepted" | "rejected" | "withdrawn";
           ride_status?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["ride_requests"]["Insert"]>;

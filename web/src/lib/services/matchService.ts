@@ -2,14 +2,13 @@ import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import type { MatchCandidate, MatchMemberSummary } from "@/types";
 
 /**
- * Find matches for a ride using the V3 scoring algorithm.
+ * Find tier-based matches for a ride.
  * Always calls the Supabase RPC directly — no silent dev fallback.
  */
 export async function findMatches(
     rideId: string,
     options?: {
         maxResults?: number;
-        minScore?: number;
     }
 ): Promise<MatchCandidate[]> {
     const supabase = getSupabaseClientOrThrow();
@@ -29,7 +28,8 @@ export async function findMatches(
     const { data, error } = await supabase.rpc("find_matches_v3", {
         p_ride_id: rideId,
         p_max_results: options?.maxResults ?? 10,
-        p_min_score: options?.minScore ?? 0,
+        // Kept only for compatibility with the deployed RPC signature.
+        p_min_score: 0,
     });
 
     if (error) {
@@ -108,7 +108,7 @@ export async function getGroupSeatCount(rideId: string): Promise<number> {
  * Accept or reject a match request.
  * Verifies the current user owns the target ride before allowing the response.
  * When accepted, also set ride_status to 'accepted' so the chat shows step 2 (Confirm meetup) instead of Requested.
- * Throws with message containing "ride_match_cap_exceeded" if either ride already has 3 matches (4 people max).
+ * Throws with message containing "ride_match_cap_exceeded" if joining would exceed 6 seats.
  */
 export async function respondToRequest(
     requestId: string,

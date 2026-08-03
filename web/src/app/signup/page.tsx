@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Mail, Chrome, Lock, MailCheck } from "lucide-react";
+import { Loader2, Mail, Chrome, Lock } from "lucide-react";
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -19,7 +19,6 @@ function SignupForm() {
   const {
     signInWithGoogle,
     signUpWithEmailPassword,
-    resendEmailConfirmation,
     devSignIn,
   } = useAuth();
   const router = useRouter();
@@ -29,8 +28,6 @@ function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [needsEmailConfirmation] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -70,21 +67,6 @@ function SignupForm() {
     const onboardingUrl = nextUrl ? `/onboarding?next=${encodeURIComponent(nextUrl)}` : "/onboarding";
     router.push(onboardingUrl);
     setIsLoading(false);
-  };
-
-  const handleResendVerification = async () => {
-    if (!email || !isValidEmail(email)) {
-      toast.error("Enter a valid email to resend the verification link.");
-      return;
-    }
-    setResendLoading(true);
-    const { error } = await resendEmailConfirmation(email);
-    if (error) {
-      toast.error(error.message ?? "Failed to resend email");
-    } else {
-      toast.success("Verification email sent. Check your inbox.");
-    }
-    setResendLoading(false);
   };
 
   return (

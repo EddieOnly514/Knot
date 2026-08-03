@@ -113,7 +113,7 @@ export interface Rating {
 export interface Suggestion {
   profile: Profile;
   trip_intent: TripIntent;
-  score: number;
+  match_label: string;
 }
 
 // Combined Match with profiles (for UI)

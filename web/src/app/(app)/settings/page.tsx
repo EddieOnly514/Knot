@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Shield, LogOut, ChevronRight, Trash2, User } from "lucide-react";
+import { Bell, Shield, LogOut, ChevronRight, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import {
   getBlockedUsers,
@@ -371,5 +371,4 @@ export default function SettingsPage() {
     </div>
   );
 }
-
 

@@ -30,7 +30,18 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const nextConfig: NextConfig = {
-    /* config options here */
+    turbopack: {
+        root: path.resolve(__dirname),
+    },
+    images: {
+        remotePatterns: [
+            {
+                protocol: "https",
+                hostname: "maps.googleapis.com",
+                pathname: "/maps/api/staticmap",
+            },
+        ],
+    },
 };
 
 export default nextConfig;

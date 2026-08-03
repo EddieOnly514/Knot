@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -863,7 +864,14 @@ export default function ChatThreadPage() {
                         >
                           {staticMapUrl && (
                             <a href={meta?.map_url} target="_blank" rel="noopener noreferrer">
-                              <img src={staticMapUrl} alt="Location" className="h-[120px] w-full object-cover" />
+                              <Image
+                                src={staticMapUrl}
+                                alt="Shared location map"
+                                width={300}
+                                height={120}
+                                unoptimized
+                                className="h-[120px] w-full object-cover"
+                              />
                             </a>
                           )}
                           <div className="px-4 py-2.5">

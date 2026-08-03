@@ -10,7 +10,6 @@ import {
     ReactNode,
 } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 // Profile type matching actual SQL schema
@@ -77,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
-    const router = useRouter();
     const supabase = getSupabaseClient();
     const profileFetchedForRef = useRef<string | null>(null);
 
@@ -124,7 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             cancelled = true;
             subscription.unsubscribe();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [supabase]);
 
     // ── Step 2: Profile fetch (separate effect, triggers when user changes) ──

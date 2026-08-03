@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useLayoutEffect, useMemo } from "react";
+import { useEffect, useState, useCallback, useLayoutEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { getMyRides, cancelRide } from "@/lib/services/rideService";
@@ -540,19 +540,8 @@ export default function HomePage() {
     }
   }, [loading, user, fetchRides, fetchRequests, cacheIsValid]);
 
-  const matchedRideIds = useMemo(() => new Set(
-    requests
-      .filter(
-        (r) =>
-          r.status === "accepted" ||
-          r.ride_status === "confirmed" ||
-          r.ride_status === "completed",
-      )
-      .flatMap((r) => [r.ride_id, r.requester_ride_id]),
-  ), [requests]);
-
-  const activeRides = useMemo(() => rides.filter((r) => !matchedRideIds.has(r.id)), [rides, matchedRideIds]);
-  const firstActiveRideId = activeRides[0]?.id ?? null;
+  // Accepted rides stay discoverable until the group reaches its capacity.
+  const activeRides = rides;
 
   const fetchSuggestedMatches = useCallback(async () => {
     if (!user || !profile || activeRides.length === 0) {
@@ -645,7 +634,7 @@ export default function HomePage() {
       console.error("[HomePage] Respond error:", message, err);
       const friendlyMessage =
         typeof message === "string" && message.includes("ride_match_cap_exceeded")
-          ? "Reached max ride limit. Group can have at most 4 people."
+          ? "Reached max ride limit. Group can have at most 6 people."
           : message || "Failed to respond to request";
       toast.error(friendlyMessage);
     } finally {
@@ -1316,7 +1305,7 @@ export default function HomePage() {
           </li>
           <li>
             <span className="font-medium text-zinc-800">2. Get matches</span>{" "}
-            — we score people by route, timing, trust, and preferences.
+            — see compatible riders by time, nearby pickup and dropoff, and preferences.
           </li>
           <li>
             <span className="font-medium text-zinc-800">3. Send a request</span>{" "}

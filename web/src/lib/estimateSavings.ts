@@ -60,8 +60,7 @@ const SPLIT_FACTOR = 2;
  */
 export function estimateSavingsDollars(
   originName: string,
-  destName: string,
-  _totalScore?: number
+  destName: string
 ): number {
   const miles = estimateTripMiles(originName, destName);
   const totalRideshareCost = miles * DOLLARS_PER_MILE;

@@ -98,7 +98,7 @@ async function fetchMatchesPageData(profileId: string, rideParam: string | null)
     .from("ride_requests")
     .select("ride_id, requester_ride_id, status")
     .or(`ride_id.eq.${id},requester_ride_id.eq.${id}`)
-    .in("status", ["accepted", "pending", "withdrawn"]);
+    .in("status", ["accepted", "pending"]);
 
   if (existingError) {
     console.error("[matches] ride_requests query failed:", existingError);
@@ -701,7 +701,7 @@ function MatchesContent() {
       console.error("Respond error:", message, err);
       const friendlyMessage =
         typeof message === "string" && message.includes("ride_match_cap_exceeded")
-          ? "Reached max ride limit. Group can have at most 4 people."
+          ? "Reached max ride limit. Group can have at most 6 people."
           : message || "Failed to respond to request";
       toast.error(friendlyMessage);
     } finally {

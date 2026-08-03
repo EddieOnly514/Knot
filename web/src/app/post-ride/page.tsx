@@ -74,7 +74,6 @@ function PostRideForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [autoSubmitting, setAutoSubmitting] = useState(false);
 
-    const rideType = "seeking";
     const [origin, setOrigin] = useState(searchParams.get("from") ?? "");
     const [originAddress, setOriginAddress] =
         useState<StructuredAddress | null>(null);
@@ -257,7 +256,6 @@ function PostRideForm() {
             }
 
             const ride = await createRide({
-                rideType,
                 originName: formData.origin,
                 originLat: effectiveOrigin?.lat,
                 originLng: effectiveOrigin?.lng,

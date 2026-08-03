@@ -107,7 +107,7 @@ export async function POST(request: Request) {
 
     const { data: matches, error: rpcErr } = await admin.rpc(
       "find_matches_v3",
-      { p_ride_id: rideId, p_max_results: 20, p_min_score: 30 } as unknown as undefined
+      { p_ride_id: rideId, p_max_results: 20, p_min_score: 0 } as unknown as undefined
     );
 
     if (rpcErr || !Array.isArray(matches)) {

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -39,7 +38,6 @@ import { getMyRequests } from "@/lib/services/matchService";
 
 export default function ProfilePage() {
   const { profile, user, updateProfile } = useAuth();
-  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -601,4 +599,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

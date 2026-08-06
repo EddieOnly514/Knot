@@ -33,7 +33,8 @@ export interface Profile {
     email_verified: boolean;
     id_verified: boolean;
     completed_rides: number;
-    gender_preference: string;
+    gender_preference: "any" | "same_only";
+    gender_identity: "woman" | "man" | "nonbinary" | "prefer_not_to_say" | null;
     // Profile extras
     bio: string | null;
     school: string | null;
@@ -41,6 +42,29 @@ export interface Profile {
     music_pref: string | null;         // 'yes' | 'no' | 'no_preference'
     smoking_pref: string | null;       // 'no' | 'outside_only'
 }
+
+export type PublicProfile = Pick<
+    Profile,
+    | "id"
+    | "created_at"
+    | "first_name"
+    | "last_name"
+    | "photo_url"
+    | "is_verified"
+    | "rating"
+    | "total_rides"
+    | "phone_verified"
+    | "email_verified"
+    | "id_verified"
+    | "completed_rides"
+    | "gender_preference"
+    | "gender_identity"
+    | "bio"
+    | "school"
+    | "conversation_pref"
+    | "music_pref"
+    | "smoking_pref"
+>;
 
 interface AuthContextType {
     session: Session | null;
@@ -131,13 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 console.log("[AuthProvider] Fetching profile for:", authUser.id);
 
-                const { data: existing, error: fetchError } = await supabase
-                    .from("profiles")
-                    .select("*")
-                    .eq("user_id", authUser.id)
-                    .single();
+                const { data: profileRows, error: fetchError } = await supabase
+                    .rpc("get_my_profile");
+                const existing = Array.isArray(profileRows)
+                    ? (profileRows[0] as Profile | undefined)
+                    : (profileRows as Profile | null);
 
-                if (fetchError && fetchError.code === "PGRST116") {
+                if (!fetchError && !existing) {
                     // No profile found — trigger may not have fired yet, create one with empty name
                     // so user is sent to onboarding to register
                     console.log("[AuthProvider] No profile found, creating...");
@@ -151,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             last_name: "",
                             photo_url: null,
                         })
-                        .select()
+                        .select("id")
                         .single();
 
                     if (insertError) {
@@ -163,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         }
                     } else {
                         console.log("[AuthProvider] Profile created:", newProfile?.id);
-                        setProfile(newProfile);
+                        return fetchProfileForUser(authUser, retryCount + 1);
                     }
                     return;
                 }
@@ -193,13 +217,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
 
                     if (Object.keys(updates).length > 0) {
-                        const { data: updated } = await supabase
+                        const { error: updateError } = await supabase
                             .from("profiles")
                             .update(updates)
-                            .eq("user_id", authUser.id)
-                            .select()
-                            .single();
-                        setProfile(updated || existing);
+                            .eq("user_id", authUser.id);
+                        if (updateError) {
+                            console.error("[AuthProvider] Metadata update error:", updateError);
+                            setProfile(existing);
+                        } else {
+                            return fetchProfileForUser(authUser, retryCount + 1);
+                        }
                     } else {
                         setProfile(existing);
                     }
@@ -286,22 +313,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             console.log("[AuthProvider] Updating profile for user:", user.id);
-            const { data: updated, error } = await supabase
+            const { error } = await supabase
                 .from("profiles")
                 .update(updates)
-                .eq("user_id", user.id)
-                .select()
-                .single();
+                .eq("user_id", user.id);
 
             if (error) {
                 console.error("[AuthProvider] Update error:", error);
                 return { error: error as unknown as Error };
             }
 
-            console.log("[AuthProvider] Update success:", updated?.id);
-            if (updated) {
-                setProfile(updated);
-            }
+            console.log("[AuthProvider] Update success");
+            await fetchProfileForUser(user);
             return { error: null };
         } catch (error) {
             console.error("[AuthProvider] Update exception:", error);
@@ -393,6 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id_verified: false,
             completed_rides: 0,
             gender_preference: "any",
+            gender_identity: null,
             bio: null,
             school: null,
             conversation_pref: null,

@@ -40,10 +40,10 @@ import Link from "next/link";
 import { AddressInput, geocodeText, type StructuredAddress } from "@/components/address-input";
 
 const SPACE_OPTIONS = [
-    { value: "0", label: "No extra space needed" },
-    { value: "1", label: "Small bag (backpack/purse)" },
-    { value: "2", label: "One suitcase" },
-    { value: "3", label: "Multiple or bulky items" },
+    { value: "0", label: "Personal item only" },
+    { value: "1", label: "1 standard bag" },
+    { value: "2", label: "2 standard bags" },
+    { value: "3", label: "Oversized item" },
 ];
 
 const STORAGE_KEY = "knot_pending_ride";
@@ -63,7 +63,7 @@ interface PendingRideData {
     spaceCapacity: string;
     quietRide: boolean;
     musicOk: boolean;
-    genderPref: "any" | "male" | "female";
+    genderPref: "any" | "same_only";
     notes: string;
 }
 
@@ -100,12 +100,12 @@ function PostRideForm() {
     const [seatsNeeded, setSeatsNeeded] = useState(
         paramSeats && ["1", "2", "3", "4"].includes(paramSeats) ? paramSeats : "1"
     );
-    const [spaceCapacity, setSpaceCapacity] = useState("1");
+    const [spaceCapacity, setSpaceCapacity] = useState("0");
 
     const [quietRide, setQuietRide] = useState(false);
     const [musicOk, setMusicOk] = useState(false);
     const [genderPref, setGenderPref] =
-        useState<"any" | "male" | "female">("any");
+        useState<"any" | "same_only">("any");
     const [notes, setNotes] = useState("");
 
     // On mount, check if we have pending ride data in localStorage (returning from signup)
@@ -133,7 +133,7 @@ function PostRideForm() {
             setSpaceCapacity(data.spaceCapacity);
             setQuietRide(data.quietRide);
             setMusicOk(data.musicOk);
-            setGenderPref(data.genderPref);
+            setGenderPref(data.genderPref === "same_only" ? "same_only" : "any");
             setNotes(data.notes);
         } catch {
             // ignore parse errors
@@ -598,21 +598,12 @@ function PostRideForm() {
                                     ? "bg-blue-600 text-white"
                                     : "bg-white text-zinc-700",
                             ].join(" ")}
-                            onClick={() => {
-                                const cycle = {
-                                    any: "male" as const,
-                                    male: "female" as const,
-                                    female: "any" as const,
-                                };
-                                setGenderPref(cycle[genderPref]);
-                            }}
+                            onClick={() => setGenderPref(genderPref === "any" ? "same_only" : "any")}
                         >
                             <Users className="h-4 w-4" />
                             {genderPref === "any"
                                 ? "Any gender"
-                                : genderPref === "male"
-                                    ? "Male only"
-                                    : "Female only"}
+                                : "Same gender only"}
                         </Button>
                     </div>
                 </CardContent>

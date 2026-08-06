@@ -66,13 +66,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       {/* Knot branding */}
-      <div className="px-4 pb-6 pt-6">
+      <div className="px-4 pb-7 pt-6">
         <button
           type="button"
           onClick={() => navigate("/home")}
-          className="rounded-2xl px-3 py-2 text-left transition-colors hover:bg-zinc-50"
+          className="rounded-2xl px-3 py-2 text-left transition-colors hover:bg-blue-50"
         >
-          <span className="text-2xl font-bold tracking-tight text-[#0052FF]">Knot</span>
+          <span className="text-2xl font-extrabold tracking-[-0.05em] text-[#075cff]">Knot</span>
         </button>
       </div>
 
@@ -90,10 +90,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   href={it.href}
                   onClick={onNavigate}
                   className={[
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
                     isActive
-                      ? "bg-[#0052FF] text-white shadow-sm"
-                      : "text-zinc-600 hover:bg-blue-50/60 hover:text-zinc-900",
+                      ? "bg-gradient-to-r from-[#075cff] to-[#2587ff] text-white shadow-[0_8px_18px_rgba(7,92,255,0.22)]"
+                      : "text-zinc-600 hover:bg-blue-50 hover:text-blue-800",
                   ].join(" ")}
                 >
                   <Icon className={[
@@ -171,12 +171,12 @@ export function SidebarNav() {
   return (
     <>
       {/* Desktop: always-visible sidebar — card-like with rounded corner */}
-      <aside className="hidden w-64 shrink-0 border-r border-zinc-200/60 bg-white md:flex md:flex-col">
+      <aside className="hidden w-64 shrink-0 border-r border-blue-100/70 bg-white/75 md:flex md:flex-col">
         <SidebarContent />
       </aside>
 
       {/* Mobile: menu button in a compact top bar */}
-      <div className="fixed left-0 right-0 top-0 z-30 flex h-12 items-center border-b border-zinc-200/60 bg-white/95 backdrop-blur-sm px-3 md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="fixed left-0 right-0 top-0 z-30 flex h-12 items-center border-b border-blue-100/70 bg-white/90 px-3 backdrop-blur-xl md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
@@ -186,7 +186,7 @@ export function SidebarNav() {
           <Menu className="h-5 w-5" />
         </button>
         <div className="ml-2">
-          <span className="text-xl font-bold tracking-tight text-[#0052FF]">Knot</span>
+          <span className="text-xl font-extrabold tracking-[-0.05em] text-[#075cff]">Knot</span>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export function SidebarNav() {
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
               <div>
-                <span className="text-xl font-bold tracking-tight text-[#0052FF]">Knot</span>
+                <span className="text-xl font-extrabold tracking-[-0.05em] text-[#075cff]">Knot</span>
               </div>
               <button
                 type="button"

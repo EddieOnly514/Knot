@@ -34,22 +34,22 @@ export function PageHeader({
   };
 
   return (
-    <header className="mb-4 flex items-center justify-between gap-3">
+    <header className="mb-6 flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="-ml-2 h-11 w-11 min-h-[44px] min-w-[44px] text-zinc-600 hover:text-zinc-900 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0"
+          className="-ml-2 h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl text-zinc-500 hover:bg-blue-50 hover:text-blue-700 touch-manipulation md:h-9 md:w-9 md:min-h-0 md:min-w-0"
           onClick={handleBack}
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-base font-semibold text-zinc-900 sm:text-lg">
+          <h1 className="text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs text-zinc-500 sm:text-sm">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-zinc-500 sm:text-sm">{subtitle}</p>
           )}
         </div>
       </div>
@@ -57,5 +57,4 @@ export function PageHeader({
     </header>
   );
 }
-
 

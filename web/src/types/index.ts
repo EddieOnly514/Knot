@@ -31,7 +31,7 @@ export interface MatchMemberSummary {
     music_ok: boolean;
 }
 
-// Match result from find_matches_v3 RPC
+// Match result from the tier-based find_matches_v4 RPC.
 export interface MatchCandidate {
     candidate_id: string;
     candidate_type: "solo" | "group";

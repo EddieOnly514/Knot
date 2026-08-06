@@ -13,6 +13,7 @@ export interface CreateRideData {
     departureEarliest: Date;
     departureLatest: Date;
     departurePreferred?: Date;
+    departureTimezone?: string;
     // Capacity
     seatsAvailable?: number;
     seatsNeeded?: number;
@@ -25,6 +26,10 @@ export interface CreateRideData {
     smokingOk?: boolean;
     verifiedOnly?: boolean;
     notes?: string;
+}
+
+function getRideTimezone(explicitTimezone?: string): string {
+    return explicitTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 /**
@@ -63,6 +68,7 @@ export async function createRide(data: CreateRideData) {
             departure_earliest: data.departureEarliest.toISOString(),
             departure_latest: data.departureLatest.toISOString(),
             departure_preferred: data.departurePreferred?.toISOString() || null,
+            departure_timezone: getRideTimezone(data.departureTimezone),
             // Capacity
             seats_available: data.seatsAvailable ?? 1,
             seats_needed: data.seatsNeeded ?? 1,
@@ -115,6 +121,7 @@ export async function getMyRides(profileId?: string) {
         .select("*")
         .eq("user_id", effectiveProfileId)
         .eq("status", "active")
+        .gte("departure_latest", new Date().toISOString())
         .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -246,6 +253,14 @@ export async function updateRide(rideId: string, data: Partial<CreateRideData>) 
         payload.departure_latest = data.departureLatest.toISOString();
     if (data.departurePreferred != null)
         payload.departure_preferred = data.departurePreferred.toISOString();
+    if (
+        data.departureEarliest != null ||
+        data.departureLatest != null ||
+        data.departurePreferred != null ||
+        data.departureTimezone != null
+    ) {
+        payload.departure_timezone = getRideTimezone(data.departureTimezone);
+    }
     if (data.seatsNeeded != null) payload.seats_needed = data.seatsNeeded;
     if (data.seatsAvailable != null) payload.seats_available = data.seatsAvailable;
     if (data.spaceCapacity != null) payload.space_capacity = data.spaceCapacity;

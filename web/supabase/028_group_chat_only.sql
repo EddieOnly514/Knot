@@ -131,6 +131,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION leave_ride_group(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION leave_ride_group(UUID) TO authenticated;
 
 -- 3. Backfill: ensure any accepted ride_request that lacks a group gets one.

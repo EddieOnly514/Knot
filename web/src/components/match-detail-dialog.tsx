@@ -56,7 +56,7 @@ export function DetailProfileCard({
   badges?: React.ReactNode;
 }) {
   return (
-    <Card className="border-zinc-200">
+    <Card className="rounded-2xl border-zinc-200/80 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <Avatar className="h-14 w-14">
@@ -109,7 +109,7 @@ export function DetailTripCard({
   xlFlagMessage?: string | null;
 }) {
   return (
-    <Card className="border-zinc-200">
+    <Card className="rounded-2xl border-zinc-200/80 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
       <CardContent className="space-y-2.5 p-4 text-sm">
         <p className="text-xs font-semibold tracking-wide text-zinc-400">TRIP DETAILS</p>
         <div className="flex items-start gap-2">
@@ -160,7 +160,7 @@ export function DetailTripCard({
           )}
           {genderPref && genderPref !== "any" && (
             <Badge variant="secondary" className="text-[10px] gap-0.5">
-              {genderPref === "same_only" ? "Same gender only" : `${genderPref} only`}
+              {genderPref === "same_only" ? "Same gender only" : "Any gender"}
             </Badge>
           )}
           {needsXl && (
@@ -214,7 +214,7 @@ export function MatchDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg gap-0 p-0" showCloseButton>
+      <DialogContent className="max-h-[90vh] max-w-lg gap-0 overflow-hidden rounded-[1.75rem] border-white/80 p-0 shadow-2xl" showCloseButton>
         <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-lg">Match details</DialogTitle>

@@ -25,19 +25,17 @@ export async function findMatches(
             members: Array.isArray(row.members) ? (row.members as MatchMemberSummary[]) : [],
         }));
 
-    const { data, error } = await supabase.rpc("find_matches_v3", {
+    const { data, error } = await supabase.rpc("find_matches_v4", {
         p_ride_id: rideId,
         p_max_results: options?.maxResults ?? 10,
-        // Kept only for compatibility with the deployed RPC signature.
-        p_min_score: 0,
     });
 
     if (error) {
         const msg = [error.message, error.code && `(${error.code})`, error.details, error.hint]
             .filter(Boolean)
             .join(" ");
-        console.error("[findMatches] find_matches_v3 RPC failed:", msg || error, error);
-        throw new Error(msg || "find_matches_v3 failed");
+        console.error("[findMatches] find_matches_v4 RPC failed:", msg || error, error);
+        throw new Error(msg || "find_matches_v4 failed");
     }
 
     return normalize((data || []) as Array<MatchCandidate & { members: unknown }>);
@@ -56,6 +54,9 @@ function toMatchRequestErrorMessage(err: { message?: string; code?: string } | n
     }
     if (msg.includes("ride_match_cap_exceeded")) {
         return "Reached max ride limit. Group can have at most 6 people.";
+    }
+    if (msg.includes("ride_request_cooldown")) {
+        return "You can request this match again seven days after the last request.";
     }
     return msg || "Failed to send request.";
 }
@@ -85,23 +86,6 @@ export async function sendMatchRequest(
         throw e;
     }
     return data.id;
-}
-
-/** Max total seats per group (e.g. 2 rides with seats_needed=3 each = 6). */
-export const MAX_GROUP_SEATS = 6;
-
-/**
- * Returns total seats currently filled in this ride's group.
- * A ride with seats_needed=2 counts as 2 toward the 6-seat cap.
- * Use to disable Accept / send request when at cap.
- */
-export async function getGroupSeatCount(rideId: string): Promise<number> {
-    const supabase = getSupabaseClientOrThrow();
-    const { data, error } = await supabase.rpc("count_group_seats_for_ride", {
-        p_ride_id: rideId,
-    });
-    if (error) throw error;
-    return typeof data === "number" ? data : 0;
 }
 
 /**

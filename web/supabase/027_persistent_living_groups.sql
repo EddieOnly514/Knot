@@ -84,6 +84,7 @@ AS $$
     );
 $$;
 
+REVOKE EXECUTE ON FUNCTION ride_group_members_visible_to_me(UUID, UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION ride_group_members_visible_to_me(UUID, UUID) TO authenticated;
 
 ALTER TABLE ride_group_members ENABLE ROW LEVEL SECURITY;
@@ -1036,5 +1037,12 @@ CREATE POLICY "messages_update" ON messages
         )
     );
 
+REVOKE EXECUTE ON FUNCTION leave_current_ride_group(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION leave_current_ride_group(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION recalculate_ride_group(UUID, TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION append_group_system_message(UUID, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION recalculate_ride_group(UUID, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION upsert_group_member(UUID, UUID, BOOLEAN) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION validate_group_join_on_accept() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION sync_group_after_accept() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION sync_group_after_request_exit() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION sync_group_after_ride_update() FROM PUBLIC, anon, authenticated;

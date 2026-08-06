@@ -20,6 +20,8 @@ export interface Database {
           email: string | null;
           phone: string | null;
           photo_url: string | null;
+          default_party_size: number | null;
+          default_luggage: string | null;
           bio: string | null;
           school: string | null;
           conversation_pref: string | null;
@@ -32,7 +34,8 @@ export interface Database {
           email_verified: boolean;
           id_verified: boolean;
           completed_rides: number;
-          gender_preference: string;
+          gender_preference: "any" | "same_only";
+          gender_identity: "woman" | "man" | "nonbinary" | "prefer_not_to_say" | null;
           suggested_matches_email_sent_at: string | null;
           created_at: string;
           updated_at: string;
@@ -45,6 +48,8 @@ export interface Database {
           email?: string | null;
           phone?: string | null;
           photo_url?: string | null;
+          default_party_size?: number | null;
+          default_luggage?: string | null;
           bio?: string | null;
           school?: string | null;
           conversation_pref?: string | null;
@@ -57,7 +62,8 @@ export interface Database {
           email_verified?: boolean;
           id_verified?: boolean;
           completed_rides?: number;
-          gender_preference?: string;
+          gender_preference?: "any" | "same_only";
+          gender_identity?: "woman" | "man" | "nonbinary" | "prefer_not_to_say" | null;
           suggested_matches_email_sent_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
@@ -77,6 +83,7 @@ export interface Database {
           departure_earliest: string;
           departure_latest: string;
           departure_preferred: string | null;
+          departure_timezone: string;
           seats_available: number;
           seats_needed: number;
           space_capacity: number;
@@ -104,6 +111,7 @@ export interface Database {
           departure_earliest: string;
           departure_latest: string;
           departure_preferred?: string | null;
+          departure_timezone?: string;
           seats_available?: number;
           seats_needed?: number;
           space_capacity?: number;
@@ -117,41 +125,6 @@ export interface Database {
           status?: string;
         };
         Update: Partial<Database["public"]["Tables"]["rides"]["Insert"]>;
-      };
-
-      ride_matches: {
-        Row: {
-          id: string;
-          ride_id: string;
-          matched_ride_id: string;
-          total_score: number;
-          score_route: number;
-          score_time: number;
-          score_trust: number;
-          score_space: number;
-          score_prefs: number;
-          time_overlap_minutes: number;
-          detour_ratio: number;
-          origin_distance_miles: number | null;
-          dest_distance_miles: number | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          ride_id: string;
-          matched_ride_id: string;
-          total_score?: number;
-          score_route?: number;
-          score_time?: number;
-          score_trust?: number;
-          score_space?: number;
-          score_prefs?: number;
-          time_overlap_minutes?: number;
-          detour_ratio?: number;
-          origin_distance_miles?: number | null;
-          dest_distance_miles?: number | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["ride_matches"]["Insert"]>;
       };
 
       ride_requests: {
@@ -280,19 +253,38 @@ export interface Database {
     };
 
     Functions: {
-      count_accepted_matches_for_ride: {
-        Args: { p_ride_id: string };
-        Returns: number;
+      get_my_profile: {
+        Args: Record<string, never>;
+        Returns: Database["public"]["Tables"]["profiles"]["Row"][];
       };
-      count_group_seats_for_ride: {
-        Args: { p_ride_id: string };
-        Returns: number;
+      get_public_profile: {
+        Args: { p_profile_id: string };
+        Returns: {
+          id: string;
+          created_at: string;
+          first_name: string;
+          last_name: string;
+          photo_url: string | null;
+          is_verified: boolean;
+          rating: number;
+          total_rides: number;
+          phone_verified: boolean;
+          email_verified: boolean;
+          id_verified: boolean;
+          completed_rides: number;
+          gender_preference: string;
+          gender_identity: string | null;
+          bio: string | null;
+          school: string | null;
+          conversation_pref: string | null;
+          music_pref: string | null;
+          smoking_pref: string | null;
+        }[];
       };
-      find_matches_v3: {
+      find_matches_v4: {
         Args: {
           p_ride_id: string;
           p_max_results?: number;
-          p_min_score?: number;
         };
         Returns: {
           candidate_id: string;
@@ -337,10 +329,6 @@ export interface Database {
           match_label: string;
           match_explanation: string;
         }[];
-      };
-      leave_current_ride_group: {
-        Args: { p_anchor_ride_id: string };
-        Returns: string;
       };
       leave_ride_group: {
         Args: { p_ride_group_id: string };

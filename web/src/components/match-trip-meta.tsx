@@ -18,30 +18,23 @@ export function luggageLabel(spaceCapacity: number) {
 export function TripCardMeta({
   spaceCapacity,
   needsXl,
-  savingsDollars,
 }: {
   spaceCapacity: number;
   needsXl: boolean;
-  savingsDollars: number;
 }) {
   return (
-    <div className="mt-2 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge
           variant="secondary"
-          className="rounded-full bg-white text-[11px] text-zinc-700"
+          className="rounded-full border border-zinc-100 bg-white px-2.5 py-1 text-[10px] font-semibold text-zinc-600 shadow-sm"
         >
           {luggageLabel(spaceCapacity)}
         </Badge>
         {needsXl && (
-          <Badge className="rounded-full border-0 bg-amber-100 text-[11px] text-amber-800">
-            Uber XL
+          <Badge className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+            Uber XL likely
           </Badge>
         )}
-      </div>
-      <p className="text-[11px] font-medium text-blue-600">
-        Est. savings ~${savingsDollars.toFixed(0)}
-      </p>
     </div>
   );
 }

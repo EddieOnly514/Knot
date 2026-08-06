@@ -33,10 +33,10 @@ export async function updateSession(request: NextRequest) {
     const authPaths = ["/login", "/signup"];
     const isOnboardingPath = pathname.startsWith("/onboarding");
 
-    const isProtectedPath = protectedPaths.some((path) =>
-        pathname.startsWith(path)
-    );
-    const isAuthPath = authPaths.some((path) => pathname.startsWith(path));
+    const matchesRoute = (path: string) =>
+        pathname === path || pathname.startsWith(`${path}/`);
+    const isProtectedPath = protectedPaths.some(matchesRoute);
+    const isAuthPath = authPaths.some(matchesRoute);
     const needsAuthCheck = isProtectedPath || isAuthPath || isOnboardingPath;
 
     // Fast-path: for routes that don't care about auth, skip Supabase entirely
@@ -46,13 +46,24 @@ export async function updateSession(request: NextRequest) {
         });
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+        if (process.env.NODE_ENV === "development") {
+            return NextResponse.next({ request });
+        }
+        return new NextResponse("Authentication service is not configured.", {
+            status: 503,
+        });
+    }
+
     let supabaseResponse = NextResponse.next({
         request,
     });
 
     const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        supabaseUrl,
+        supabaseAnonKey,
         {
             cookies: {
                 getAll() {

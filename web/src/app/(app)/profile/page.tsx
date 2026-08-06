@@ -59,7 +59,10 @@ export default function ProfilePage() {
   const [smokingPref, setSmokingPref] = useState(
     profile?.smoking_pref || "no",
   );
-  const [genderPref, setGenderPref] = useState(
+  const [genderIdentity, setGenderIdentity] = useState<
+    "woman" | "man" | "nonbinary" | "prefer_not_to_say"
+  >(profile?.gender_identity || "prefer_not_to_say");
+  const [genderPref, setGenderPref] = useState<"any" | "same_only">(
     profile?.gender_preference || "any",
   );
   const [completedRidesCount, setCompletedRidesCount] = useState<number | null>(null);
@@ -84,6 +87,7 @@ export default function ProfilePage() {
       setConversationPref(profile.conversation_pref || "chill");
       setMusicPref(profile.music_pref || "no_preference");
       setSmokingPref(profile.smoking_pref || "no");
+      setGenderIdentity(profile.gender_identity || "prefer_not_to_say");
       setGenderPref(profile.gender_preference || "any");
     }
   }, [profile, isEditing]);
@@ -173,6 +177,7 @@ export default function ProfilePage() {
         conversation_pref: conversationPref,
         music_pref: musicPref,
         smoking_pref: smokingPref,
+        gender_identity: genderIdentity,
         gender_preference: genderPref,
       });
       if (result?.error) {
@@ -201,6 +206,7 @@ export default function ProfilePage() {
     setConversationPref(profile?.conversation_pref || "chill");
     setMusicPref(profile?.music_pref || "no_preference");
     setSmokingPref(profile?.smoking_pref || "no");
+    setGenderIdentity(profile?.gender_identity || "prefer_not_to_say");
     setGenderPref(profile?.gender_preference || "any");
     setIsEditing(false);
   };
@@ -489,21 +495,45 @@ export default function ProfilePage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-600">
-                  <Users className="h-3.5 w-3.5" />
-                  Gender preference
-                </Label>
-                <Select value={genderPref} onValueChange={setGenderPref}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">No preference</SelectItem>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-600">
+                    <Users className="h-3.5 w-3.5" />
+                    Your gender
+                  </Label>
+                  <Select
+                    value={genderIdentity}
+                    onValueChange={(value) => setGenderIdentity(value as typeof genderIdentity)}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="woman">Woman</SelectItem>
+                      <SelectItem value="man">Man</SelectItem>
+                      <SelectItem value="nonbinary">Nonbinary</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-1.5 flex items-center gap-1.5 text-xs text-zinc-600">
+                    <Shield className="h-3.5 w-3.5" />
+                    Group preference
+                  </Label>
+                  <Select
+                    value={genderPref}
+                    onValueChange={(value) => setGenderPref(value as typeof genderPref)}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any gender</SelectItem>
+                      <SelectItem value="same_only">Same gender only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           ) : (
@@ -535,12 +565,12 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-zinc-600">
                   <Users className="h-4 w-4 text-zinc-400" />
-                  Gender preference
+                  Group preference
                 </span>
-                <span className="text-sm font-medium capitalize text-zinc-900">
+                <span className="text-sm font-medium text-zinc-900">
                   {profile?.gender_preference === "any"
-                    ? "No preference"
-                    : profile?.gender_preference || "No preference"}
+                    ? "Any gender"
+                    : "Same gender only"}
                 </span>
               </div>
             </div>

@@ -30,6 +30,7 @@ import {
     GraduationCap,
     Phone,
     Camera,
+    Shield,
 } from "lucide-react";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 
@@ -50,7 +51,10 @@ function OnboardingContent() {
     const [phone, setPhone] = useState("");
     const [conversationPref, setConversationPref] = useState("chill");
     const [musicPref, setMusicPref] = useState("no_preference");
-    const [genderPref, setGenderPref] = useState("any");
+    const [genderIdentity, setGenderIdentity] = useState<
+        "woman" | "man" | "nonbinary" | "prefer_not_to_say"
+    >("prefer_not_to_say");
+    const [genderPref, setGenderPref] = useState<"any" | "same_only">("any");
     const [bio, setBio] = useState("");
 
     // Pre-fill from existing profile data only (not Google metadata — user should type their own name)
@@ -58,8 +62,13 @@ function OnboardingContent() {
         if (profile) {
             setFirstName((profile.first_name || "").trim());
             setLastName((profile.last_name || "").trim());
+            setSchool(profile.school || "");
             setPhone(profile.phone || "");
             setBio(profile.bio || "");
+            setConversationPref(profile.conversation_pref || "chill");
+            setMusicPref(profile.music_pref || "no_preference");
+            setGenderIdentity(profile.gender_identity || "prefer_not_to_say");
+            setGenderPref(profile.gender_preference || "any");
         }
     }, [profile]);
 
@@ -163,6 +172,7 @@ function OnboardingContent() {
                 bio: bio.trim() || null,
                 conversation_pref: conversationPref,
                 music_pref: musicPref,
+                gender_identity: genderIdentity,
                 gender_preference: genderPref,
             });
 
@@ -341,21 +351,43 @@ function OnboardingContent() {
                             </Select>
                         </div>
 
-                        {/* Gender */}
-                        <div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
                             <Label className="text-xs text-zinc-600 flex items-center gap-1.5 mb-1.5">
-                                <Users className="w-3.5 h-3.5" /> Gender preference
+                                <Users className="w-3.5 h-3.5" /> Your gender
                             </Label>
-                            <Select value={genderPref} onValueChange={setGenderPref}>
+                            <Select
+                                value={genderIdentity}
+                                onValueChange={(value) => setGenderIdentity(value as typeof genderIdentity)}
+                            >
                                 <SelectTrigger className="h-11">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="any">No preference</SelectItem>
-                                    <SelectItem value="male">Male</SelectItem>
-                                    <SelectItem value="female">Female</SelectItem>
+                                    <SelectItem value="woman">Woman</SelectItem>
+                                    <SelectItem value="man">Man</SelectItem>
+                                    <SelectItem value="nonbinary">Nonbinary</SelectItem>
+                                    <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                                 </SelectContent>
                             </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-zinc-600 flex items-center gap-1.5 mb-1.5">
+                                <Shield className="w-3.5 h-3.5" /> Group preference
+                            </Label>
+                            <Select
+                                value={genderPref}
+                                onValueChange={(value) => setGenderPref(value as typeof genderPref)}
+                            >
+                                <SelectTrigger className="h-11">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="any">Any gender</SelectItem>
+                                    <SelectItem value="same_only">Same gender only</SelectItem>
+                                </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                     </CardContent>
                 </Card>

@@ -108,10 +108,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-blue-50/40 via-zinc-50 to-zinc-100/60 text-zinc-900">
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 md:my-4 md:rounded-2xl md:border md:border-zinc-200/60 md:bg-white md:shadow-[0_2px_12px_0_rgba(0,0,0,0.04)] md:overflow-hidden">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f5f8ff] text-zinc-900">
+      <div aria-hidden className="pointer-events-none fixed -left-32 -top-36 h-96 w-96 rounded-full bg-blue-300/25 blur-3xl" />
+      <div aria-hidden className="pointer-events-none fixed -bottom-48 right-0 h-[30rem] w-[30rem] rounded-full bg-sky-200/35 blur-3xl" />
+      <div className="relative mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 md:my-4 md:overflow-hidden md:rounded-[2rem] md:border md:border-white/80 md:bg-white/85 md:shadow-[0_24px_80px_rgba(39,76,139,0.12)] md:backdrop-blur-xl">
         <SidebarNav />
-        <main className="app-main flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-white px-4 pt-14 md:px-10 md:pt-8">
+        <main className="app-main flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-white/80 px-4 pt-14 md:px-8 md:pt-8 lg:px-10">
           <EmailVerificationBanner />
           {children}
         </main>
@@ -119,4 +121,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

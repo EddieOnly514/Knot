@@ -35,6 +35,7 @@ AS $$
     );
 $$;
 
+REVOKE EXECUTE ON FUNCTION ride_group_members_visible_to_me(UUID, UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION ride_group_members_visible_to_me(UUID, UUID) TO authenticated;
 
 DROP POLICY IF EXISTS "ride_group_members_select" ON ride_group_members;

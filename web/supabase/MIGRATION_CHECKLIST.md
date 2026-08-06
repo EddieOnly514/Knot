@@ -1,82 +1,86 @@
-# SQL Migration Checklist - All Files Ready ✅
+# Knot Supabase Migration Checklist
 
-## Security Fixes Applied
+## Apply Order
 
-### ✅ All Functions Have `SET search_path = public`
-All database functions now have the `SET search_path = public` clause to prevent search_path manipulation vulnerabilities:
+Apply every numbered SQL file in ascending order. The current production
+sequence ends at `044_remove_retired_matching_helpers.sql`.
 
-- ✅ `001_initial_schema.sql`: `update_updated_at_column()`, `handle_new_user()`
-- ✅ `002_matching_functions.sql`: `haversine_distance()`, `find_potential_matches()`, `check_and_update_mutual_match()`, `express_interest()`
-- ✅ `003_google_oauth_trigger.sql`: `handle_new_user()`
-- ✅ `004_matching_v2.sql`: `find_potential_matches()`
-- ✅ `005_schema_v3.sql`: `update_rides_updated_at()`, `haversine_miles()`, `calculate_time_overlap()`, `find_matches_v3()`
-- ✅ `006_seeker_matching.sql`: `find_matches_v3()`
-- ✅ `011_performance_optimizations.sql`: `bounding_box_contains()`, `find_matches_v3()`
+For an existing project, verify the following recent migrations are present:
 
-### ✅ All Policies Are Idempotent
-All `CREATE POLICY` statements now have `DROP POLICY IF EXISTS` before them:
+1. `034_consistent_time_matching.sql`
+2. `035_matching_safety_and_preferences.sql`
+3. `036_secure_profile_rpcs.sql`
+4. `037_function_acl_hardening.sql`
+5. `038_local_ride_timezone.sql`
+6. `039_security_advisor_cleanup.sql`
+7. `040_matcher_safety_before_ranking.sql`
+8. `041_remove_retired_matching_schema.sql`
+9. `042_explicit_rls_and_profile_privacy.sql`
+10. `043_group_timezone_and_request_integrity.sql`
+11. `044_remove_retired_matching_helpers.sql`
 
-- ✅ `001_initial_schema.sql`: All 12 policies
-- ✅ `005_schema_v3.sql`: All 8 policies
-- ✅ `008_messages.sql`: All 4 policies
-- ✅ `009_user_safety.sql`: All 5 policies
-- ✅ `012_spatial_ref_sys_rls.sql`: 1 policy (conditional)
+## Current Matching Path
 
-## Schema Compatibility
+- Next.js calls `find_matches_v4(ride_id, max_results)`.
+- `find_matches_v4` verifies the caller owns the selected ride and applies the
+  ride's IANA timezone before same-calendar-day checks.
+- `find_matches_v3` performs deterministic hard filters and tier sorting. It
+  does not use an ML model, weighted score, trust score, or driver/seeker role.
+- Everyone is a seeker. The database constraint permits only
+  `rides.ride_type = 'seeking'`.
+- Origin and destination must each be within 2 miles.
+- Both rides must be active, unexpired, unblocked, on the same local date, and
+  fit within the six-seat group limit.
+- Original window overlap is tiered as Strong, Okay, or Weak. Non-overlapping
+  windows remain eligible when extending both parties by two hours produces a
+  shared window, which is equivalent to an original gap of at most 240 minutes.
+- Last-resort suppression runs only after invalid candidates are removed.
+- Distance and preferences only order candidates inside a time tier. Luggage
+  and groups over four occupied seats set the Uber XL warning but do not filter.
 
-### ✅ Messages Table Handling
-`001_initial_schema.sql` now conditionally creates policies for the old schema (`match_id`) only if that column exists. The new schema (`conversation_id`) is handled by `008_messages.sql`.
+## Request And Group Integrity
 
-## Performance Optimizations
+- Request pairs have a seven-day cooldown, enforced by the insert trigger.
+- Acceptance rechecks date, expiry, blocking, origin, destination, time, and
+  capacity so edits after request creation cannot bypass hard filters.
+- Accepted pairs create or join one persistent `ride_group`; messages belong to
+  the group and remain when a member leaves.
+- Join acceptance locks involved rides before the six-seat count, preventing
+  concurrent overfill.
+- Group edits and leaves recalculate the main rider, member count, common time
+  window, origin centroid, luggage, Uber XL state, and match label.
+- Group recalculation uses the main ride's local timezone and stores a valid
+  shared extended window when original member windows do not overlap.
 
-### ✅ Indexes
-- Composite indexes for common query patterns (`005_schema_v3.sql`, `011_performance_optimizations.sql`)
-- Geographic indexes for location-based queries
-- Covering indexes for user lookups
-- Partial indexes for filtered queries (e.g., `WHERE status = 'active'`)
+## Data API And RLS
 
-### ✅ Query Optimizations
-- `bounding_box_contains()` function for fast geographic pre-filtering before expensive haversine calculations
-- Optimized `find_matches_v3()` with two-pass filtering (cheap checks first, expensive calculations second)
-- Pre-calculated time windows to avoid redundant calculations
+- Application tables use explicit `anon` and `authenticated` grants in addition
+  to RLS. Anonymous users cannot read rides or profiles.
+- Signed-in users cannot directly select another profile's email or phone and
+  cannot update trust/verification counters.
+- `get_my_profile()` returns private fields only for the current auth user.
+- `get_public_profile(profile_id)` returns the safe profile projection.
+- Group-member policies use the non-recursive visibility helper from migration
+  `029`.
+- Internal trigger functions have no `PUBLIC`, `anon`, or `authenticated`
+  execute grant unless they are an intentional authenticated RPC.
 
-### ✅ Table Statistics
-`011_performance_optimizations.sql` includes `ANALYZE` statements to update query planner statistics.
+## Retired Schema
 
-## File Execution Order
+Migrations `041` and `044` remove the old trip-intent, swipe, cached-score,
+driver-era helper, unused PostGIS, and retired enum objects. Current matching is
+built from `rides`, `ride_requests`, `ride_groups`, `ride_group_members`,
+`messages`, `blocked_users`, and `profiles`.
 
-Run files in this order for a fresh database:
+## Verification
 
-1. `001_initial_schema.sql` - Base schema (profiles, trip_intents, matches, etc.)
-2. `002_matching_functions.sql` - Matching functions for old schema
-3. `003_google_oauth_trigger.sql` - OAuth user handling
-4. `004_matching_v2.sql` - Updated matching algorithm
-5. `005_schema_v3.sql` - New rides-based schema
-6. `006_seeker_matching.sql` - Seeker-to-seeker matching
-7. `007_ride_notes.sql` - Add notes column
-8. `008_messages.sql` - Messaging system
-9. `009_user_safety.sql` - Blocking and reporting
-10. `010_profile_extras.sql` - Additional profile fields
-11. `011_performance_optimizations.sql` - Performance indexes and optimized functions
-12. `012_spatial_ref_sys_rls.sql` - PostGIS RLS (if using PostGIS)
+After a schema change:
 
-## Notes
+1. Run migrations in a rollback transaction before applying them.
+2. Run Supabase security and performance advisors.
+3. Run `npm run test:matching`.
+4. Run `npm run lint`.
+5. Run `npm run build`.
 
-- All files use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, etc. for idempotency
-- Functions use `CREATE OR REPLACE FUNCTION` so they can be rerun safely
-- Policies are dropped before creation to allow reruns
-- Conditional logic handles schema evolution (old vs new messages table)
-
-## Remaining Manual Steps
-
-1. **Extension in Public Schema**: Move `postgis` extension to a different schema (Dashboard → Database → Extensions)
-2. **Leaked Password Protection**: Enable in Dashboard → Authentication → Settings
-3. **Missing Function**: If `expire_old_trip_intents()` exists in your database, add `SET search_path = public` or drop it
-
-## Testing
-
-After running migrations:
-1. Check Supabase Dashboard → Database → Linter for any remaining warnings
-2. Verify all functions have `SET search_path` set correctly
-3. Test key queries (matching, messaging, etc.)
-4. Monitor query performance using Dashboard → Database → Query Performance
+The Auth setting for leaked-password protection must be enabled in the Supabase
+Dashboard; it is a project setting rather than a SQL migration.

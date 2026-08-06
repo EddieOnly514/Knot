@@ -106,6 +106,23 @@ BEGIN
         RAISE EXCEPTION 'ride_group_join_invalid: Your own rides cannot match each other.';
     END IF;
 
+    IF EXISTS (
+        SELECT 1
+        FROM rides host
+        JOIN rides requester ON requester.id = NEW.requester_ride_id
+        JOIN blocked_users bu
+          ON (
+              bu.blocker_profile_id = host.user_id
+              AND bu.blocked_profile_id = requester.user_id
+          ) OR (
+              bu.blocker_profile_id = requester.user_id
+              AND bu.blocked_profile_id = host.user_id
+          )
+        WHERE host.id = NEW.ride_id
+    ) THEN
+        RAISE EXCEPTION 'ride_group_join_invalid: This request is not available.';
+    END IF;
+
     UPDATE ride_requests rr
     SET status = 'withdrawn',
         updated_at = NOW()
@@ -115,6 +132,19 @@ BEGIN
           = LEAST(NEW.ride_id, NEW.requester_ride_id)
       AND GREATEST(rr.ride_id, rr.requester_ride_id)
           = GREATEST(NEW.ride_id, NEW.requester_ride_id);
+
+    IF EXISTS (
+        SELECT 1
+        FROM ride_requests rr
+        WHERE rr.created_at > NOW() - INTERVAL '7 days'
+          AND LEAST(rr.ride_id, rr.requester_ride_id)
+              = LEAST(NEW.ride_id, NEW.requester_ride_id)
+          AND GREATEST(rr.ride_id, rr.requester_ride_id)
+              = GREATEST(NEW.ride_id, NEW.requester_ride_id)
+    ) THEN
+        RAISE EXCEPTION
+            'ride_request_cooldown: This pair can match again seven days after the last request.';
+    END IF;
 
     RETURN NEW;
 END;
@@ -236,8 +266,30 @@ BEGIN
        OR v_candidate IS NULL
        OR v_anchor.status <> 'active'
        OR v_candidate.status <> 'active'
+       OR v_anchor.departure_latest < NOW()
+       OR v_candidate.departure_latest < NOW()
        OR v_anchor.ride_type <> 'seeking'
        OR v_candidate.ride_type <> 'seeking' THEN
+        RETURN FALSE;
+    END IF;
+
+    IF COALESCE(v_anchor.departure_preferred, v_anchor.departure_earliest)::DATE
+       IS DISTINCT FROM
+       COALESCE(v_candidate.departure_preferred, v_candidate.departure_earliest)::DATE THEN
+        RETURN FALSE;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM blocked_users bu
+        WHERE (
+            bu.blocker_profile_id = v_anchor.user_id
+            AND bu.blocked_profile_id = v_candidate.user_id
+        ) OR (
+            bu.blocker_profile_id = v_candidate.user_id
+            AND bu.blocked_profile_id = v_anchor.user_id
+        )
+    ) THEN
         RETURN FALSE;
     END IF;
 
@@ -1058,6 +1110,7 @@ AS $$
         WHERE r.id = p_ride_id
           AND r.ride_type = 'seeking'
           AND r.status = 'active'
+          AND r.departure_latest >= NOW()
     ),
     my_membership AS (
         SELECT rgm.ride_group_id, rg.ride_id AS host_ride_id
@@ -1294,6 +1347,49 @@ AS $$
           AND cs.total_seats + ms.total_seats <= 6
           AND haversine_miles(ms.origin_lat, ms.origin_lng, cs.origin_lat, cs.origin_lng) <= 2.0
           AND haversine_miles(mr.dest_lat, mr.dest_lng, ch.dest_lat, ch.dest_lng) <= 2.0
+          -- Apply safety filters before tier suppression and LIMIT. Otherwise a
+          -- blocked, expired, or different-date candidate can hide an eligible
+          -- LAST_RESORT match and consume the candidate window used by V4.
+          AND NOT EXISTS (
+              SELECT 1
+              FROM my_member_rides my_member
+              WHERE my_member.departure_latest < NOW()
+                 OR COALESCE(
+                        my_member.departure_preferred,
+                        my_member.departure_earliest
+                    )::DATE IS DISTINCT FROM
+                    COALESCE(mr.departure_preferred, mr.departure_earliest)::DATE
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM candidate_members cm
+              WHERE cm.host_ride_id = ch.host_ride_id
+                AND cm.group_id IS NOT DISTINCT FROM ch.group_id
+                AND (
+                    cm.departure_latest < NOW()
+                    OR COALESCE(
+                           cm.departure_preferred,
+                           cm.departure_earliest
+                       )::DATE IS DISTINCT FROM
+                       COALESCE(mr.departure_preferred, mr.departure_earliest)::DATE
+                )
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM my_member_rides my_member
+              JOIN candidate_members cm
+                ON cm.host_ride_id = ch.host_ride_id
+               AND cm.group_id IS NOT DISTINCT FROM ch.group_id
+              JOIN blocked_users bu
+                ON (
+                    bu.blocker_profile_id = my_member.user_id
+                    AND bu.blocked_profile_id = cm.user_id
+                )
+                OR (
+                    bu.blocker_profile_id = cm.user_id
+                    AND bu.blocked_profile_id = my_member.user_id
+                )
+          )
           AND NOT EXISTS (
               SELECT 1
               FROM ride_requests rr
@@ -1376,8 +1472,16 @@ AS $$
         v.ride_type,
         v.origin_name,
         v.dest_name,
-        v.group_interval_start AS departure_earliest,
-        v.group_interval_end AS departure_latest,
+        CASE
+            WHEN v.group_interval_start <= v.group_interval_end
+                THEN v.group_interval_start
+            ELSE v.group_interval_start - INTERVAL '2 hours'
+        END AS departure_earliest,
+        CASE
+            WHEN v.group_interval_start <= v.group_interval_end
+                THEN v.group_interval_end
+            ELSE v.group_interval_end + INTERVAL '2 hours'
+        END AS departure_latest,
         v.departure_preferred,
         v.seats_needed,
         v.space_capacity,
@@ -1529,6 +1633,7 @@ REVOKE EXECUTE ON FUNCTION prepare_ride_request_insert() FROM PUBLIC, anon, auth
 REVOKE EXECUTE ON FUNCTION validate_ride_request_status_transition() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION ride_fits_group_core(UUID, TIMESTAMPTZ, TIMESTAMPTZ, DECIMAL, DECIMAL, INTEGER, UUID) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION recalculate_ride_group(UUID, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION count_group_seats_for_ride(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION check_ride_match_cap() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION validate_group_join_on_accept() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION sync_group_after_accept() FROM PUBLIC, anon, authenticated;

@@ -39,10 +39,10 @@ import { PageHeader } from "@/components/page-header";
 import { AddressInput, geocodeText, type StructuredAddress } from "@/components/address-input";
 
 const SPACE_OPTIONS = [
-  { value: "0", label: "No extra space needed" },
-  { value: "1", label: "Small bag (backpack/purse)" },
-  { value: "2", label: "One suitcase" },
-  { value: "3", label: "Multiple or bulky items" },
+  { value: "0", label: "Personal item only" },
+  { value: "1", label: "1 standard bag" },
+  { value: "2", label: "2 standard bags" },
+  { value: "3", label: "Oversized item" },
 ];
 
 export default function PostRidePage() {
@@ -81,12 +81,12 @@ export default function PostRidePage() {
   const [seatsNeeded, setSeatsNeeded] = useState(
     paramSeats && ["1", "2", "3", "4"].includes(paramSeats) ? paramSeats : "1"
   );
-  const [spaceCapacity, setSpaceCapacity] = useState("1");
+  const [spaceCapacity, setSpaceCapacity] = useState("0");
 
   const [quietRide, setQuietRide] = useState(false);
   const [musicOk, setMusicOk] = useState(false);
   const [genderPref, setGenderPref] =
-    useState<"any" | "male" | "female">("any");
+    useState<"any" | "same_only">("any");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function PostRidePage() {
         setSpaceCapacity(String(ride.space_capacity));
         setQuietRide(ride.quiet_ride);
         setMusicOk(ride.music_ok);
-        setGenderPref((ride.gender_pref as "any" | "male" | "female") || "any");
+        setGenderPref(ride.gender_pref === "same_only" ? "same_only" : "any");
         setNotes(ride.notes || "");
       })
       .catch((err) => {
@@ -133,6 +133,12 @@ export default function PostRidePage() {
       })
       .finally(() => setLoadingEdit(false));
   }, [editRideId, profile]);
+
+  useEffect(() => {
+    if (!editRideId && profile?.gender_preference) {
+      setGenderPref(profile.gender_preference);
+    }
+  }, [editRideId, profile?.gender_preference]);
 
   function buildTime(
     baseDate: Date,
@@ -537,7 +543,7 @@ export default function PostRidePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Button
                   type="button"
                   variant={quietRide ? "default" : "outline"}
@@ -570,26 +576,15 @@ export default function PostRidePage() {
                   type="button"
                   variant={genderPref !== "any" ? "default" : "outline"}
                   className={[
-                    "h-14 flex-col gap-1 text-xs",
+                    "col-span-2 h-14 flex-col gap-1 text-xs sm:col-span-1",
                     genderPref !== "any"
                       ? "bg-blue-600 text-white"
                       : "bg-white text-zinc-700",
                   ].join(" ")}
-                  onClick={() => {
-                    const cycle = {
-                      any: "male" as const,
-                      male: "female" as const,
-                      female: "any" as const,
-                    };
-                    setGenderPref(cycle[genderPref]);
-                  }}
+                  onClick={() => setGenderPref(genderPref === "any" ? "same_only" : "any")}
                 >
                   <Users className="h-4 w-4" />
-                  {genderPref === "any"
-                    ? "Any gender"
-                    : genderPref === "male"
-                      ? "Male only"
-                      : "Female only"}
+                  {genderPref === "any" ? "Any gender" : "Same gender only"}
                 </Button>
               </div>
             </CardContent>

@@ -257,7 +257,7 @@ export default function MessagesPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search conversations..."
-                className="h-10 w-full rounded-full bg-zinc-100 pl-10 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-4 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
@@ -268,7 +268,7 @@ export default function MessagesPage() {
                 key={conv.id}
                 type="button"
                 className={[
-                  "w-full min-h-[72px] rounded-xl border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:shadow-md active:bg-zinc-50 touch-manipulation",
+                  "w-full min-h-[76px] rounded-2xl border bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_30px_rgba(37,99,235,0.09)] active:bg-zinc-50 touch-manipulation",
                   recentlyUpdated.has(conv.id)
                     ? "border-blue-300 ring-2 ring-blue-100"
                     : "border-zinc-200",

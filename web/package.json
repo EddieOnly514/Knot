@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:matching": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/matching/time.test.mjs"
+    "test:matching": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test src/lib/matching/*.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

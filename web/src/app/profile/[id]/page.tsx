@@ -22,28 +22,26 @@ import {
     Loader2,
 } from "lucide-react";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
-import type { Profile } from "@/contexts/AuthContext";
+import type { PublicProfile } from "@/contexts/AuthContext";
 
 export default function PublicProfilePage() {
     const router = useRouter();
     const params = useParams();
     const profileId = params.id as string;
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<PublicProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchProfile() {
             const supabase = getSupabaseClientOrThrow();
             const { data, error } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", profileId)
+                .rpc("get_public_profile", { p_profile_id: profileId })
                 .single();
 
             if (error) {
                 console.error("Error fetching profile:", error);
             } else {
-                setProfile(data);
+                setProfile(data as PublicProfile | null);
             }
             setLoading(false);
         }
@@ -215,7 +213,7 @@ export default function PublicProfilePage() {
                             {profile.gender_preference && profile.gender_preference !== "any" && (
                                 <Badge variant="outline" className="text-sm">
                                     <Users className="w-3 h-3 mr-1" />
-                                    {profile.gender_preference === "male" ? "Prefers Male" : "Prefers Female"}
+                                    Same gender group preferred
                                 </Badge>
                             )}
                         </div>

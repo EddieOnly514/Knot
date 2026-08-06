@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePathname, useRouter } from "next/navigation";
 import { getMyRides, cancelRide } from "@/lib/services/rideService";
 import { getMyRequests, respondToRequest, withdrawRequest } from "@/lib/services/matchService";
-import { findMatches, sendMatchRequest } from "@/lib/services/matchService";
+import { findMatches } from "@/lib/services/matchService";
 import type { RideRequest } from "@/lib/services/matchService";
 import { getSupabaseClientOrThrow } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -57,8 +57,7 @@ import {
   HOME_CACHE_TTL_MS,
   type HomeCache,
 } from "@/lib/homeCache";
-import { estimateSavingsDollars as estimateSavings } from "@/lib/estimateSavings";
-import { TripCardMeta } from "@/components/match-trip-meta";
+import { MatchCandidateCard, RideRequestCard } from "@/components/match-cards";
 
 function toErrorDetails(err: unknown): string {
   if (!err) return "";
@@ -81,158 +80,6 @@ function toErrorDetails(err: unknown): string {
     return "Unknown error";
   }
   return String(err);
-}
-
-function formatMatchTime(value: string | Date) {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-function compactRoute(origin: string, dest: string) {
-  return `${origin} → ${dest}`;
-}
-
-function RequestCard({
-  request,
-  variant,
-  busy,
-  onPrimary,
-  onSecondary,
-  onOpenProfile,
-  onOpenDetails,
-}: {
-  request: RideRequest;
-  variant: "incoming" | "outgoing";
-  busy: boolean;
-  onPrimary: () => void;
-  onSecondary?: () => void;
-  onOpenProfile: () => void;
-  onOpenDetails: () => void;
-}) {
-  const isIncoming = variant === "incoming";
-
-  return (
-    <Card
-      className={`cursor-pointer border bg-white shadow-sm transition-shadow hover:shadow-md ${isIncoming ? "border-blue-200" : "border-amber-200/80"
-        }`}
-      onClick={onOpenDetails}
-    >
-      <CardContent className="p-3">
-        <div className="flex items-center gap-2.5">
-          <Avatar
-            className="h-8 w-8 shrink-0 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenProfile();
-            }}
-          >
-            <AvatarImage src={request.requester_photo || undefined} />
-            <AvatarFallback
-              className={`text-sm font-medium ${isIncoming
-                ? "bg-blue-50 text-blue-600"
-                : "bg-amber-50 text-amber-600"
-                }`}
-            >
-              {request.requester_name[0]}
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-[15px] font-semibold leading-none text-zinc-900">
-                {request.requester_name}
-              </span>
-              {request.requester_school && (
-                <span className="text-[11px] text-zinc-500">
-                  {request.requester_school}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 truncate text-sm leading-tight text-zinc-700">
-              {request.requester_origin} → {request.requester_dest}
-            </p>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
-              <span>
-                {request.requester_departure
-                  ? formatMatchTime(request.requester_departure)
-                  : "—"}
-              </span>
-              <span>Party of {request.requester_seats}</span>
-            </div>
-          </div>
-
-          <div
-            className="flex flex-shrink-0 items-center gap-2 sm:gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isIncoming ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 min-h-[36px] flex-1 rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
-                  onClick={onSecondary}
-                  disabled={busy}
-                >
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Decline
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 min-h-[36px] flex-1 rounded-lg px-3 bg-blue-600 text-xs font-medium text-white hover:bg-blue-700 touch-manipulation sm:h-8 sm:min-h-0 sm:flex-initial"
-                  onClick={onPrimary}
-                  disabled={busy}
-                >
-                  {busy ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <>
-                      <Check className="mr-1 h-3 w-3" />
-                      Accept
-                    </>
-                  )}
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 min-h-[36px] rounded-lg px-3 border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 touch-manipulation sm:h-8 sm:min-h-0"
-                onClick={onPrimary}
-                disabled={busy}
-              >
-                {busy ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <>
-                    <XCircle className="mr-1 h-3 w-3" />
-                    Withdraw
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function estimateSavingsDollars(match: MatchCandidate) {
-  return estimateSavings(match.origin_name, match.dest_name);
-}
-
-function matchBadgeClasses(label: string) {
-  switch (label) {
-    case "Great Match":
-      return "bg-emerald-50 text-emerald-700";
-    case "Okay Match":
-      return "bg-amber-50 text-amber-700";
-    case "Possible Match":
-      return "bg-orange-50 text-orange-700";
-    default:
-      return "bg-zinc-100 text-zinc-700";
-  }
 }
 
 interface Ride {
@@ -265,107 +112,6 @@ interface RequestRideSnapshot {
   notes: string | null;
 }
 
-function SuggestedMatchCard({
-  match,
-  groupSize,
-  requesting,
-  onConnect,
-  onViewProfile,
-  onShowInfo,
-}: {
-  match: MatchCandidate;
-  groupSize?: number;
-  requesting: boolean;
-  onConnect: () => void;
-  onViewProfile: () => void;
-  onShowInfo: () => void;
-}) {
-  const isGroup = groupSize != null && groupSize >= 2;
-
-  return (
-    <Card
-      className="cursor-pointer overflow-hidden border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-      onClick={onShowInfo}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={match.photo_url || undefined} />
-            <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
-              {match.first_name?.[0] || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <p className="truncate text-sm font-semibold text-zinc-900">
-                  {match.first_name} {match.last_name?.[0] ? `${match.last_name[0]}.` : ""}
-                </p>
-                {match.d_origin_miles != null && (
-                  <span className="shrink-0 text-xs text-zinc-400">
-                    {match.d_origin_miles.toFixed(1)} mi
-                  </span>
-                )}
-              </div>
-              <Badge className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${matchBadgeClasses(match.match_label)}`}>
-                {match.match_label}
-              </Badge>
-            </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
-              {isGroup && (
-                <Badge variant="secondary" className="rounded-full bg-amber-100 px-2 py-0 text-[10px] font-semibold text-amber-800">
-                  Group of {groupSize}
-                </Badge>
-              )}
-              {match.school && <span className="text-zinc-500">{match.school}</span>}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-3.5">
-          <p className="truncate text-base font-semibold text-zinc-950">
-            {compactRoute(match.origin_name, match.dest_name)}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600">
-            <span>{formatMatchTime(match.departure_preferred ?? match.departure_earliest)}</span>
-            <span>{isGroup ? `${groupSize} riders` : `Party of ${match.seats_needed}`}</span>
-            <span>{match.d_origin_miles?.toFixed(1) ?? "?"} mi away</span>
-          </div>
-          <TripCardMeta
-            spaceCapacity={match.space_capacity}
-            needsXl={match.needs_xl}
-            savingsDollars={estimateSavingsDollars(match)}
-          />
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="outline"
-            className="h-9 rounded-full text-xs font-semibold"
-            onClick={onViewProfile}
-          >
-            View Profile
-          </Button>
-          <Button
-            className="h-9 rounded-full bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700"
-            onClick={onConnect}
-            disabled={requesting}
-          >
-            {requesting ? (
-              <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              "Match Request"
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function HomePage() {
   const { profile, loading, user } = useAuth();
   const router = useRouter();
@@ -387,9 +133,6 @@ export default function HomePage() {
     cacheIsValid ? (homeCache!.suggestedMatches as Record<string, MatchCandidate[]>) : {},
   );
   const [loadingMatches, setLoadingMatches] = useState(false);
-  const [requestingMatchRideId, setRequestingMatchRideId] = useState<string | null>(
-    null,
-  );
   const [loadingRides, setLoadingRides] = useState(!cacheIsValid);
   const [loadingRequests, setLoadingRequests] = useState(!cacheIsValid);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -706,27 +449,6 @@ export default function HomePage() {
     });
   }, [persistCache]);
 
-  const handleConnect = async (myRideId: string, targetRideId: string) => {
-    if (!myRideId) {
-      toast.error("Post a ride first to connect with matches");
-      return;
-    }
-    setRequestingMatchRideId(targetRideId);
-    try {
-      await sendMatchRequest(myRideId, targetRideId);
-      toast.success("Request sent");
-      removeSuggestedMatch(myRideId, targetRideId);
-      fetchRequests();
-      fetchSuggestedMatches();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : toErrorDetails(err);
-      console.error("[HomePage] Failed to send match request:", message, err);
-      toast.error(message || "Failed to send request");
-    } finally {
-      setRequestingMatchRideId(null);
-    }
-  };
-
   const hour = typeof window !== "undefined" ? new Date().getHours() : 12;
   const timeGreeting =
     hour >= 5 && hour < 12
@@ -738,16 +460,16 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       {/* ── Header with avatar greeting  ── */}
-      <section className="flex items-center justify-between gap-4">
+      <section className="flex items-center justify-between gap-4 rounded-[1.75rem] border border-blue-100/80 bg-gradient-to-br from-blue-50 via-white to-sky-50/70 p-5 sm:p-6">
         <div className="flex items-center gap-3 min-w-0">
-          <Avatar className="h-11 w-11 shrink-0">
+          <Avatar className="h-12 w-12 shrink-0 border-2 border-white shadow-md ring-1 ring-blue-100">
             <AvatarImage src={profile?.photo_url || undefined} />
             <AvatarFallback className="bg-blue-50 text-sm font-medium text-blue-600">
               {profile?.first_name?.[0] || "U"}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
+            <h1 className="text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl">
               {timeGreeting}{profile?.first_name ? `, ${profile.first_name}` : ""}
             </h1>
             <p className="text-sm text-zinc-500">
@@ -756,17 +478,17 @@ export default function HomePage() {
           </div>
         </div>
         <Button
-          className="h-11 min-h-[44px] shrink-0 rounded-full bg-[#0052FF] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[#0045DD] touch-manipulation"
+          className="h-11 min-h-[44px] shrink-0 rounded-xl bg-gradient-to-r from-[#075cff] to-[#2587ff] px-4 text-sm font-bold text-white shadow-[0_10px_22px_rgba(7,92,255,0.22)] hover:from-[#0751e5] hover:to-[#1676ef] touch-manipulation sm:px-5"
           onClick={() => router.push("/post")}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Post New Ride
+          Post ride
         </Button>
       </section>
 
       {/* Stats */}
       <section className="grid gap-3 md:grid-cols-3">
-        <Card className="border-zinc-200/80 bg-white">
+        <Card className="rounded-2xl border-zinc-200/70 bg-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
           <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-xs font-medium text-zinc-500">Total Saved</p>
@@ -779,7 +501,7 @@ export default function HomePage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-zinc-200/80 bg-white">
+        <Card className="rounded-2xl border-zinc-200/70 bg-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
           <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-xs font-medium text-zinc-500">Rides Shared</p>
@@ -792,7 +514,7 @@ export default function HomePage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-zinc-200/80 bg-white">
+        <Card className="rounded-2xl border-zinc-200/70 bg-white/90 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
           <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-xs font-medium text-zinc-500">CO2 Reduced</p>
@@ -818,7 +540,7 @@ export default function HomePage() {
             className="h-9 px-3 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700"
             onClick={() => router.push("/history")}
           >
-            View History
+            View history
           </Button>
         </div>
 
@@ -859,7 +581,7 @@ export default function HomePage() {
               return (
                 <Card
                   key={ride.id}
-                  className="cursor-pointer border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+                  className="cursor-pointer rounded-2xl border-zinc-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_32px_rgba(37,99,235,0.09)]"
                   onClick={() => router.push(`/post?edit=${ride.id}`)}
                 >
                   <CardContent className="p-4">
@@ -1040,7 +762,7 @@ export default function HomePage() {
                   className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
                   onClick={() => router.push("/post")}
                 >
-                  Edit Preferences
+                  Edit ride
                 </Button>
               </div>
             )}
@@ -1056,13 +778,15 @@ export default function HomePage() {
                 {rideMatches.map((item: MatchCandidate) => {
                   const targetRideId = item.request_target_ride_id;
                   return (
-                    <SuggestedMatchCard
+                    <MatchCandidateCard
                       key={item.candidate_id}
                       match={item}
-                      groupSize={item.candidate_type === "group" ? item.group_size_before_join : undefined}
-                      requesting={requestingMatchRideId === targetRideId}
-                      onConnect={() => handleConnect(ride.id, targetRideId)}
-                      onViewProfile={() => router.push(`/profile/${item.user_id}`)}
+                      myRideId={ride.id}
+                      onRequested={() => {
+                        removeSuggestedMatch(ride.id, targetRideId);
+                        fetchRequests();
+                        fetchSuggestedMatches();
+                      }}
                       onShowInfo={() => {
                         setDetailItem(item);
                         setDetailOpen(true);
@@ -1091,7 +815,7 @@ export default function HomePage() {
               className="mt-4 h-9 rounded-full border-zinc-300 px-5 text-xs font-semibold"
               onClick={() => router.push("/post")}
             >
-              Post a Ride
+              Post ride
             </Button>
           </div>
         </section>
@@ -1125,7 +849,7 @@ export default function HomePage() {
             {requests
               .filter((r) => r.direction === "outgoing" && r.status === "pending" && r.ride_status !== "completed")
               .map((req) => (
-                <RequestCard
+                <RideRequestCard
                   key={req.id}
                   request={req}
                   variant="outgoing"
@@ -1156,7 +880,7 @@ export default function HomePage() {
             {requests
               .filter((r) => r.direction === "incoming" && r.status === "pending" && r.ride_status !== "completed")
               .map((req) => (
-                <RequestCard
+                <RideRequestCard
                   key={req.id}
                   request={req}
                   variant="incoming"

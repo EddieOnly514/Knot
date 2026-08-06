@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const inter = Inter({
-  variable: "--font-inter",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -61,7 +61,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body suppressHydrationWarning className={`${inter.variable} font-sans antialiased bg-background`}>
+      <body suppressHydrationWarning className={`${manrope.variable} font-sans antialiased bg-background`}>
         <Providers>{children}</Providers>
       </body>
     </html>

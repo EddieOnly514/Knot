@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS waitlist_created_at_idx ON public.waitlist(created_at
 ALTER TABLE public.waitlist ENABLE ROW LEVEL SECURITY;
 
 -- Anyone can insert (for signup form)
+DROP POLICY IF EXISTS "Allow anonymous insert" ON public.waitlist;
 CREATE POLICY "Allow anonymous insert"
     ON public.waitlist
     FOR INSERT
@@ -25,6 +26,7 @@ CREATE POLICY "Allow anonymous insert"
     WITH CHECK (true);
 
 -- Only service role can read rows (for admin / stats from API)
+DROP POLICY IF EXISTS "Service role can read waitlist" ON public.waitlist;
 CREATE POLICY "Service role can read waitlist"
     ON public.waitlist
     FOR SELECT

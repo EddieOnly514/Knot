@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+const OUT=process.argv[2];
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const p = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+const reqs=[]; p.on('response', r => { if (/api|auth|scrape/.test(r.url()) && !/posthog|gtm|google/.test(r.url())) reqs.push(r.status()+' '+r.request().method()+' '+r.url().slice(0,120)); });
+await p.goto('https://www.olostep.com/playground', { waitUntil: 'networkidle' });
+await p.getByPlaceholder(/URL/i).first().fill('https://example.com');
+const t0=Date.now();
+await p.getByRole('button', { name: /start scraping/i }).click();
+await p.waitForTimeout(12000);
+console.log('url after click:', p.url(), 'ms', Date.now()-t0);
+console.log((await p.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').slice(0,900));
+console.log(reqs.slice(0,15).join('\n'));
+await p.screenshot({ path: `${OUT}/shots/playground_after_click.png` });
+await p.goto('https://www.olostep.com/auth', { waitUntil: 'networkidle' }); await p.waitForTimeout(1500);
+console.log('\nAUTH url:', p.url()); console.log((await p.evaluate(()=>document.body.innerText)).replace(/\s+/g,' ').slice(0,500));
+await p.screenshot({ path: `${OUT}/shots/auth_desktop.png` });
+await b.close();
